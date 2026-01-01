@@ -37,6 +37,7 @@ class Character extends GameObject
         this.renderOrder = 10;
         this.overkill = this.grenadeCount = this.walkCyclePercent = 0;
         this.grendeThrowTimer = new Timer;
+        this.maxFallVelocity = 0; // track maximum fall velocity for fall damage
         this.setCollision();
     }
     
@@ -89,6 +90,7 @@ class Character extends GameObject
             this.gravityScale = this.climbingWall = this.groundObject = 0;
             this.jumpTimer.unset();
             this.groundTimer.unset();
+            this.maxFallVelocity = 0; // reset fall velocity when climbing ladder
             this.velocity = this.velocity.multiply(vec2(.85)).add(vec2(0,.02*moveInput.y));
 
             const delta = (this.pos.x|0)+.5 - this.pos.x;
@@ -100,6 +102,14 @@ class Character extends GameObject
         }
         else
         {
+            // track fall velocity for fall damage (before physics update)
+            if (!this.groundObject && !this.climbingWall && !this.climbingLadder)
+            {
+                // falling - track maximum downward velocity
+                if (this.velocity.y < 0)
+                    this.maxFallVelocity = min(this.maxFallVelocity, this.velocity.y);
+            }
+
             // update jumping and ground check
             if (this.groundObject || this.climbingWall)
                 this.groundTimer.set(.1);
@@ -187,7 +197,38 @@ class Character extends GameObject
 
         // call parent, update physics
         const oldVelocity = this.velocity.copy();
+        const wasOnGroundBeforeUpdate = (this.groundObject || this.climbingWall || this.climbingLadder) ? 1 : 0;
         super.update();
+        
+        // check for fall damage after physics update (groundObject is now updated)
+        if (!this.climbingLadder && (this.groundObject || this.climbingWall))
+        {
+            // just landed - apply fall damage if falling fast enough
+            if (wasOnGroundBeforeUpdate == 0 && this.maxFallVelocity < 0)
+            {
+                // Calculate fall damage based on impact velocity
+                // Damage threshold: -0.6 (small falls don't hurt)
+                // Max damage at -1.2+ velocity (lethal falls)
+                const fallSpeed = -this.maxFallVelocity;
+                if (fallSpeed > 0.6)
+                {
+                    // Scale damage: 0.6 speed = 0 damage, 1.2+ speed = 1 damage (lethal)
+                    const damage = clamp((fallSpeed - 0.6) / 0.6, 0, 1);
+                    if (damage > 0)
+                    {
+                        this.damage(damage, null);
+                        // Play sound effect for fall damage
+                        if (damage > 0.5)
+                            playSound(sound_die, this.pos);
+                        else
+                            playSound(sound_walk, this.pos);
+                    }
+                }
+            }
+            // Reset fall velocity tracker after landing
+            this.maxFallVelocity = 0;
+        }
+        
         if (!this.isPlayer && !this.dodgeTimer.active())
         {
             // apply collision damage
@@ -207,10 +248,9 @@ class Character extends GameObject
         this.weapon.triggerIsDown = this.holdingShoot && !this.dodgeTimer.active() && !this.meleeTimer.active();
         if (!this.dodgeTimer.active())
         {
-            if (this.grenadeCount > 0 && this.pressingThrow && !this.wasPressingThrow && !this.grendeThrowTimer.active())
+            if (this.pressingThrow && !this.wasPressingThrow && !this.grendeThrowTimer.active())
             {
                 // throw greande
-                --this.grenadeCount;
                 const grenade = new Grenade(this.pos);
                 grenade.velocity = this.velocity.add(vec2(this.getMirrorSign(),rand(.8,.7)).normalize(.25+rand(.02)));
                 grenade.angleVelocity = this.getMirrorSign() * rand(.8,.5);
