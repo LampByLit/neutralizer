@@ -98,8 +98,17 @@ engineInit(
 
     // restart if no lives left
     let minDeadTime = 1e3;
+    let allPlayersDead = players.length > 0;
     for(const player of players)
+    {
+        if (player && !player.isDead())
+            allPlayersDead = 0;
         minDeadTime = min(minDeadTime, player && player.isDead() ? player.deadTimer.get() : 0);
+    }
+
+    // check for game over (all players dead and no lives left)
+    if (allPlayersDead && playerLives <= 0 && !gameOverTimer.isSet())
+        gameOverTimer.set();
 
     if (minDeadTime > 3 && (keyWasPressed(90) || keyWasPressed(32) || gamepadWasPressed(0)) || keyWasPressed(82))
         resetGame();
@@ -232,4 +241,17 @@ engineInit(
     // fade in level transition
     const fade = levelEndTimer.isSet() ? percent(levelEndTimer.get(), 3, 1) : percent(levelTimer.get(), .5, 2);
     drawRect(cameraPos, vec2(1e3), new Color(0,0,0,fade))
+
+    // game over text
+    if (gameOverTimer.isSet())
+    {
+        const gameOverFade = min(gameOverTimer.get() / 1.5, 1); // fade in over 1.5 seconds
+        const textAlpha = gameOverFade; // fade in text
+        
+        mainContext.textAlign = 'center';
+        mainContext.textBaseline = 'middle';
+        mainContext.fillStyle = new Color(1, 1, 1, textAlpha).rgba();
+        mainContext.font = 'bold 64px Inter';
+        mainContext.fillText('GAME OVER', mainCanvas.width/2, mainCanvas.height/2);
+    }
 });

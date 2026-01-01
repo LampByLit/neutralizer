@@ -27,7 +27,7 @@ let players=[], playerLives, tileLayer, tileBackgroundLayer, totalKills;
 let levelSize, level, levelSeed, levelEnemyCount, levelWarmup;
 let levelColor, levelBackgroundColor, levelSkyColor, levelSkyHorizonColor, levelGroundColor;
 let skyParticles, skyRain, skySoundTimer = new Timer;
-let gameTimer = new Timer, levelTimer = new Timer, levelEndTimer = new Timer;
+let gameTimer = new Timer, levelTimer = new Timer, levelEndTimer = new Timer, gameOverTimer = new Timer;
 
 let tileBackground;
 const setTileBackgroundData = (pos, data=0)=>
@@ -41,6 +41,7 @@ const getTileBackgroundData = (pos)=>
 const resetGame=()=>
 {
     levelEndTimer.unset();
+    gameOverTimer.unset();
     gameTimer.set(totalKills = level = 0);
     nextLevel();
 }
