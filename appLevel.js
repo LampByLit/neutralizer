@@ -27,9 +27,20 @@ let players=[], playerLives, tileLayer, tileBackgroundLayer, totalKills;
 let levelSize, level, levelSeed, levelEnemyCount, levelWarmup;
 let levelColor, levelBackgroundColor, levelSkyColor, levelSkyHorizonColor, levelGroundColor;
 let skyParticles, skyRain, skySoundTimer = new Timer;
-let gameTimer = new Timer, levelTimer = new Timer, levelEndTimer = new Timer, gameOverTimer = new Timer;
+let gameTimer = new Timer, levelTimer = new Timer, levelEndTimer = new Timer, gameOverTimer = new Timer, gameCompleteTimer = new Timer;
 
-let tileBackground;
+// level enemy limits: [maxEnemies, maxSlimes, maxBastards]
+const levelLimits = {
+    1: [20, 1, 0],
+    2: [40, 3, 0],
+    3: [50, 10, 1],
+    4: [20, 20, 5],
+    5: [100, 30, 20]
+};
+let levelMaxEnemies, levelMaxSlimes, levelMaxBastards;
+let totalEnemiesSpawned, totalSlimesSpawned, totalBastardsSpawned;
+
+let tileBackground, keyItemSpawned;
 const setTileBackgroundData = (pos, data=0)=>
     pos.arrayCheck(tileCollisionSize) && (tileBackground[(pos.y|0)*tileCollisionSize.x+pos.x|0] = data);
 const getTileBackgroundData = (pos)=>
@@ -42,6 +53,7 @@ const resetGame=()=>
 {
     levelEndTimer.unset();
     gameOverTimer.unset();
+    gameCompleteTimer.unset();
     gameTimer.set(totalKills = level = 0);
     nextLevel();
 }
@@ -156,8 +168,12 @@ function spawnProps(pos)
     }
 }
 
-function buildBase(totalSlimesSpawnedRef)
+function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalEnemiesSpawnedRef)
 {
+    // check if we've hit limits
+    if (totalEnemiesSpawnedRef.value >= levelMaxEnemies)
+        return 1; // reached max enemies
+    
     let raycastHit;
     for(let tries=99;!raycastHit;)
     {
@@ -280,27 +296,58 @@ function buildBase(totalSlimesSpawnedRef)
             let slimeSpawned = 0;
             for(let i = enemyCount; i--;)
             {
+                // check limits before spawning
+                if (totalEnemiesSpawnedRef.value >= levelMaxEnemies)
+                    break;
+                
                 const pos = floorBottomCenterPos.add(vec2(randSeeded( floorWidth-1,-floorWidth+1),.7));
-                // On level 1, only spawn 1 slime total. On other levels, ensure at least one slime spawns per level, with chance for more
-                let slimeChance = 0;
-                if (level == 1)
+                
+                // decide what to spawn: slime, bastard, or regular enemy
+                let spawnSlime = 0;
+                let spawnBastard = 0;
+                
+                // Bastards only spawn from level 3+
+                if (level >= 3 && totalBastardsSpawnedRef.value < levelMaxBastards)
                 {
-                    // Level 1: only spawn 1 slime total
-                    slimeChance = totalSlimesSpawnedRef.value == 0 ? 1.0 : 0;
+                    // Chance to spawn bastard based on level
+                    let bastardChance = level == 3 ? 0.1 : (level == 4 ? 0.25 : 0.2); // 10% level 3, 25% level 4, 20% level 5
+                    if (randSeeded() < bastardChance)
+                        spawnBastard = 1;
                 }
-                else
+                
+                // If not spawning bastard, check for slime
+                if (!spawnBastard && totalSlimesSpawnedRef.value < levelMaxSlimes)
                 {
-                    // Other levels: ensure at least one slime spawns per level, with chance for more
-                    slimeChance = !slimeSpawned ? 1.0 : (level >= 3 ? min((level - 2) * 0.1, 0.3) : 0.1);
+                    // we can still spawn slimes, use chance-based logic
+                    if (level == 1)
+                    {
+                        spawnSlime = totalSlimesSpawnedRef.value == 0 ? 1 : 0;
+                    }
+                    else
+                    {
+                        // prefer slimes if we haven't spawned any yet, otherwise use chance
+                        spawnSlime = !slimeSpawned ? 1 : (randSeeded() < 0.3);
+                    }
                 }
-                if (randSeeded() < slimeChance)
+                
+                if (spawnBastard)
+                {
+                    new Bastard(pos);
+                    ++totalBastardsSpawnedRef.value;
+                    ++totalEnemiesSpawnedRef.value;
+                }
+                else if (spawnSlime)
                 {
                     new Slime(pos);
                     slimeSpawned = 1;
                     ++totalSlimesSpawnedRef.value;
+                    ++totalEnemiesSpawnedRef.value;
                 }
                 else
+                {
                     new Enemy(pos);
+                    ++totalEnemiesSpawnedRef.value;
+                }
             }
         }
 
@@ -313,8 +360,8 @@ function buildBase(totalSlimesSpawnedRef)
 
     //checkpointPos = floorBottomCenterPos.copy(); // start player on base for testing
 
-    // spawn random enemies and props
-    for(let i=20;levelEnemyCount>0&&i--;)
+        // spawn random enemies and props
+    for(let i=20;totalEnemiesSpawnedRef.value < levelMaxEnemies && i--;)
     {
         const pos = vec2(floorBottomCenterPos.x + randSeeded(99, -99), levelSize.y);
         raycastHit = tileCollisionRaycast(pos, vec2(pos.x, 0));
@@ -322,7 +369,37 @@ function buildBase(totalSlimesSpawnedRef)
         if (raycastHit && abs(checkpointPos.x-pos.x) > 20)
         {
             const pos = raycastHit.add(vec2(0,2));
-            randSeeded() < .7 ? new Enemy(pos) : spawnProps(pos);
+            if (randSeeded() < .7)
+            {
+                // spawn enemy (not slime in random spawns)
+                new Enemy(pos);
+                ++totalEnemiesSpawnedRef.value;
+            }
+            else
+                spawnProps(pos);
+        }
+    }
+
+    // spawn key item in random base (only one per level)
+    if (!keyItemSpawned && randSeeded() < .3) // 30% chance per base
+    {
+        // Find a good spot for the key - try a few positions
+        let keyPlaced = 0;
+        for(let attempts=10; !keyPlaced && attempts--;)
+        {
+            const keyX = floorBottomCenterPos.x + randSeeded(floorWidth-2, -floorWidth+2);
+            const keyY = floorBottomCenterPos.y - randSeeded(3, 0);
+            const keyPos = vec2(keyX, keyY);
+
+            // Check if position is valid (solid ground below, empty space)
+            if (getTileCollisionData(keyPos) <= 0 &&
+                getTileCollisionData(keyPos.add(vec2(0,1))) > 0 &&
+                abs(checkpointPos.x - keyPos.x) > 15) // not too close to start
+            {
+                new KeyItem(keyPos.add(vec2(0, .5)));
+                keyItemSpawned = 1;
+                keyPlaced = 1;
+            }
         }
     }
 }
@@ -331,11 +408,27 @@ function generateLevel()
 {
     levelEndTimer.unset();
 
+    // explicitly destroy tile layers and sky particles before destroying all objects
+    if (tileLayer)
+        tileLayer.destroy();
+    if (tileBackgroundLayer)
+        tileBackgroundLayer.destroy();
+    if (skyParticles)
+        skyParticles.destroy();
+
     // remove all objects that are not persistnt or are descendants of something persitant
     for(const o of engineObjects)
         o.destroy();
     engineObjects = [];
     engineCollideObjects = [];
+
+    // clear tile layer references
+    tileLayer = null;
+    tileBackgroundLayer = null;
+    skyParticles = null;
+
+    // reset key item spawn flag
+    keyItemSpawned = 0;
 
     // randomize ground level hills
     buildTerrain(levelSize);
@@ -353,18 +446,28 @@ function generateLevel()
     }
     checkpointPos = raycastHit.add(vec2(0,1));
 
-    // track total slimes spawned for this level
-    const totalSlimesSpawned = { value: 0 };
+    // track total enemies, slimes, and bastards spawned for this level
+    totalEnemiesSpawned = 0;
+    totalSlimesSpawned = 0;
+    totalBastardsSpawned = 0;
+    const totalSlimesSpawnedRef = { value: 0 };
+    const totalBastardsSpawnedRef = { value: 0 };
+    const totalEnemiesSpawnedRef = { value: 0 };
 
-    // random bases until there enough enemies
-    for(let tries=99;levelEnemyCount>0;)
+    // random bases until we hit enemy limits
+    for(let tries=99;totalEnemiesSpawnedRef.value < levelMaxEnemies;)
     {
         if (!tries--)
-            return 1; // count not spawn enemies
+            break; // stop if we can't spawn more bases
 
-        if (buildBase(totalSlimesSpawned))
-            return 1;
+        if (buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalEnemiesSpawnedRef))
+            break; // stop if buildBase returns error or limit reached
     }
+    
+    // sync the refs back to globals
+    totalEnemiesSpawned = totalEnemiesSpawnedRef.value;
+    totalSlimesSpawned = totalSlimesSpawnedRef.value;
+    totalBastardsSpawned = totalBastardsSpawnedRef.value;
 
     // build checkpoints
     for(let x=0; x<levelSize.x-9; )
@@ -493,10 +596,11 @@ function applyArtToLevel()
 
     if (precipitationEnable && !lowGraphicsSettings)
     {
-        // create rain or snow particles
-        if (skyRain = rand() < .5)
+        // Level 1 always has heavy rain, other levels randomly choose rain or snow
+        if (level == 1)
         {
-            // rain
+            // Level 1: heavy rain
+            skyRain = 1;
             skyParticles = new ParticleEmitter(
                 vec2(), 3, 0, 0, .3, // pos, emitSize, emitTime, emitRate, emiteCone
                 0, undefined,   // tileIndex, tileSize
@@ -508,30 +612,57 @@ function applyArtToLevel()
             );
             skyParticles.elasticity = .2;
             skyParticles.trailScale = 2;
+            skyParticles.emitRate = 800; // Heavy rain for level 1
+            skyParticles.angle = PI+rand(.5,-.5);
         }
         else
         {
-            // snow
-            skyParticles = new ParticleEmitter(
-                vec2(), 3, 0, 0, .5, // pos, emitSize, emitTime, emitRate, emiteCone
-                0, undefined,   // tileIndex, tileSize
-                new Color(1,1,1,.8), new Color(1,1,1,.2), // colorStartA, colorStartB
-                new Color(1,1,1,.8), new Color(1,1,1,.2), // colorEndA, colorEndB
-                3, .1, .1, .3, .01,  // particleTime, sizeStart, sizeEnd, particleSpeed, particleAngleSpeed
-                .98, 1, .2, PI, .2,  // damping, angleDamping, gravityScale, particleCone, fadeRate, 
-                .5, 1              // randomness, collide, additive, randomColorLinear, renderOrder
-            );
+            // Other levels: randomly choose rain or snow
+            if (skyRain = rand() < .5)
+            {
+                // rain
+                skyParticles = new ParticleEmitter(
+                    vec2(), 3, 0, 0, .3, // pos, emitSize, emitTime, emitRate, emiteCone
+                    0, undefined,   // tileIndex, tileSize
+                    new Color(.8,1,1,.6), new Color(.5,.5,1,.2), // colorStartA, colorStartB
+                    new Color(.8,1,1,.6), new Color(.5,.5,1,.2), // colorEndA, colorEndB
+                    2, .1, .1, .2, 0,  // particleTime, sizeStart, sizeEnd, particleSpeed, particleAngleSpeed
+                    .99, 1, .5, PI, .2,  // damping, angleDamping, gravityScale, particleCone, fadeRate, 
+                    .5, 1              // randomness, collide, additive, randomColorLinear, renderOrder
+                );
+                skyParticles.elasticity = .2;
+                skyParticles.trailScale = 2;
+            }
+            else
+            {
+                // snow
+                skyParticles = new ParticleEmitter(
+                    vec2(), 3, 0, 0, .5, // pos, emitSize, emitTime, emitRate, emiteCone
+                    0, undefined,   // tileIndex, tileSize
+                    new Color(1,1,1,.8), new Color(1,1,1,.2), // colorStartA, colorStartB
+                    new Color(1,1,1,.8), new Color(1,1,1,.2), // colorEndA, colorEndB
+                    3, .1, .1, .3, .01,  // particleTime, sizeStart, sizeEnd, particleSpeed, particleAngleSpeed
+                    .98, 1, .2, PI, .2,  // damping, angleDamping, gravityScale, particleCone, fadeRate, 
+                    .5, 1              // randomness, collide, additive, randomColorLinear, renderOrder
+                );
+            }
+            skyParticles.emitRate = precipitationEnable && rand()<.5 ? rand(500) : 0;
+            skyParticles.angle = PI+rand(.5,-.5);
         }
-        skyParticles.emitRate = precipitationEnable && rand()<.5 ? rand(500) : 0;
-        skyParticles.angle = PI+rand(.5,-.5);
     }
 }
 
 function nextLevel()
 {
     playerLives = level == 0 ? 3 : playerLives + 4; // start with 3 lives, then add 4 for beating a level plus 1 for respawning
-    levelEnemyCount = 15 + min(level * 30, 300);
     ++level;
+    
+    // set level limits
+    const limits = levelLimits[level] || levelLimits[5]; // use level 5 limits for levels beyond 5
+    levelMaxEnemies = limits[0];
+    levelMaxSlimes = limits[1];
+    levelMaxBastards = limits[2];
+    levelEnemyCount = levelMaxEnemies; // keep for compatibility with existing code
     levelSeed = randSeed = rand(1e9)|0;
     levelSize = level == 1 ? vec2(300,200) : vec2(min(level*99,400),200);
     levelColor = randColor(new Color(.2,.2,.2), new Color(.8,.8,.8));

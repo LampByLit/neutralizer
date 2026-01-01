@@ -110,11 +110,17 @@ engineInit(
     if (allPlayersDead && playerLives <= 0 && !gameOverTimer.isSet())
         gameOverTimer.set();
 
-    if (minDeadTime > 3 && (keyWasPressed(90) || keyWasPressed(32) || gamepadWasPressed(0)) || keyWasPressed(82))
+    if (minDeadTime > 3 && (keyWasPressed(90) || keyWasPressed(32) || gamepadWasPressed(0)))
         resetGame();
 
     if (levelEndTimer.get() > 3)
-        nextLevel();
+    {
+        // End game after level 5
+        if (level >= 5)
+            gameCompleteTimer.set();
+        else
+            nextLevel();
+    }
 },
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -253,5 +259,18 @@ engineInit(
         mainContext.fillStyle = new Color(1, 1, 1, textAlpha).rgba();
         mainContext.font = 'bold 64px Inter';
         mainContext.fillText('GAME OVER', mainCanvas.width/2, mainCanvas.height/2);
+    }
+
+    // game complete text
+    if (gameCompleteTimer.isSet())
+    {
+        const gameCompleteFade = min(gameCompleteTimer.get() / 1.5, 1); // fade in over 1.5 seconds
+        const textAlpha = gameCompleteFade; // fade in text
+        
+        mainContext.textAlign = 'center';
+        mainContext.textBaseline = 'middle';
+        mainContext.fillStyle = new Color(1, 1, 1, textAlpha).rgba();
+        mainContext.font = 'bold 64px Inter';
+        mainContext.fillText('YOU WIN!', mainCanvas.width/2, mainCanvas.height/2);
     }
 });

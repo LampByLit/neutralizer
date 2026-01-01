@@ -14,6 +14,14 @@ const glEnable = 1;     // can run without gl (texured coloring will be disabled
 let glCanvas, glContext, glTileTexture, glShader, glPositionData, glColorData, 
     glBatchCount, glDirty, glAdditive, glShrinkTilesX, glShrinkTilesY, glOverlay;
 
+function glIsContextValid()
+{
+    if (!glEnable || !glContext) return false;
+    const lost = glContext.isContextLost();
+    if (lost) return false;
+    return true;
+}
+
 function glInit()
 {
     if (!glEnable) return;
@@ -21,6 +29,25 @@ function glInit()
     // create the canvas and tile texture
     glCanvas = document.createElement('canvas');
     glContext = glCanvas.getContext('webgl', {antialias:!pixelated});
+    
+    // handle WebGL context loss
+    if (glContext)
+    {
+        glCanvas.addEventListener('webglcontextlost', (e)=>
+        {
+            e.preventDefault();
+            console.warn('WebGL context lost - attempting recovery');
+        }, false);
+        
+        glCanvas.addEventListener('webglcontextrestored', ()=>
+        {
+            console.warn('WebGL context restored - reinitializing');
+            glTileTexture = glCreateTexture(tileImage);
+            glContext.texParameteri(gl_TEXTURE_2D, gl_TEXTURE_MIN_FILTER, pixelated ? gl_NEAREST : gl_LINEAR);
+            glContext.texParameteri(gl_TEXTURE_2D, gl_TEXTURE_MAG_FILTER, pixelated ? gl_NEAREST : gl_LINEAR);
+        }, false);
+    }
+    
     glTileTexture = glCreateTexture(tileImage);
     glShrinkTilesX = tileBleedShrinkFix/tileImageSize.x;
     glShrinkTilesY = tileBleedShrinkFix/tileImageSize.y;
@@ -84,7 +111,7 @@ function glInit()
 
 function glSetBlendMode(additive)
 {
-    if (!glEnable) return;
+    if (!glEnable || !glIsContextValid()) return;
         
     if (additive != glAdditive)
         glFlush();
@@ -132,7 +159,7 @@ function glCreateProgram(vsSource, fsSource)
 
 function glCreateBuffer(bufferType, size, usage)
 {
-    if (!glEnable) return;
+    if (!glEnable || !glIsContextValid()) return;
 
     // build the buffer
     const buffer = glContext.createBuffer();
@@ -143,7 +170,7 @@ function glCreateBuffer(bufferType, size, usage)
 
 function glCreateTexture(image)
 {
-    if (!glEnable) return;
+    if (!glEnable || !glIsContextValid()) return;
 
     // build the texture
     const texture = glContext.createTexture();
@@ -154,7 +181,7 @@ function glCreateTexture(image)
 
 function glPreRender(width, height)
 {
-    if (!glEnable) return;
+    if (!glEnable || !glIsContextValid()) return;
 
     // clear and set to same size as main canvas
     glCanvas.width = width;
@@ -180,7 +207,7 @@ function glPreRender(width, height)
 
 function glFlush()
 {
-    if (!glEnable) return;
+    if (!glEnable || !glIsContextValid()) return;
     if (!glBatchCount)
         return;
 
@@ -192,7 +219,7 @@ function glFlush()
 
 function glCopyToContext(context, forceDraw)
 {
-    if (!glEnable) return;
+    if (!glEnable || !glIsContextValid()) return;
     if (!glDirty)  return;
     
     // draw any sprites still in the buffer, copy to main canvas and clear
@@ -208,7 +235,7 @@ function glCopyToContext(context, forceDraw)
 
 function glDraw(x, y, sizeX, sizeY, angle, mirror, uv0X, uv0Y, uv1X, uv1Y, abgr, abgrAdditive)
 {
-    if (!glEnable) return;
+    if (!glEnable || !glIsContextValid()) return;
     
     // flush if there is no room for more verts
     if (glBatchCount >= MAX_BATCH)

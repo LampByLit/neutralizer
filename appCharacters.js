@@ -245,7 +245,8 @@ class Character extends GameObject
         else
             this.walkCyclePercent = 0;
 
-        this.weapon.triggerIsDown = this.holdingShoot && !this.dodgeTimer.active() && !this.meleeTimer.active();
+        if (this.weapon)
+            this.weapon.triggerIsDown = this.holdingShoot && !this.dodgeTimer.active() && !this.meleeTimer.active();
         if (!this.dodgeTimer.active())
         {
             if (this.pressingThrow && !this.wasPressingThrow && !this.grendeThrowTimer.active())
@@ -429,7 +430,8 @@ const type_strong = 2;
 const type_elite  = 3;
 const type_grenade= 4;
 const type_slime  = 5;
-const type_count  = 6;
+const type_bastard= 6;
+const type_count  = 7;
 
 function alertEnemies(pos, playerPos)
 {
@@ -854,6 +856,238 @@ class Slime extends Enemy
             const eyeColor = this.eyeColor.scale(this.burnColorPercent(), 1);
             const blinkScale = this.canBlink ? .5 + .5*Math.cos(this.blinkTimer.getPercent()*PI*2) : 1;
             drawTile(this.pos.add(vec2(this.getMirrorSign(.05),.46).scale(sizeScale).rotate(-this.angle)),vec2(sizeScale/2, blinkScale*sizeScale/2),this.headTile+1,vec2(8), eyeColor, this.angle, this.mirror, this.additiveColor);
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class Bastard extends Enemy
+{
+    constructor(pos) 
+    { 
+        super(pos);
+        
+        // Override type to be bastard
+        this.type = type_bastard;
+        
+        // Bastard is fast and agile
+        this.size = this.size.scale(this.sizeScale = 1.0);
+        this.health = this.healthMax = 2; // Moderate health
+        this.maxSpeed = maxCharacterSpeed * 1.5; // 50% faster than normal
+        
+        // Unique sprite - use tile 20 for body (assuming it's available)
+        this.bodyTile = 20;
+        this.headTile = 2; // Use same head tile as normal enemies
+        
+        // Reddish/orange color to distinguish from other enemies
+        this.color = new Color(1, 0.4, 0);
+        this.eyeColor = new Color(1, 0, 0);
+        
+        // Remove weapon - bastard is melee only
+        if (this.weapon)
+        {
+            this.weapon.destroy();
+            this.weapon = null;
+        }
+        
+        // Enhanced vision range for aggressive chasing
+        this.maxVisionRange = 15;
+        
+        // Melee attack timer for aggressive melee attacks
+        this.meleeAttackTimer = new Timer;
+        this.meleeCooldownTimer = new Timer;
+        
+        // Don't burn (optional - can remove if you want them to burn)
+        // this.canBurn = 0;
+    }
+    
+    update()
+    {
+        if (!aiEnable || levelWarmup || this.isDead() || !this.inUpdateWindow())
+        {
+            // Call Character.update() directly, not Enemy.update() since we have no weapon
+            Character.prototype.update.call(this);
+            return;
+        }
+
+        // update check if players are visible (same as Enemy)
+        const sightCheckFrames = 9;
+        ASSERT(this.sawPlayerPos || !this.sawPlayerTimer.isSet());
+        if (frame%sightCheckFrames == this.sightCheckFrame)
+        {
+            const sawRecently = this.sawPlayerTimer.isSet() && this.sawPlayerTimer.get() < 5;
+            const visionRangeSquared = (sawRecently ? this.maxVisionRange * 1.2 : this.maxVisionRange)**2;
+            debugAI && debugCircle(this.pos, visionRangeSquared**.5, '#f003', .1);
+            for(const player of players)
+            {
+                if (player && !player.isDead())
+                if (sawRecently || this.getMirrorSign() == sign(player.pos.x - this.pos.x))
+                if (sawRecently || abs(player.pos.x - this.pos.x) > abs(player.pos.y - this.pos.y))
+                if (this.pos.distanceSquared(player.pos) < visionRangeSquared)
+                {
+                    const raycastHit = tileCollisionRaycast(this.pos, player.pos);
+                    if (!raycastHit)
+                    {
+                        this.alert(player.pos, 1);
+                        debugAI && debugLine(this.pos, player.pos, '#0f0',.1)
+                        break;
+                    }
+                    debugAI && debugLine(this.pos, player.pos, '#f00',.1)
+                    debugAI && raycastHit && debugPoint(raycastHit, '#ff0',.1)
+                }
+            }
+
+            if (sawRecently)
+            {
+                alertEnemies(this.pos, this.sawPlayerPos);
+            }
+        }
+
+        this.pressedDodge = this.climbingWall = this.pressingThrow = 0;
+        
+        if (this.burnTimer.isSet())
+        {
+            // burning, run around
+            this.facePlayerTimer.unset();
+            if (rand()< .005)
+            {
+                this.pressedJumpTimer.set(.05);
+                this.holdJumpTimer.set(rand(.05));
+            }
+            if (rand()<.05)
+                this.moveInput.x = randSign()*rand(.6, .3);
+            this.moveInput.y = 0;
+        }
+        else if (this.sawPlayerTimer.isSet() && this.sawPlayerTimer.get() < 10)
+        {
+            debugAI && debugPoint(this.sawPlayerPos, '#f00');
+
+            // Aggressive wall climbing - bastard climbs walls like strong enemies
+            if (this.moveInput.x && !this.velocity.x && this.velocity.y < 0)
+            {
+                this.velocity.y *=.8;
+                this.climbingWall = 1;
+                this.pressedJumpTimer.set(.1);
+                this.holdJumpTimer.set(rand(.2));
+            }
+            
+            const timeSinceSawPlayer = this.sawPlayerTimer.get();
+            if (this.reactionTimer.active())
+            {
+                // just saw player for first time, act surprised
+                this.moveInput.x = 0;
+            }
+            else if (timeSinceSawPlayer < 5)
+            {
+                debugAI && debugRect(this.pos, this.size, '#f00');
+                    
+                if (!this.dodgeTimer.active())
+                {
+                    const playerDirection = sign(this.sawPlayerPos.x - this.pos.x);
+                    const playerDistance = this.pos.distance(this.sawPlayerPos);
+                    
+                    // Aggressive melee attack when close
+                    if (playerDistance < 2.5 && !this.meleeCooldownTimer.isSet())
+                    {
+                        this.pressedMelee = 1;
+                        this.meleeCooldownTimer.set(1.5); // Cooldown between melee attacks
+                    }
+                    
+                    if (rand()<.05)
+                        this.facePlayerTimer.set(rand(2,.5));
+
+                    // Frequent aggressive jumps
+                    if (rand()<.02) // Much more frequent than normal enemies
+                    {
+                        this.pressedJumpTimer.set(.1);
+                        this.holdJumpTimer.set(rand(.2));
+                    }
+                    
+                    // Aggressive movement towards player
+                    if (rand()<.01)
+                        this.moveInput.x = 0;
+                    else
+                        this.moveInput.x = playerDirection * rand(.8, .5); // Move faster towards player
+                    
+                    // Aggressive ladder climbing - always try to climb towards player
+                    if (rand()<.05)
+                        this.moveInput.y = 0;
+                    else
+                        this.moveInput.y = clamp(this.sawPlayerPos.y - this.pos.y, .8, -.8); // Aggressive vertical movement
+                }
+            }
+            else
+            {
+                // was fighting but lost player - still aggressive
+                debugAI && debugRect(this.pos, this.size, '#ff0');
+
+                if (rand()<.04)
+                    this.facePlayerTimer.set(rand(2,.5));
+
+                if (rand()<.02)
+                    this.moveInput.x = 0;
+                else if (rand()<.01)
+                    this.moveInput.x = randSign()*rand(.4, .2);
+
+                // Still jump when searching
+                if (rand() < .01)
+                {
+                    this.pressedJumpTimer.set(.1);
+                    this.holdJumpTimer.set(rand(.2));
+                }
+                
+                // Move up/down in direction last player was seen
+                this.moveInput.y = clamp(this.sawPlayerPos.y - this.pos.y,.8,-.8);
+            }
+        }
+        else
+        {
+            // try to act normal
+            if (rand()<.03)
+                this.moveInput.x = 0;
+            else if (rand()<.005)
+                this.moveInput.x = randSign()*rand(.2, .1);
+            else if (rand()<.001)
+                this.moveInput.x = randSign()*1e-9;
+        }
+
+        this.holdingShoot = 0; // No shooting for bastard
+        this.holdingJump = this.holdJumpTimer.active();
+
+        // Call Character.update() directly instead of Enemy.update() to avoid weapon access
+        Character.prototype.update.call(this);
+        
+        // Override velocity clamping to allow faster movement than normal enemies
+        // Character.update() already applied acceleration clamped to maxCharacterSpeed
+        // Now we allow it to go up to maxSpeed (1.5x faster) by continuing acceleration
+        if (this.moveInput.x && abs(this.velocity.x) < this.maxSpeed)
+        {
+            // Continue accelerating if we haven't reached maxSpeed yet
+            this.velocity.x = clamp(this.velocity.x + this.moveInput.x * .042, this.maxSpeed, -this.maxSpeed);
+        }
+        // Ensure velocity doesn't exceed maxSpeed
+        if (abs(this.velocity.x) > this.maxSpeed)
+            this.velocity.x = sign(this.velocity.x) * this.maxSpeed;
+
+        // override default mirror to face player
+        if (this.facePlayerTimer.active() && !this.dodgeTimer.active() && !this.reactionTimer.active())
+            this.mirror = this.sawPlayerPos.x < this.pos.x;
+    }
+
+    alert(playerPos, resetSawPlayer)
+    {
+        if (resetSawPlayer || !this.sawPlayerTimer.isSet())
+        {
+            if (!this.reactionTimer.isSet())
+            {
+                this.reactionTimer.set(rand(.5,.3)); // Faster reaction than normal enemies
+                this.facePlayerTimer.set(rand(2,1));
+                if (this.groundObject && rand() < .3) // More likely to jump when alerted
+                    this.pressedJumpTimer.set(.1);
+            }
+            this.sawPlayerPos = playerPos.copy();
+            this.sawPlayerTimer.set();
         }
     }
 }

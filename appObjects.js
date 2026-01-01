@@ -403,6 +403,104 @@ class Grenade extends GameObject
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class KeyItem extends GameObject
+{
+    constructor(pos)
+    {
+        super(pos, vec2(.5,.5), -1, vec2(8)); // No sprite needed, use -1 for untextured
+
+        this.health = this.healthMax = 1e3; // Indestructible
+        this.canBurn = 0; // Can't be burned
+        this.setCollision(1, 1);
+        this.renderOrder = 1e9; // Draw on top
+        this.color = new Color(1, 1, 0); // Yellow/gold color
+        this.additiveColor = new Color(0.5, 0.5, 0); // Golden glow
+        this.isKeyItem = 1;
+
+        // Gentle floating animation
+        this.floatTimer = 0;
+        this.originalY = pos.y;
+    }
+
+    update()
+    {
+        super.update();
+
+        // Gentle floating up and down
+        this.floatTimer += timeDelta;
+        this.pos.y = this.originalY + Math.sin(this.floatTimer * 2) * 0.1;
+
+        // Check for player collision
+        for(const player of players)
+        {
+            if (player && !player.isDead() && this.pos.distanceSquared(player.pos) < 1)
+            {
+                this.collect(player);
+                break;
+            }
+        }
+    }
+
+    collect(player)
+    {
+        // Play collection sound
+        playSound(sound_checkpoint, this.pos);
+
+        // Create particle effect
+        const emitter = new ParticleEmitter(
+            this.pos, .5, .2, 200, PI, // pos, emitSize, emitTime, emitRate, emiteCone
+            0, undefined,     // tileIndex, tileSize
+            new Color(1,1,0,.8), new Color(1,1,0,.2), // colorStartA, colorStartB
+            new Color(1,1,0,0), new Color(1,1,0,0), // colorEndA, colorEndB
+            .3, .5, .1, .1, .1, // particleTime, sizeStart, sizeEnd, particleSpeed, particleAngleSpeed
+            1, 1, .5, PI, .1,  // damping, angleDamping, gravityScale, particleCone, fadeRate,
+            .5, 1, 1           // randomness, collide, additive, randomColorLinear, renderOrder
+        );
+
+        // Mark level as won by collecting key
+        levelEndTimer.set();
+
+        // Destroy the key item
+        this.destroy();
+    }
+
+    render()
+    {
+        // Draw glowing golden circle with multiple layers for glow effect
+        const baseRadius = 0.25;
+        const glowLayers = [
+            { radius: 0.5, alpha: 0.15 },
+            { radius: 0.4, alpha: 0.25 },
+            { radius: 0.3, alpha: 0.4 },
+            { radius: baseRadius, alpha: 1.0 }
+        ];
+
+        // Outer glow layers with additive blending
+        setBlendMode(1); // Additive blend for glow
+        for(let i = 0; i < glowLayers.length - 1; i++)
+        {
+            const layer = glowLayers[i];
+            drawCanvas2D(this.pos, vec2(layer.radius * 2), 0, 0, (ctx) => {
+                ctx.fillStyle = new Color(1, 0.85, 0, layer.alpha).rgba();
+                ctx.beginPath();
+                ctx.arc(0, 0, 0.5, 0, PI * 2);
+                ctx.fill();
+            });
+        }
+        setBlendMode(0); // Back to normal blend
+
+        // Main circle
+        drawCanvas2D(this.pos, vec2(baseRadius * 2), 0, 0, (ctx) => {
+            ctx.fillStyle = new Color(1, 0.85, 0, 1).rgba();
+            ctx.beginPath();
+            ctx.arc(0, 0, 0.5, 0, PI * 2);
+            ctx.fill();
+        });
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 class Weapon extends EngineObject 
 {
     constructor(pos, parent) 
