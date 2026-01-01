@@ -12,6 +12,16 @@ const startCameraScale = 4*16;
 const defaultCameraScale = 4*16;
 const maxPlayers = 4;
 
+// Title image
+const titleImage = new Image();
+titleImage.onload = function() {
+    // Image loaded successfully
+};
+titleImage.onerror = function() {
+    console.warn('Failed to load title.png');
+};
+titleImage.src = 'title.png';
+
 const team_none = 0;
 const team_player = 1;
 const team_enemy = 2;
@@ -21,9 +31,9 @@ let updateWindowSize, renderWindowSize, gameplayWindowSize;
 engineInit(
 
 ///////////////////////////////////////////////////////////////////////////////
-()=> // appInit 
+()=> // appInit
 {
-    resetGame();
+    gameState = 'title';
     cameraScale = startCameraScale;
 },
 
@@ -37,6 +47,13 @@ engineInit(
     updateWindowSize = gameplayWindowSize.add(vec2(30));
     //debugRect(cameraPos, maxGameplayCameraSize);
     //debugRect(cameraPos, updateWindowSize);
+
+    // handle title screen input
+    if (gameState === 'title' && (keyWasPressed(32) || gamepadWasPressed(0)))
+    {
+        gameState = 'playing';
+        resetGame();
+    }
 
     if (debug)
     {
@@ -76,7 +93,7 @@ engineInit(
 
         if (mouseWheel) // mouse zoom
             cameraScale = clamp(cameraScale*(1-mouseWheel/10), defaultTileSize.x*16, defaultTileSize.x/16);
-                    
+
         //if (keyWasPressed(77))
         //    playSong([[[,0,219,,,,,1.1,,-.1,-50,-.05,-.01,1],[2,0,84,,,.1,,.7,,,,.5,,6.7,1,.05]],[[[0,-1,1,0,5,0],[1,1,8,8,0,3]]],[0,0,0,0],90]) // music test
 
@@ -96,125 +113,174 @@ engineInit(
             nextLevel();
     }
 
-    // restart if no lives left
-    let minDeadTime = 1e3;
-    let allPlayersDead = players.length > 0;
-    for(const player of players)
+    // only run gameplay logic when in playing state
+    if (gameState === 'playing')
     {
-        if (player && !player.isDead())
-            allPlayersDead = 0;
-        minDeadTime = min(minDeadTime, player && player.isDead() ? player.deadTimer.get() : 0);
+        // restart if no lives left
+        let minDeadTime = 1e3;
+        let allPlayersDead = players.length > 0;
+        for(const player of players)
+        {
+            if (player && !player.isDead())
+                allPlayersDead = 0;
+            minDeadTime = min(minDeadTime, player && player.isDead() ? player.deadTimer.get() : 0);
+        }
+
+        // check for game over (all players dead and no lives left)
+        if (allPlayersDead && playerLives <= 0 && !gameOverTimer.isSet())
+        {
+            gameOverTimer.set();
+            gameState = 'gameOver';
+        }
+
+        if (minDeadTime > 3 && (keyWasPressed(90) || keyWasPressed(32) || gamepadWasPressed(0)))
+            resetGame();
+
+        if (levelEndTimer.get() > 3)
+        {
+            // End game after level 5
+            if (level >= 5)
+            {
+                gameCompleteTimer.set();
+                gameState = 'win';
+            }
+            else
+                nextLevel();
+        }
     }
-
-    // check for game over (all players dead and no lives left)
-    if (allPlayersDead && playerLives <= 0 && !gameOverTimer.isSet())
-        gameOverTimer.set();
-
-    if (minDeadTime > 3 && (keyWasPressed(90) || keyWasPressed(32) || gamepadWasPressed(0)))
-        resetGame();
-
-    if (levelEndTimer.get() > 3)
+    else if (gameState === 'gameOver' && gameOverTimer.get() > 4)
     {
-        // End game after level 5
-        if (level >= 5)
-            gameCompleteTimer.set();
-        else
-            nextLevel();
+        // return to title screen after game over
+        gameState = 'title';
+    }
+    else if (gameState === 'win' && gameCompleteTimer.get() > 4)
+    {
+        // return to title screen after win
+        gameState = 'title';
     }
 },
 
 ///////////////////////////////////////////////////////////////////////////////
 ()=> // appUpdatePost
 {
-    if (players.length == 1)
+    if (gameState === 'playing')
     {
-        const player = players[0];
-        if (!player.isDead())
-            cameraPos = cameraPos.lerp(player.pos, clamp(player.getAliveTime()/2));
-    }
-    else
-    {
-        // camera follows average pos of living players
-        let posTotal = vec2();
-        let playerCount = 0;
-        let cameraOffset = 1;
-        for(const player of players)
+        if (players.length == 1)
         {
-            if (player && !player.isDead())
+            const player = players[0];
+            if (!player.isDead())
+                cameraPos = cameraPos.lerp(player.pos, clamp(player.getAliveTime()/2));
+        }
+        else
+        {
+            // camera follows average pos of living players
+            let posTotal = vec2();
+            let playerCount = 0;
+            let cameraOffset = 1;
+            for(const player of players)
             {
-                ++playerCount;
-                posTotal = posTotal.add(player.pos.add(vec2(0,cameraOffset)));
+                if (player && !player.isDead())
+                {
+                    ++playerCount;
+                    posTotal = posTotal.add(player.pos.add(vec2(0,cameraOffset)));
+                }
+            }
+
+            if (playerCount)
+                cameraPos = cameraPos.lerp(posTotal.scale(1/playerCount), .2);
+        }
+
+        // spawn players if they don't exist
+        for(let i = maxPlayers;i--;)
+        {
+            if (!players[i] && (gamepadWasPressed(0, i)||gamepadWasPressed(1, i)))
+            {
+                ++playerLives;
+                new Player(checkpointPos, i);
             }
         }
 
-        if (playerCount)
-            cameraPos = cameraPos.lerp(posTotal.scale(1/playerCount), .2);
-    }
-
-    // spawn players if they don't exist
-    for(let i = maxPlayers;i--;)
-    {
-        if (!players[i] && (gamepadWasPressed(0, i)||gamepadWasPressed(1, i)))
+        // clamp to bottom and sides of level
+        if (clampCamera)
         {
-            ++playerLives;
-            new Player(checkpointPos, i);
+            const w = mainCanvas.width/2/cameraScale+1;
+            const h = mainCanvas.height/2/cameraScale+2;
+            cameraPos.y = max(cameraPos.y, h);
+            if (w*2 < tileCollisionSize.x)
+                cameraPos.x = clamp(cameraPos.x, tileCollisionSize.x - w, w);
         }
-    }
-    
-    // clamp to bottom and sides of level
-    if (clampCamera)
-    {
-        const w = mainCanvas.width/2/cameraScale+1;
-        const h = mainCanvas.height/2/cameraScale+2;
-        cameraPos.y = max(cameraPos.y, h);
-        if (w*2 < tileCollisionSize.x)
-            cameraPos.x = clamp(cameraPos.x, tileCollisionSize.x - w, w);
-    }
 
-    updateParallaxLayers();
+        updateParallaxLayers();
 
-    updateSky();
+        updateSky();
+    }
 },
 
 ///////////////////////////////////////////////////////////////////////////////
 ()=> // appRender
 {
-    const gradient = mainContext.createLinearGradient(0,0,0,mainCanvas.height);
-    gradient.addColorStop(0,levelSkyColor.rgba());
-    gradient.addColorStop(1,levelSkyHorizonColor.rgba());
-    mainContext.fillStyle = gradient;
-    //mainContext.fillStyle = levelSkyColor.rgba();
-    mainContext.fillRect(0,0,mainCanvas.width, mainCanvas.height);
+    if (gameState === 'playing')
+    {
+        const gradient = mainContext.createLinearGradient(0,0,0,mainCanvas.height);
+        gradient.addColorStop(0,levelSkyColor.rgba());
+        gradient.addColorStop(1,levelSkyHorizonColor.rgba());
+        mainContext.fillStyle = gradient;
+        //mainContext.fillStyle = levelSkyColor.rgba();
+        mainContext.fillRect(0,0,mainCanvas.width, mainCanvas.height);
 
-    drawStars();
+        drawStars();
+    }
+    else
+    {
+        // simple black background for title/game over/win screens
+        mainContext.fillStyle = '#000';
+        mainContext.fillRect(0,0,mainCanvas.width, mainCanvas.height);
+    }
 },
 
 ///////////////////////////////////////////////////////////////////////////////
 ()=> // appRenderPost
 {
-    //let minAliveTime = 9;
-    //for(const player of players)
-    //    minAliveTime = min(minAliveTime, player.getAliveTime());
-
-    //const livesPercent = percent(minAliveTime, 5, 4)
-    //const s = 8;
-    //const offset = 100*livesPercent;
-    //mainContext.drawImage(tileImage, 32, 8, s, s, 32, mainCanvas.height-90, s*9, s*9);
-    mainContext.textAlign = 'center';
-    const p = percent(gameTimer.get(), 8, 10);
-
-    //mainContext.globalCompositeOperation = 'difference';
-    mainContext.fillStyle = new Color(1,1,1,p).rgba();
-    if (p > 0)
+    if (gameState === 'title')
     {
-        //mainContext.fillStyle = (new Color).setHSLA(time/3,1,.5,p).rgba();
-        mainContext.font = 'bold 1in Inter';
-        mainContext.fillText('ROUGHSHOD MALEFACTOR', mainCanvas.width/2, 150);
+        // Title screen with logo image
+        const titleX = mainCanvas.width / 2;
+        const titleY = mainCanvas.height / 2 - 100;
+        const titleScale = 0.8;
         
+        if (titleImage.complete && titleImage.width > 0 && titleImage.height > 0)
+        {
+            const titleWidth = titleImage.width * titleScale;
+            const titleHeight = titleImage.height * titleScale;
+            
+            // Draw title image
+            mainContext.drawImage(
+                titleImage,
+                titleX - titleWidth/2,
+                titleY - titleHeight/2,
+                titleWidth,
+                titleHeight
+            );
+        }
+        else
+        {
+            // Fallback: show text if image hasn't loaded yet
+            mainContext.textAlign = 'center';
+            mainContext.fillStyle = new Color(1,1,1).rgba();
+            mainContext.font = 'bold 64px JetBrains Mono';
+            mainContext.fillText('MALEFACTOR', mainCanvas.width/2, mainCanvas.height/2 - 100);
+        }
+        
+        // Press to start text
+        mainContext.textAlign = 'center';
+        mainContext.fillStyle = new Color(1,1,1).rgba();
+        mainContext.font = 'bold 32px JetBrains Mono';
+        mainContext.fillText('Press SPACE to Start', mainCanvas.width/2, mainCanvas.height/2 + 50);
+
         // Controls subtitle
-        mainContext.font = 'bold 24px Inter';
-        const controlsY = 220;
-        const lineHeight = 28;
+        mainContext.font = 'bold 20px JetBrains Mono';
+        const controlsY = mainCanvas.height/2 + 120;
+        const lineHeight = 24;
         mainContext.fillText('WASD = Move', mainCanvas.width/2, controlsY);
         mainContext.fillText('Arrows = Aim', mainCanvas.width/2, controlsY + lineHeight);
         mainContext.fillText('E = Melee', mainCanvas.width/2, controlsY + lineHeight * 2);
@@ -222,65 +288,66 @@ engineInit(
         mainContext.fillText('Space = Shoot', mainCanvas.width/2, controlsY + lineHeight * 4);
         mainContext.fillText('Shift = Roll', mainCanvas.width/2, controlsY + lineHeight * 5);
     }
-
-    // check if any enemies left
-    let enemiesCount = 0;
-    for (const o of engineCollideObjects)
+    else if (gameState === 'playing')
     {
-        // Only count living, non-destroyed enemy characters with health > 0
-        // Also check that it's actually an enemy (has team property set correctly)
-        if (o.isCharacter && o.team == team_enemy && !o.destroyed && o.health > 0 && o.health !== undefined)
+        // Gameplay UI
+        // check if any enemies left
+        let enemiesCount = 0;
+        for (const o of engineCollideObjects)
         {
-            ++enemiesCount;
-            const pos = vec2(mainCanvas.width/2 + (o.pos.x - cameraPos.x)*30,mainCanvas.height-20);
-            const size = o.size.scale(20);
-            const color = o.color.scale(1,.6);
-            mainContext.fillStyle = color.rgba();
-            mainContext.fillRect(pos.x - size.x/2, pos.y - size.y/2, size.x, size.y);
+            // Only count living, non-destroyed enemy characters with health > 0
+            // Also check that it's actually an enemy (has team property set correctly)
+            if (o.isCharacter && o.team == team_enemy && !o.destroyed && o.health > 0 && o.health !== undefined)
+            {
+                ++enemiesCount;
+                const pos = vec2(mainCanvas.width/2 + (o.pos.x - cameraPos.x)*30,mainCanvas.height-20);
+                const size = o.size.scale(20);
+                const color = o.color.scale(1,.6);
+                mainContext.fillStyle = color.rgba();
+                mainContext.fillRect(pos.x - size.x/2, pos.y - size.y/2, size.x, size.y);
+            }
         }
+
+        if (!enemiesCount && !levelEndTimer.isSet())
+            levelEndTimer.set();
+
+        mainContext.fillStyle = new Color(1,1,1).rgba();
+        mainContext.font = 'bold 16px JetBrains Mono';
+        mainContext.textAlign = 'left';
+        const hudX = 20;
+        const hudY = 30;
+        const lineHeight = 20;
+
+        mainContext.fillText('LEVEL ' + level, hudX, hudY);
+        mainContext.fillText('LIVES ' + playerLives, hudX, hudY + lineHeight);
+        mainContext.fillText('ENEMIES ' + enemiesCount, hudX, hudY + lineHeight * 2);
+
+        // fade in level transition
+        const fade = levelEndTimer.isSet() ? percent(levelEndTimer.get(), 3, 1) : percent(levelTimer.get(), .5, 2);
+        drawRect(cameraPos, vec2(1e3), new Color(0,0,0,fade))
     }
-
-    if (!enemiesCount && !levelEndTimer.isSet())
-        levelEndTimer.set();
-
-    mainContext.fillStyle = new Color(1,1,1).rgba();
-    mainContext.font = 'bold 16px Inter';
-    mainContext.textAlign = 'left';
-    const hudX = 20;
-    const hudY = 30;
-    const lineHeight = 20;
-
-    mainContext.fillText('LEVEL ' + level, hudX, hudY);
-    mainContext.fillText('LIVES ' + playerLives, hudX, hudY + lineHeight);
-    mainContext.fillText('ENEMIES ' + enemiesCount, hudX, hudY + lineHeight * 2);
-
-    // fade in level transition
-    const fade = levelEndTimer.isSet() ? percent(levelEndTimer.get(), 3, 1) : percent(levelTimer.get(), .5, 2);
-    drawRect(cameraPos, vec2(1e3), new Color(0,0,0,fade))
-
-    // game over text
-    if (gameOverTimer.isSet())
+    else if (gameState === 'gameOver')
     {
+        // game over text
         const gameOverFade = min(gameOverTimer.get() / 1.5, 1); // fade in over 1.5 seconds
         const textAlpha = gameOverFade; // fade in text
-        
+
         mainContext.textAlign = 'center';
         mainContext.textBaseline = 'middle';
         mainContext.fillStyle = new Color(1, 1, 1, textAlpha).rgba();
-        mainContext.font = 'bold 64px Inter';
+        mainContext.font = 'bold 64px JetBrains Mono';
         mainContext.fillText('GAME OVER', mainCanvas.width/2, mainCanvas.height/2);
     }
-
-    // game complete text
-    if (gameCompleteTimer.isSet())
+    else if (gameState === 'win')
     {
+        // game complete text
         const gameCompleteFade = min(gameCompleteTimer.get() / 1.5, 1); // fade in over 1.5 seconds
         const textAlpha = gameCompleteFade; // fade in text
-        
+
         mainContext.textAlign = 'center';
         mainContext.textBaseline = 'middle';
         mainContext.fillStyle = new Color(1, 1, 1, textAlpha).rgba();
-        mainContext.font = 'bold 64px Inter';
+        mainContext.font = 'bold 64px JetBrains Mono';
         mainContext.fillText('YOU WIN!', mainCanvas.width/2, mainCanvas.height/2);
     }
 });

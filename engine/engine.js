@@ -25,7 +25,7 @@
 const engineName = 'LittleJS';
 const engineVersion = 'v0.74';
 const FPS = 60, timeDelta = 1/FPS;
-const defaultFont = 'arial'; // font used for text rendering
+const defaultFont = 'JetBrains Mono'; // font used for text rendering
 const maxWidth = 1920, maxHeight = 1200; // up to 1080p and 16:10
 const fixedWidth = 0; // native resolution
 //const fixedWidth = 1280, fixedHeight = 720; // 720p

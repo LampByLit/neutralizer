@@ -28,6 +28,7 @@ let levelSize, level, levelSeed, levelEnemyCount, levelWarmup;
 let levelColor, levelBackgroundColor, levelSkyColor, levelSkyHorizonColor, levelGroundColor;
 let skyParticles, skyRain, skySoundTimer = new Timer;
 let gameTimer = new Timer, levelTimer = new Timer, levelEndTimer = new Timer, gameOverTimer = new Timer, gameCompleteTimer = new Timer;
+let gameState = 'title'; // game states: 'title', 'playing', 'gameOver', 'win'
 
 // level enemy limits: [maxEnemies, maxSlimes, maxBastards, maxMalefactors]
 const levelLimits = {
@@ -55,6 +56,7 @@ const resetGame=()=>
     gameOverTimer.unset();
     gameCompleteTimer.unset();
     gameTimer.set(totalKills = level = 0);
+    gameState = 'playing';
     nextLevel();
 }
 
