@@ -226,10 +226,11 @@ class Character extends GameObject
         const sizeScale = this.sizeScale;
         const color = this.color.scale(this.burnColorPercent(),1);
         const eyeColor = this.eyeColor.scale(this.burnColorPercent(),1);
+        const headColor = this.team == team_enemy ? new Color() : color; // enemies use neutral color for head
 
         const bodyPos = this.pos.add(vec2(0,-.1+.06*Math.sin(this.walkCyclePercent*PI)).scale(sizeScale));
         drawTile(bodyPos, vec2(sizeScale), this.tileIndex, this.tileSize, color, this.angle, this.mirror, additive);
-        drawTile(this.pos.add(vec2(this.getMirrorSign(.05),.46).scale(sizeScale).rotate(-this.angle)),vec2(sizeScale/2),this.headTile,vec2(8), color,this.angle,this.mirror, additive);
+        drawTile(this.pos.add(vec2(this.getMirrorSign(.05),.46).scale(sizeScale).rotate(-this.angle)),vec2(sizeScale/2),this.headTile,vec2(8), headColor,this.angle,this.mirror, additive);
 
         //for(let i = this.grenadeCount; i--;)
         //    drawTile(bodyPos, vec2(.5), 5, vec2(8), new Color, this.angle, this.mirror, additive);
