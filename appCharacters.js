@@ -428,7 +428,8 @@ const type_normal = 1;
 const type_strong = 2;
 const type_elite  = 3;
 const type_grenade= 4;
-const type_count  = 5;
+const type_slime  = 5;
+const type_count  = 6;
 
 function alertEnemies(pos, playerPos)
 {
@@ -729,6 +730,131 @@ class Enemy extends Character
 
         super.kill(damagingObject);
         levelWarmup || ++totalKills;
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class Slime extends Enemy
+{
+    constructor(pos) 
+    { 
+        super(pos);
+        
+        // Override type to be slime
+        this.type = type_slime;
+        
+        // Slime is large and slow
+        this.size = this.size.scale(this.sizeScale = 1.5);
+        this.health = this.healthMax = 6; // Most difficult enemy yet
+        
+        // Green slime color
+        this.color = new Color(0, 1, 0);
+        this.eyeColor = new Color(0, 0.8, 0);
+        
+        // Slime-specific properties
+        // Slime sprite is at pixel (112,0) to (127,13) - unused space in tileset
+        this.slimeTile = 19; // Tile index for slime body sprite
+        this.slimeTileSize = vec2(16); // Slime sprite is 16x14 pixels
+        this.headTile = 2; // Use same head tile as normal enemies
+        this.trailPositions = []; // Store positions for trail
+        this.maxTrailLength = 10;
+        this.lastTrailPos = this.pos.copy();
+        this.trailTimer = new Timer;
+        
+        // Slow movement - slimes move at 40% speed
+        this.maxSpeed = maxCharacterSpeed * 0.4;
+        
+        // Replace weapon with slime weapon
+        this.weapon && this.weapon.destroy();
+        new SlimeWeapon(this.pos, this);
+        
+        // Slime doesn't burn
+        this.canBurn = 0;
+        
+        // Initialize trail timer
+        this.trailTimer.set(0.1);
+    }
+    
+    update()
+    {
+        // Update trail
+        if (this.trailTimer.elapsed())
+        {
+            this.trailTimer.set(0.1); // Add to trail every 0.1 seconds
+            const dist = this.pos.distance(this.lastTrailPos);
+            if (dist > 0.2) // Only add if moved enough
+            {
+                this.trailPositions.push(this.pos.copy());
+                if (this.trailPositions.length > this.maxTrailLength)
+                    this.trailPositions.shift();
+                this.lastTrailPos = this.pos.copy();
+            }
+        }
+        
+        // Scale down movement input for slow slime movement
+        if (this.moveInput)
+        {
+            this.moveInput = this.moveInput.scale(0.4);
+        }
+        
+        super.update();
+        
+        // Clamp velocity to slime's max speed
+        if (abs(this.velocity.x) > this.maxSpeed)
+            this.velocity.x = sign(this.velocity.x) * this.maxSpeed;
+    }
+    
+    render()
+    {
+        if (!isOverlapping(this.pos, this.size, cameraPos, renderWindowSize))
+            return;
+        
+        const sizeScale = this.sizeScale;
+        const color = this.color.scale(this.burnColorPercent(), 1);
+        
+        // Draw trail (green translucent blobs)
+        if (this.trailPositions.length > 0)
+        {
+            setBlendMode(0); // Regular blend for translucent effect
+            for(let i = 0; i < this.trailPositions.length; i++)
+            {
+                const trailPos = this.trailPositions[i];
+                const alpha = (i + 1) / this.trailPositions.length * 0.3; // Fade out trail
+                const trailSize = sizeScale * 0.6 * (i + 1) / this.trailPositions.length;
+                const trailColor = new Color(0, 1, 0, alpha);
+                drawTile(trailPos, vec2(trailSize), -1, undefined, trailColor);
+            }
+            setBlendMode(0);
+        }
+        
+        // Draw translucent green liquid blob around slime (3-4 overlapping squares)
+        setBlendMode(0);
+        const translucentColor = new Color(0, 1, 0, 0.3);
+        const blobSize = sizeScale * 1.2; // Large chunks for liquid effect
+        // Draw multiple overlapping blobs to create liquid effect
+        drawTile(this.pos.add(vec2(-0.15, 0.1).scale(sizeScale)), vec2(blobSize), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(0.15, 0.1).scale(sizeScale)), vec2(blobSize), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(0, -0.1).scale(sizeScale)), vec2(blobSize), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(0, 0.15).scale(sizeScale)), vec2(blobSize * 0.9), -1, undefined, translucentColor);
+        setBlendMode(0);
+        
+        // Draw main slime body sprite
+        const bodyPos = this.pos.add(vec2(0, -0.1 + 0.06 * Math.sin(this.walkCyclePercent * PI)).scale(sizeScale));
+        drawTile(bodyPos, vec2(sizeScale), this.slimeTile, this.slimeTileSize, color, this.angle, this.mirror);
+        
+        // Draw head (like normal enemies)
+        const headColor = new Color(); // Enemies use neutral color for head
+        const meleeHeadOffset = this.meleeTimer && this.meleeTimer.active() ? -.12 * Math.sin(this.meleeTimer.getPercent() * PI) : 0;
+        drawTile(this.pos.add(vec2(this.getMirrorSign(.05) + meleeHeadOffset * this.getMirrorSign(),.46).scale(sizeScale).rotate(-this.angle)),vec2(sizeScale/2),this.headTile,vec2(8), headColor,this.angle,this.mirror);
+        
+        // Draw eyes on head (like normal enemies)
+        if (!this.isDead())
+        {
+            const eyeColor = this.eyeColor.scale(this.burnColorPercent(), 1);
+            const blinkScale = this.canBlink ? .5 + .5*Math.cos(this.blinkTimer.getPercent()*PI*2) : 1;
+            drawTile(this.pos.add(vec2(this.getMirrorSign(.05),.46).scale(sizeScale).rotate(-this.angle)),vec2(sizeScale/2, blinkScale*sizeScale/2),this.headTile+1,vec2(8), eyeColor, this.angle, this.mirror, this.additiveColor);
+        }
     }
 }
 

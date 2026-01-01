@@ -603,3 +603,191 @@ class Bullet extends EngineObject
         drawRect(this.pos, vec2(.2,.5), this.color, this.velocity.angle());
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+class SlimeWeapon extends EngineObject 
+{
+    constructor(pos, parent) 
+    { 
+        super(pos, vec2(.6), 4, vec2(8));
+
+        this.isWeapon = 1;
+        this.fireTimeBuffer = this.localAngle = 0;
+        this.burstTimer = new Timer;
+        this.burstActive = 0;
+        this.burstDuration = 2.5; // Longer bursts for more aggression
+        this.burstCooldown = 0.8; // Shorter cooldown for more aggression
+        
+        this.renderOrder = parent.renderOrder+1;
+        this.hidden = 1; // Don't render the weapon (slime shoots from head, not gun)
+
+        parent.weapon = this;
+        parent.addChild(this, this.localOffset = vec2(.55,0));
+    }
+    
+    render()
+    {
+        // Don't render - slime shoots from head, not a visible weapon
+        return;
+    }
+
+    update()
+    {
+        super.update();
+
+        const particleSpeed = .3;
+        const particleRate = 40; // More particles per second for aggression
+        const spread = .01; // Very small spread for accurate aim
+
+        this.mirror = this.parent.mirror;
+
+        // Burst pattern: active for burstDuration, then cooldown
+        if (!this.burstTimer.isSet())
+        {
+            // Start first burst
+            this.burstActive = 1;
+            this.burstTimer.set(this.burstDuration);
+        }
+        else if (this.burstTimer.elapsed())
+        {
+            if (this.burstActive)
+            {
+                // Burst finished, start cooldown
+                this.burstActive = 0;
+                this.burstTimer.set(this.burstCooldown);
+            }
+            else
+            {
+                // Cooldown finished, start new burst
+                this.burstActive = 1;
+                this.burstTimer.set(this.burstDuration);
+            }
+        }
+
+        // Only shoot when parent sees player and burst is active
+        if (this.parent.sawPlayerTimer && this.parent.sawPlayerTimer.isSet() && 
+            this.parent.sawPlayerTimer.get() < 10 && this.burstActive)
+        {
+            this.fireTimeBuffer += timeDelta;
+            const rate = 1/particleRate;
+            
+            // Get direction to player from head position
+            const headPos = this.parent.pos.add(vec2(this.parent.getMirrorSign(.05), .46).scale(this.parent.sizeScale || 1));
+            const playerPos = this.parent.sawPlayerPos;
+            const direction = playerPos.subtract(headPos).normalize();
+            
+            for(; this.fireTimeBuffer > 0; this.fireTimeBuffer -= rate)
+            {
+                // Create slime particle from head position
+                const particle = new SlimeParticle(headPos, this.parent);
+                
+                // Fire particle directly towards player with small spread
+                // Apply small random rotation to direction vector for spread
+                const spreadAngle = rand(spread, -spread);
+                particle.velocity = direction.rotate(spreadAngle).scale(particleSpeed);
+            }
+        }
+        else
+        {
+            this.fireTimeBuffer = min(this.fireTimeBuffer, 0);
+            // Face player even when not shooting
+            if (this.parent.sawPlayerTimer && this.parent.sawPlayerTimer.isSet())
+            {
+                const playerPos = this.parent.sawPlayerPos;
+                const direction = playerPos.subtract(this.pos).normalize();
+                const aimAngle = direction.angle();
+                this.localAngle = -aimAngle * this.getMirrorSign();
+            }
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class SlimeParticle extends EngineObject 
+{
+    constructor(pos, attacker) 
+    { 
+        super(pos, vec2(.15));
+        this.color = new Color(0, 1, 0, 0.8);
+        this.setCollision();
+
+        this.damage = 0.5; // Lower damage per particle but many particles
+        this.damping = 0.98;
+        this.gravityScale = 0.1; // Slight gravity
+        this.attacker = attacker;
+        this.team = attacker.team;
+        this.renderOrder = 1e9;
+        this.lifetime = 2.0; // How long particle lives
+        this.spawnTime = time;
+        this.hasHit = []; // Track what we've hit to avoid multiple hits
+    }
+
+    update()
+    {
+        super.update();
+
+        // Check lifetime
+        if (time - this.spawnTime > this.lifetime)
+        {
+            this.destroy();
+            return;
+        }
+
+        // check if hit someone
+        forEachObject(this.pos, this.size, (o)=>
+        {
+            if (o.isGameObject && !o.parent && o.team != this.team)
+            {
+                // Check if we've already hit this object
+                if (this.hasHit.indexOf(o) >= 0)
+                    return;
+                    
+                if (!o.dodgeTimer || !o.dodgeTimer.active())
+                {
+                    this.collideWithObject(o);
+                    this.hasHit.push(o);
+                }
+            }
+        });
+    }
+    
+    collideWithObject(o)
+    {
+        if (o.isGameObject)
+        {
+            o.damage(this.damage, this);
+            o.applyForce(this.velocity.scale(.05));
+            // Don't destroy on hit - particles can hit multiple times
+        }
+    
+        return 1; 
+    }
+
+    collideWithTile(data, pos)
+    {
+        if (data <= 0)
+            return 0;
+            
+        // Slime particles stick to walls briefly
+        this.velocity = this.velocity.scale(0.3);
+        this.damping = 0.9;
+        
+        // Small chance to destroy weak tiles
+        const destroyTileChance = data == tileType_glass ? 0.1 : data == tileType_dirt ? 0.05 : 0;
+        rand() < destroyTileChance && destroyTile(pos);
+
+        return 0; // Don't stop particle, just slow it
+    }
+
+    render()
+    {
+        // Draw as green translucent blob
+        setBlendMode(0);
+        const alpha = 0.8 * (1 - (time - this.spawnTime) / this.lifetime);
+        const particleColor = new Color(0, 1, 0, alpha);
+        drawTile(this.pos, this.size, -1, undefined, particleColor);
+        setBlendMode(0);
+    }
+}

@@ -274,11 +274,21 @@ function buildBase()
 
         if (topFloor || floorSpace > 1)
         {
-            // spawn enemies
-            for(let i = propCount; i--;)
+            // spawn enemies - ensure at least one enemy spawns per floor
+            const enemyCount = max(propCount, 1);
+            let slimeSpawned = 0;
+            for(let i = enemyCount; i--;)
             {
                 const pos = floorBottomCenterPos.add(vec2(randSeeded( floorWidth-1,-floorWidth+1),.7));
-                new Enemy(pos);
+                // Ensure at least one slime spawns per level, with chance for more
+                const slimeChance = !slimeSpawned ? 1.0 : (level >= 3 ? min((level - 2) * 0.1, 0.3) : 0.1);
+                if (randSeeded() < slimeChance)
+                {
+                    new Slime(pos);
+                    slimeSpawned = 1;
+                }
+                else
+                    new Enemy(pos);
             }
         }
 
