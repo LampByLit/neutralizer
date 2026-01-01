@@ -361,9 +361,10 @@ function drawStars()
         }
         
         const w = mainCanvas.width+400, h = mainCanvas.height+400;
+        const moonY = i < 9 ? randSeeded(h*.4)+time*speed*randSeeded(1,.2) : randSeeded(h)+time*speed*randSeeded(1,.2);
         const screenPos = vec2(
             (randSeeded(w)+time*speed)%w-200,
-            (randSeeded(h)+time*speed*randSeeded(1,.2))%h-200);
+            moonY%h-200);
 
         if (lowGraphicsSettings)
         {
@@ -425,11 +426,17 @@ function generateParallaxLayers()
         gradient.addColorStop(0,layerColor.rgba());
         gradient.addColorStop(1,layerColor.subtract(new Color(1,1,1,0)).mutate(.1).clamp().rgba());
 
-        for(let x=parallaxSize.x;x--;)
+        // draw city buildings instead of mountains
+        let x = 0;
+        while(x < parallaxSize.x)
         {
-            // pull slope towards start ground level
-            tileParallaxLayer.context.fillRect(x,groundLevel += groundSlope = rand() < .05 ? rand(1,-1) :
-                groundSlope + (startGroundLevel - groundLevel)/2e3,1,parallaxSize.y)
+            const buildingWidth = rand(15, 5) + i*5; // wider buildings in back layers
+            const buildingHeight = rand(parallaxSize.y - 40, 40); // random height from bottom
+            const buildingTop = parallaxSize.y - buildingHeight; // start from bottom
+            
+            tileParallaxLayer.context.fillRect(x, buildingTop, buildingWidth, buildingHeight);
+            
+            x += buildingWidth + rand(8, 2); // spacing between buildings
         }
     }
 }
