@@ -209,8 +209,7 @@ engineInit(
     {
         //mainContext.fillStyle = (new Color).setHSLA(time/3,1,.5,p).rgba();
         mainContext.font = 'bold 1in Inter';
-        mainContext.fillText('ROUGHSHOD', mainCanvas.width/2, 120);
-        mainContext.fillText('MALEFACTOR', mainCanvas.width/2, 180);
+        mainContext.fillText('ROUGHSHOD MALEFACTOR', mainCanvas.width/2, 150);
     }
 
     // check if any enemies left
