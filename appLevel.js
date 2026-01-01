@@ -156,7 +156,7 @@ function spawnProps(pos)
     }
 }
 
-function buildBase()
+function buildBase(totalSlimesSpawnedRef)
 {
     let raycastHit;
     for(let tries=99;!raycastHit;)
@@ -281,12 +281,23 @@ function buildBase()
             for(let i = enemyCount; i--;)
             {
                 const pos = floorBottomCenterPos.add(vec2(randSeeded( floorWidth-1,-floorWidth+1),.7));
-                // Ensure at least one slime spawns per level, with chance for more
-                const slimeChance = !slimeSpawned ? 1.0 : (level >= 3 ? min((level - 2) * 0.1, 0.3) : 0.1);
+                // On level 1, only spawn 1 slime total. On other levels, ensure at least one slime spawns per level, with chance for more
+                let slimeChance = 0;
+                if (level == 1)
+                {
+                    // Level 1: only spawn 1 slime total
+                    slimeChance = totalSlimesSpawnedRef.value == 0 ? 1.0 : 0;
+                }
+                else
+                {
+                    // Other levels: ensure at least one slime spawns per level, with chance for more
+                    slimeChance = !slimeSpawned ? 1.0 : (level >= 3 ? min((level - 2) * 0.1, 0.3) : 0.1);
+                }
                 if (randSeeded() < slimeChance)
                 {
                     new Slime(pos);
                     slimeSpawned = 1;
+                    ++totalSlimesSpawnedRef.value;
                 }
                 else
                     new Enemy(pos);
@@ -342,13 +353,16 @@ function generateLevel()
     }
     checkpointPos = raycastHit.add(vec2(0,1));
 
+    // track total slimes spawned for this level
+    const totalSlimesSpawned = { value: 0 };
+
     // random bases until there enough enemies
     for(let tries=99;levelEnemyCount>0;)
     {
         if (!tries--)
             return 1; // count not spawn enemies
 
-        if (buildBase())
+        if (buildBase(totalSlimesSpawned))
             return 1;
     }
 
