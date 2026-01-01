@@ -33,7 +33,7 @@ let gameTimer = new Timer, levelTimer = new Timer, levelEndTimer = new Timer, ga
 const levelLimits = {
     1: [20, 1, 0, 0],
     2: [40, 3, 0, 0],
-    3: [50, 10, 1, 0],
+    3: [50, 10, 15, 0],
     4: [20, 20, 5, 1],
     5: [100, 30, 20, 2]
 };
@@ -320,7 +320,7 @@ function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefact
                 if (level >= 3 && totalBastardsSpawnedRef.value < levelMaxBastards)
                 {
                     // Chance to spawn bastard based on level
-                    let bastardChance = level == 3 ? 0.1 : (level == 4 ? 0.25 : 0.2); // 10% level 3, 25% level 4, 20% level 5
+                    let bastardChance = level == 3 ? 0.4 : (level == 4 ? 0.25 : 0.2); // 40% level 3, 25% level 4, 20% level 5
                     if (randSeeded() < bastardChance)
                         spawnBastard = 1;
                 }

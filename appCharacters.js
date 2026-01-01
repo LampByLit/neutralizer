@@ -457,6 +457,15 @@ class Enemy extends Character
 
         this.type = randSeeded()**3*min(level+1,type_count)|0;
 
+        // Increase chance of grenade throwers (Demolitions Experts) on levels 3, 4, and 5
+        if ((level == 3 || level == 4 || level == 5) && this.type < type_slime)
+        {
+            // High chance to spawn as grenade thrower on these levels
+            const grenadeChance = level == 3 ? 0.35 : (level == 4 ? 0.4 : 0.35); // 35% level 3, 40% level 4, 35% level 5
+            if (randSeeded() < grenadeChance)
+                this.type = type_grenade;
+        }
+
         let health = 1 + this.type;
         this.eyeColor = new Color(1,.5,0);
         if (this.type == type_weak)
