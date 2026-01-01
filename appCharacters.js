@@ -24,6 +24,8 @@ class Character extends GameObject
         this.preventJumpTimer = new Timer;
         this.dodgeTimer = new Timer;
         this.dodgeRechargeTimer = new Timer;
+        this.meleeTimer = new Timer;
+        this.meleeRechargeTimer = new Timer;
         this.deadTimer = new Timer;
         this.blinkTimer = new Timer;
         this.moveInput = vec2();
@@ -159,6 +161,27 @@ class Character extends GameObject
                 this.velocity.y += .2;
         }
 
+        if (this.pressedMelee && !this.meleeTimer.active() && !this.meleeRechargeTimer.active() && !this.dodgeTimer.active())
+        {
+            // start melee attack
+            this.meleeTimer.set(.2);
+            this.meleeRechargeTimer.set(2);
+            playSound(sound_shoot, this.pos);
+
+            // check for nearby enemies and apply damage
+            const meleeRange = 1.8;
+            forEachObject(this.pos, meleeRange, (o)=>
+            {
+                if (o.isCharacter && o.team != this.team && !o.destroyed && o.health > 0)
+                {
+                    o.damage(1, this);
+                    // apply small knockback
+                    const direction = o.pos.subtract(this.pos).normalize();
+                    o.applyForce(direction.scale(.05));
+                }
+            });
+        }
+
         // apply movement acceleration and clamp
         this.velocity.x = clamp(this.velocity.x + moveInput.x * .042, maxCharacterSpeed, -maxCharacterSpeed);
 
@@ -181,7 +204,7 @@ class Character extends GameObject
         else
             this.walkCyclePercent = 0;
 
-        this.weapon.triggerIsDown = this.holdingShoot && !this.dodgeTimer.active();
+        this.weapon.triggerIsDown = this.holdingShoot && !this.dodgeTimer.active() && !this.meleeTimer.active();
         if (!this.dodgeTimer.active())
         {
             if (this.grenadeCount > 0 && this.pressingThrow && !this.wasPressingThrow && !this.grendeThrowTimer.active())
@@ -228,9 +251,12 @@ class Character extends GameObject
         const eyeColor = this.eyeColor.scale(this.burnColorPercent(),1);
         const headColor = this.team == team_enemy ? new Color() : color; // enemies use neutral color for head
 
+        // melee animation - head moves back
+        const meleeHeadOffset = this.meleeTimer.active() ? -.12 * Math.sin(this.meleeTimer.getPercent() * PI) : 0;
+
         const bodyPos = this.pos.add(vec2(0,-.1+.06*Math.sin(this.walkCyclePercent*PI)).scale(sizeScale));
         drawTile(bodyPos, vec2(sizeScale), this.tileIndex, this.tileSize, color, this.angle, this.mirror, additive);
-        drawTile(this.pos.add(vec2(this.getMirrorSign(.05),.46).scale(sizeScale).rotate(-this.angle)),vec2(sizeScale/2),this.headTile,vec2(8), headColor,this.angle,this.mirror, additive);
+        drawTile(this.pos.add(vec2(this.getMirrorSign(.05) + meleeHeadOffset * this.getMirrorSign(),.46).scale(sizeScale).rotate(-this.angle)),vec2(sizeScale/2),this.headTile,vec2(8), headColor,this.angle,this.mirror, additive);
 
         //for(let i = this.grenadeCount; i--;)
         //    drawTile(bodyPos, vec2(.5), 5, vec2(8), new Color, this.angle, this.mirror, additive);
@@ -781,6 +807,7 @@ class Player extends Character
         this.holdingShoot  = !this.playerIndex && (mouseIsDown(0) || keyIsDown(90) || keyIsDown(32)) || gamepadIsDown(2, this.playerIndex);
         this.pressingThrow = !this.playerIndex && (mouseIsDown(2) || keyIsDown(67)) || gamepadIsDown(1, this.playerIndex);
         this.pressedDodge  = !this.playerIndex && (mouseIsDown(1) || keyIsDown(16)) || gamepadIsDown(3, this.playerIndex); // Shift key for roll
+        this.pressedMelee  = !this.playerIndex && keyWasPressed(69) || gamepadWasPressed(4, this.playerIndex); // E key for melee
 
         // aiming with arrow keys - Up/Down for vertical aim
         if (!this.playerIndex)

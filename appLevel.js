@@ -42,7 +42,7 @@ const resetGame=()=>
 {
     levelEndTimer.unset();
     gameTimer.set(totalKills = level = 0);
-    nextLevel(playerLives = 6);
+    nextLevel();
 }
 
 function buildTerrain(size)
@@ -504,11 +504,11 @@ function applyArtToLevel()
 
 function nextLevel()
 {
-    playerLives += 4; // three for beating a level plus 1 for respawning
+    playerLives = level == 0 ? 3 : playerLives + 4; // start with 3 lives, then add 4 for beating a level plus 1 for respawning
     levelEnemyCount = 15 + min(level * 30, 300);
     ++level;
     levelSeed = randSeed = rand(1e9)|0;
-    levelSize = vec2(min(level*99,400),200);
+    levelSize = level == 1 ? vec2(300,200) : vec2(min(level*99,400),200);
     levelColor = randColor(new Color(.2,.2,.2), new Color(.8,.8,.8));
     levelSkyColor = randColor(new Color(.5,.5,.5), new Color(.9,.9,.9));
     levelSkyHorizonColor = levelSkyColor.subtract(new Color(.05,.05,.05)).mutate(.3).clamp();

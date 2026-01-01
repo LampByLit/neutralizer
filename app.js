@@ -50,7 +50,7 @@ engineInit(
                 new Prop(mousePosWorld);
         }
 
-        if (keyWasPressed(69))
+        if (keyWasPressed(190))
             explosion(mousePosWorld);
 
         if (keyIsDown(89))
@@ -189,16 +189,14 @@ engineInit(
     const p = percent(gameTimer.get(), 8, 10);
 
     //mainContext.globalCompositeOperation = 'difference';
-    mainContext.fillStyle = new Color(0,0,0,p).rgba();
+    mainContext.fillStyle = new Color(1,1,1,p).rgba();
     if (p > 0)
     {
         //mainContext.fillStyle = (new Color).setHSLA(time/3,1,.5,p).rgba();
-        mainContext.font = '1.5in impact';
-        mainContext.fillText('SPACE HUGGERS', mainCanvas.width/2, 140);
+        mainContext.font = 'bold 1in Inter';
+        mainContext.fillText('ROUGHSHOD', mainCanvas.width/2, 120);
+        mainContext.fillText('MALEFACTOR', mainCanvas.width/2, 180);
     }
-
-    mainContext.font = '.5in impact';
-    p > 0 && mainContext.fillText('A JS13K Game by Frank Force',mainCanvas.width/2, 210);
 
     // check if any enemies left
     let enemiesCount = 0;
@@ -210,15 +208,26 @@ engineInit(
         {
             ++enemiesCount;
             const pos = vec2(mainCanvas.width/2 + (o.pos.x - cameraPos.x)*30,mainCanvas.height-20);
-            drawRectScreenSpace(pos, o.size.scale(20), o.color.scale(1,.6));
+            const size = o.size.scale(20);
+            const color = o.color.scale(1,.6);
+            mainContext.fillStyle = color.rgba();
+            mainContext.fillRect(pos.x - size.x/2, pos.y - size.y/2, size.x, size.y);
         }
     }
 
     if (!enemiesCount && !levelEndTimer.isSet())
         levelEndTimer.set();
 
-    mainContext.fillStyle = new Color(0,0,0).rgba();
-    mainContext.fillText('Level ' + level + '      Lives ' + playerLives + '      Enemies ' + enemiesCount, mainCanvas.width/2, mainCanvas.height-40);
+    mainContext.fillStyle = new Color(1,1,1).rgba();
+    mainContext.font = 'bold 16px Inter';
+    mainContext.textAlign = 'left';
+    const hudX = 20;
+    const hudY = 30;
+    const lineHeight = 20;
+
+    mainContext.fillText('LEVEL ' + level, hudX, hudY);
+    mainContext.fillText('LIVES ' + playerLives, hudX, hudY + lineHeight);
+    mainContext.fillText('ENEMIES ' + enemiesCount, hudX, hudY + lineHeight * 2);
 
     // fade in level transition
     const fade = levelEndTimer.isSet() ? percent(levelEndTimer.get(), 3, 1) : percent(levelTimer.get(), .5, 2);
