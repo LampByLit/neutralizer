@@ -35,7 +35,7 @@ const levelLimits = {
     2: [40, 3, 0, 0],
     3: [50, 10, 1, 0],
     4: [20, 20, 5, 1],
-    5: [100, 30, 20, 1]
+    5: [100, 30, 20, 2]
 };
 let levelMaxEnemies, levelMaxSlimes, levelMaxBastards, levelMaxMalefactors;
 let totalEnemiesSpawned, totalSlimesSpawned, totalBastardsSpawned, totalMalefactorsSpawned;
@@ -289,6 +289,16 @@ function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefact
         for(let i = propCount; i--;)
             spawnProps(floorBottomCenterPos.add(vec2(randSeeded( floorWidth-2,-floorWidth+2),.5)));
 
+        // Spawn malefactor on top floor first (before other enemies) if needed
+        // Guaranteed spawn: 1 on level 4, 2 on level 5
+        if (topFloor && (level == 4 || level == 5) && totalMalefactorsSpawnedRef.value < levelMaxMalefactors)
+        {
+            const pos = floorBottomCenterPos.add(vec2(randSeeded( floorWidth-1,-floorWidth+1),.7));
+            new Malefactor(pos);
+            ++totalMalefactorsSpawnedRef.value;
+            ++totalEnemiesSpawnedRef.value;
+        }
+
         if (topFloor || floorSpace > 1)
         {
             // spawn enemies - ensure at least one enemy spawns per floor
@@ -302,21 +312,12 @@ function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefact
                 
                 const pos = floorBottomCenterPos.add(vec2(randSeeded( floorWidth-1,-floorWidth+1),.7));
                 
-                // decide what to spawn: malefactor, slime, bastard, or regular enemy
+                // decide what to spawn: slime, bastard, or regular enemy (malefactor already handled above)
                 let spawnSlime = 0;
                 let spawnBastard = 0;
-                let spawnMalefactor = 0;
-                
-                // Malefactor spawns on levels 4 and 5, one per level
-                if ((level == 4 || level == 5) && totalMalefactorsSpawnedRef.value < levelMaxMalefactors)
-                {
-                    // Spawn malefactor on top floor only, guaranteed if not spawned yet
-                    if (floor == baseFloors && totalMalefactorsSpawnedRef.value == 0)
-                        spawnMalefactor = 1;
-                }
                 
                 // If not spawning malefactor, check for bastard
-                if (!spawnMalefactor && level >= 3 && totalBastardsSpawnedRef.value < levelMaxBastards)
+                if (level >= 3 && totalBastardsSpawnedRef.value < levelMaxBastards)
                 {
                     // Chance to spawn bastard based on level
                     let bastardChance = level == 3 ? 0.1 : (level == 4 ? 0.25 : 0.2); // 10% level 3, 25% level 4, 20% level 5
@@ -324,8 +325,8 @@ function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefact
                         spawnBastard = 1;
                 }
                 
-                // If not spawning malefactor or bastard, check for slime
-                if (!spawnMalefactor && !spawnBastard && totalSlimesSpawnedRef.value < levelMaxSlimes)
+                // If not spawning bastard, check for slime
+                if (!spawnBastard && totalSlimesSpawnedRef.value < levelMaxSlimes)
                 {
                     // we can still spawn slimes, use chance-based logic
                     if (level == 1)
@@ -339,13 +340,7 @@ function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefact
                     }
                 }
                 
-                if (spawnMalefactor)
-                {
-                    new Malefactor(pos);
-                    ++totalMalefactorsSpawnedRef.value;
-                    ++totalEnemiesSpawnedRef.value;
-                }
-                else if (spawnBastard)
+                if (spawnBastard)
                 {
                     new Bastard(pos);
                     ++totalBastardsSpawnedRef.value;
@@ -479,6 +474,28 @@ function generateLevel()
 
         if (buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefactorsSpawnedRef, totalEnemiesSpawnedRef))
             break; // stop if buildBase returns error or limit reached
+    }
+    
+    // Guarantee malefactors spawn: 1 on level 4, 2 on level 5
+    // Spawn any missing malefactors at valid ground positions
+    while ((level == 4 || level == 5) && totalMalefactorsSpawnedRef.value < levelMaxMalefactors)
+    {
+        let malefactorSpawned = 0;
+        for(let attempts = 50; !malefactorSpawned && attempts--;)
+        {
+            const pos = vec2(randSeeded(levelSize.x-40, 40), levelSize.y);
+            raycastHit = tileCollisionRaycast(pos, vec2(pos.x, 0));
+            if (raycastHit && abs(checkpointPos.x-pos.x) > 30)
+            {
+                const spawnPos = raycastHit.add(vec2(randSeeded(10, -10), 2));
+                new Malefactor(spawnPos);
+                ++totalMalefactorsSpawnedRef.value;
+                ++totalEnemiesSpawnedRef.value;
+                malefactorSpawned = 1;
+            }
+        }
+        if (!malefactorSpawned)
+            break; // couldn't find valid spawn position after many attempts
     }
     
     // sync the refs back to globals
