@@ -771,7 +771,8 @@ class Player extends Character
         this.holdingJump = (!this.playerIndex && keyIsDown(87)) || gamepadIsDown(0, this.playerIndex); // W key
         if (!this.holdingJump)
             this.pressedJumpTimer.unset();
-        else if (!this.wasHoldingJump || this.climbingWall)
+        else
+            // keep pressedJumpTimer active while holding W for continuous jumping
             this.pressedJumpTimer.set(.3);
         this.wasHoldingJump = this.holdingJump;
 

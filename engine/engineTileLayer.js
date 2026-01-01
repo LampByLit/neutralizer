@@ -43,6 +43,9 @@ function tileCollisionTest(pos, size=vec2(), object)
     for(let y = minY; y <= maxY; ++y)
     for(let x = minX; x <= maxX; ++x)
     {
+        // check bounds before accessing array - out of bounds means no collision (can jump off edge)
+        if (x < 0 || y < 0 || x >= tileCollisionSize.x || y >= tileCollisionSize.y)
+            continue;
         const tileData = tileCollision[y*tileCollisionSize.x + x];
         if (tileData && (!object || object.collideWithTile(tileData, new Vector2(x, y))))
             return 1;

@@ -113,6 +113,25 @@ function buildTerrain(size)
     }
 }
 
+function clearEdgeTiles(size, edgeBuffer = 20)
+{
+    // clear collision tiles within edgeBuffer tiles from left and right edges
+    // this ensures players can jump off the sides of the floating island
+    for(let x = 0; x < edgeBuffer; ++x)
+    for(let y = 0; y < size.y; ++y)
+    {
+        setTileCollisionData(vec2(x, y), tileType_empty);
+        setTileBackgroundData(vec2(x, y), tileType_empty);
+    }
+    
+    for(let x = size.x - edgeBuffer; x < size.x; ++x)
+    for(let y = 0; y < size.y; ++y)
+    {
+        setTileCollisionData(vec2(x, y), tileType_empty);
+        setTileBackgroundData(vec2(x, y), tileType_empty);
+    }
+}
+
 function spawnProps(pos)
 {
     if (abs(checkpointPos.x-pos.x) > 5)
@@ -336,6 +355,9 @@ function generateLevel()
             new Checkpoint(pos);
         }
     }
+    
+    // clear edge tiles so players can jump off the sides (do this last after all generation)
+    clearEdgeTiles(levelSize, 20);
 }
 
 const groundTileStart = 8;
