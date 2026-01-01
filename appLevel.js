@@ -29,16 +29,16 @@ let levelColor, levelBackgroundColor, levelSkyColor, levelSkyHorizonColor, level
 let skyParticles, skyRain, skySoundTimer = new Timer;
 let gameTimer = new Timer, levelTimer = new Timer, levelEndTimer = new Timer, gameOverTimer = new Timer, gameCompleteTimer = new Timer;
 
-// level enemy limits: [maxEnemies, maxSlimes, maxBastards]
+// level enemy limits: [maxEnemies, maxSlimes, maxBastards, maxMalefactors]
 const levelLimits = {
-    1: [20, 1, 0],
-    2: [40, 3, 0],
-    3: [50, 10, 1],
-    4: [20, 20, 5],
-    5: [100, 30, 20]
+    1: [20, 1, 0, 0],
+    2: [40, 3, 0, 0],
+    3: [50, 10, 1, 0],
+    4: [20, 20, 5, 1],
+    5: [100, 30, 20, 1]
 };
-let levelMaxEnemies, levelMaxSlimes, levelMaxBastards;
-let totalEnemiesSpawned, totalSlimesSpawned, totalBastardsSpawned;
+let levelMaxEnemies, levelMaxSlimes, levelMaxBastards, levelMaxMalefactors;
+let totalEnemiesSpawned, totalSlimesSpawned, totalBastardsSpawned, totalMalefactorsSpawned;
 
 let tileBackground, keyItemSpawned;
 const setTileBackgroundData = (pos, data=0)=>
@@ -168,7 +168,7 @@ function spawnProps(pos)
     }
 }
 
-function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalEnemiesSpawnedRef)
+function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefactorsSpawnedRef, totalEnemiesSpawnedRef)
 {
     // check if we've hit limits
     if (totalEnemiesSpawnedRef.value >= levelMaxEnemies)
@@ -302,12 +302,21 @@ function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalEnemiesS
                 
                 const pos = floorBottomCenterPos.add(vec2(randSeeded( floorWidth-1,-floorWidth+1),.7));
                 
-                // decide what to spawn: slime, bastard, or regular enemy
+                // decide what to spawn: malefactor, slime, bastard, or regular enemy
                 let spawnSlime = 0;
                 let spawnBastard = 0;
+                let spawnMalefactor = 0;
                 
-                // Bastards only spawn from level 3+
-                if (level >= 3 && totalBastardsSpawnedRef.value < levelMaxBastards)
+                // Malefactor spawns on levels 4 and 5, one per level
+                if ((level == 4 || level == 5) && totalMalefactorsSpawnedRef.value < levelMaxMalefactors)
+                {
+                    // Spawn malefactor on top floor only, guaranteed if not spawned yet
+                    if (floor == baseFloors && totalMalefactorsSpawnedRef.value == 0)
+                        spawnMalefactor = 1;
+                }
+                
+                // If not spawning malefactor, check for bastard
+                if (!spawnMalefactor && level >= 3 && totalBastardsSpawnedRef.value < levelMaxBastards)
                 {
                     // Chance to spawn bastard based on level
                     let bastardChance = level == 3 ? 0.1 : (level == 4 ? 0.25 : 0.2); // 10% level 3, 25% level 4, 20% level 5
@@ -315,8 +324,8 @@ function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalEnemiesS
                         spawnBastard = 1;
                 }
                 
-                // If not spawning bastard, check for slime
-                if (!spawnBastard && totalSlimesSpawnedRef.value < levelMaxSlimes)
+                // If not spawning malefactor or bastard, check for slime
+                if (!spawnMalefactor && !spawnBastard && totalSlimesSpawnedRef.value < levelMaxSlimes)
                 {
                     // we can still spawn slimes, use chance-based logic
                     if (level == 1)
@@ -330,7 +339,13 @@ function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalEnemiesS
                     }
                 }
                 
-                if (spawnBastard)
+                if (spawnMalefactor)
+                {
+                    new Malefactor(pos);
+                    ++totalMalefactorsSpawnedRef.value;
+                    ++totalEnemiesSpawnedRef.value;
+                }
+                else if (spawnBastard)
                 {
                     new Bastard(pos);
                     ++totalBastardsSpawnedRef.value;
@@ -446,12 +461,14 @@ function generateLevel()
     }
     checkpointPos = raycastHit.add(vec2(0,1));
 
-    // track total enemies, slimes, and bastards spawned for this level
+    // track total enemies, slimes, bastards, and malefactors spawned for this level
     totalEnemiesSpawned = 0;
     totalSlimesSpawned = 0;
     totalBastardsSpawned = 0;
+    totalMalefactorsSpawned = 0;
     const totalSlimesSpawnedRef = { value: 0 };
     const totalBastardsSpawnedRef = { value: 0 };
+    const totalMalefactorsSpawnedRef = { value: 0 };
     const totalEnemiesSpawnedRef = { value: 0 };
 
     // random bases until we hit enemy limits
@@ -460,7 +477,7 @@ function generateLevel()
         if (!tries--)
             break; // stop if we can't spawn more bases
 
-        if (buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalEnemiesSpawnedRef))
+        if (buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefactorsSpawnedRef, totalEnemiesSpawnedRef))
             break; // stop if buildBase returns error or limit reached
     }
     
@@ -468,6 +485,7 @@ function generateLevel()
     totalEnemiesSpawned = totalEnemiesSpawnedRef.value;
     totalSlimesSpawned = totalSlimesSpawnedRef.value;
     totalBastardsSpawned = totalBastardsSpawnedRef.value;
+    totalMalefactorsSpawned = totalMalefactorsSpawnedRef.value;
 
     // build checkpoints
     for(let x=0; x<levelSize.x-9; )
@@ -662,6 +680,7 @@ function nextLevel()
     levelMaxEnemies = limits[0];
     levelMaxSlimes = limits[1];
     levelMaxBastards = limits[2];
+    levelMaxMalefactors = limits[3];
     levelEnemyCount = levelMaxEnemies; // keep for compatibility with existing code
     levelSeed = randSeed = rand(1e9)|0;
     levelSize = level == 1 ? vec2(300,200) : vec2(min(level*99,400),200);

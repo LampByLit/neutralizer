@@ -41,8 +41,8 @@ engineInit(
     if (debug)
     {
         randSeeded(randSeeded(randSeeded(randSeed = Date.now()))); // set random seed for debug mode stuf
-        if (keyWasPressed(81))
-            new Enemy(mousePosWorld);
+        if (keyWasPressed(188)) // Comma key
+            new Malefactor(mousePosWorld);
 
         if (keyWasPressed(84))
         {
