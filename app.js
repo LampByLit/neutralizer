@@ -210,6 +210,17 @@ engineInit(
         //mainContext.fillStyle = (new Color).setHSLA(time/3,1,.5,p).rgba();
         mainContext.font = 'bold 1in Inter';
         mainContext.fillText('ROUGHSHOD MALEFACTOR', mainCanvas.width/2, 150);
+        
+        // Controls subtitle
+        mainContext.font = 'bold 24px Inter';
+        const controlsY = 220;
+        const lineHeight = 28;
+        mainContext.fillText('WASD = Move', mainCanvas.width/2, controlsY);
+        mainContext.fillText('Arrows = Aim', mainCanvas.width/2, controlsY + lineHeight);
+        mainContext.fillText('E = Melee', mainCanvas.width/2, controlsY + lineHeight * 2);
+        mainContext.fillText('C = Grenade', mainCanvas.width/2, controlsY + lineHeight * 3);
+        mainContext.fillText('Space = Shoot', mainCanvas.width/2, controlsY + lineHeight * 4);
+        mainContext.fillText('Shift = Roll', mainCanvas.width/2, controlsY + lineHeight * 5);
     }
 
     // check if any enemies left
