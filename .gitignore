@@ -1,0 +1,22 @@
+# Cursor IDE files
+.cursor/
+
+# Build artifacts
+build/
+*.zip
+index.min.html
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node modules (if any)
+node_modules/
+

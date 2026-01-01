@@ -675,6 +675,7 @@ class Player extends Character
 
         this.grenadeCount = 3;
         this.burnTime = 2;
+        this.aimAngle = 0; // weapon aim angle in radians
         
         this.eyeColor = (new Color).setHSLA(-playerIndex*.6,1,.5);
         if (playerIndex)
@@ -761,13 +762,13 @@ class Player extends Character
             this.climbingWall = 1;
         }
 
-        // movement control
-        this.moveInput.x = isUsingGamepad || this.playerIndex ? gamepadStick(0, this.playerIndex).x : keyIsDown(39) - keyIsDown(37);
+        // movement control - WASD for movement only
+        this.moveInput.x = isUsingGamepad || this.playerIndex ? gamepadStick(0, this.playerIndex).x : keyIsDown(68) - keyIsDown(65); // D - A
 
-        this.moveInput.y = isUsingGamepad || this.playerIndex ? gamepadStick(0, this.playerIndex).y : keyIsDown(38) - keyIsDown(40);
+        this.moveInput.y = isUsingGamepad || this.playerIndex ? gamepadStick(0, this.playerIndex).y : keyIsDown(87) - keyIsDown(83); // W - S (W=up/climb up, S=down/climb down)
         
-        // jump
-        this.holdingJump = (!this.playerIndex && keyIsDown(38)) || gamepadIsDown(0, this.playerIndex);
+        // jump - W key only
+        this.holdingJump = (!this.playerIndex && keyIsDown(87)) || gamepadIsDown(0, this.playerIndex); // W key
         if (!this.holdingJump)
             this.pressedJumpTimer.unset();
         else if (!this.wasHoldingJump || this.climbingWall)
@@ -775,9 +776,28 @@ class Player extends Character
         this.wasHoldingJump = this.holdingJump;
 
         // controls
-        this.holdingShoot  = !this.playerIndex && (mouseIsDown(0) || keyIsDown(90)) || gamepadIsDown(2, this.playerIndex);
+        this.holdingShoot  = !this.playerIndex && (mouseIsDown(0) || keyIsDown(90) || keyIsDown(32)) || gamepadIsDown(2, this.playerIndex);
         this.pressingThrow = !this.playerIndex && (mouseIsDown(2) || keyIsDown(67)) || gamepadIsDown(1, this.playerIndex);
         this.pressedDodge  = !this.playerIndex && (mouseIsDown(1) || keyIsDown(88)) || gamepadIsDown(3, this.playerIndex);
+
+        // aiming with arrow keys - Up/Down for vertical aim
+        if (!this.playerIndex)
+        {
+            const aimSpeed = 0.08; // radians per frame
+            const maxAimAngle = PI/2; // 90 degrees up/down
+            
+            // Invert controls when facing left (mirrored)
+            const aimDirection = this.mirror ? -1 : 1;
+            
+            if (keyIsDown(38)) // Up Arrow - aim up
+                this.aimAngle = min(this.aimAngle + aimSpeed * aimDirection, maxAimAngle);
+            if (keyIsDown(40)) // Down Arrow - aim down
+                this.aimAngle = max(this.aimAngle - aimSpeed * aimDirection, -maxAimAngle);
+            
+            // Decay aim angle back to horizontal when not aiming
+            if (!keyIsDown(38) && !keyIsDown(40))
+                this.aimAngle *= 0.95; // smooth decay
+        }
 
         super.update();
 

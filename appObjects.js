@@ -442,8 +442,17 @@ class Weapon extends EngineObject
         this.mirror = this.parent.mirror;
         this.fireTimeBuffer += timeDelta;
 
+        // Get base aim angle from parent (player's aimAngle, or 0 for enemies)
+        const baseAimAngle = this.parent.aimAngle || 0;
+
+        // Negate angle for sprite display (sprite rotation is inverted from bullet direction)
+        // When mirrored (facing left), the engine will negate the angle again, so we need to account for that
+        const spriteAngle = -baseAimAngle * this.getMirrorSign();
+
         if (this.recoilTimer.active())
-            this.localAngle = lerp(this.recoilTimer.getPercent(), 0, this.localAngle);
+            this.localAngle = lerp(this.recoilTimer.getPercent(), spriteAngle, this.localAngle);
+        else
+            this.localAngle = spriteAngle;
 
         if (this.triggerIsDown)
         {
@@ -452,10 +461,14 @@ class Weapon extends EngineObject
             const rate = 1/fireRate;
             for(; this.fireTimeBuffer > 0; this.fireTimeBuffer -= rate)
             {
-                this.localAngle = -rand(.2,.15);
+                // Apply recoil on top of aim angle (negated for sprite, accounting for mirror)
+                const recoilAngle = -(baseAimAngle - rand(.2,.15)) * this.getMirrorSign();
+                this.localAngle = recoilAngle;
                 this.recoilTimer.set(rand(.4,.3));
                 const bullet = new Bullet(this.pos, this.parent);
-                const direction = vec2(this.getMirrorSign(speed), 0);
+                
+                // Fire bullet in the direction of aim angle (with spread)
+                const direction = vec2(this.getMirrorSign(speed), 0).rotate(baseAimAngle);
                 bullet.velocity = direction.rotate(rand(spread,-spread));
 
                 this.shellEmitter.localAngle = -.8*this.getMirrorSign();
@@ -487,7 +500,7 @@ class Bullet extends EngineObject
         this.attacker = attacker;
         this.team = attacker.team;
         this.renderOrder = 1e9;
-        this.range = 8;
+        this.range = 16; // Doubled from 8 to make bullets travel twice as far
     }
 
     update()

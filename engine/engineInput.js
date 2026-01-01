@@ -13,7 +13,7 @@
 const enableGamepads = 1;
 const enableTouchInput = 0;
 const copyGamepadDirectionToStick = 1;
-const copyWASDToDpad = 1;
+const copyWASDToDpad = 0; // Disabled: WASD for movement, arrows for aiming
 
 // input for all devices including keyboard, mouse, and gamepad. (d=down, p=pressed, r=released)
 const inputData = [[]];
@@ -57,7 +57,12 @@ onmousemove = e=>
 if(debug)
     onwheel = e=> e.ctrlKey || (mouseWheel = sign(e.deltaY));
 oncontextmenu = e=> !1; // prevent right click menu
-const remapKeyCode = c=> copyWASDToDpad ? c==87?38 : c==83?40 : c==65?37 : c==68?39 : c : c;
+const remapKeyCode = c=> {
+    // When copyWASDToDpad is disabled, return original key code
+    if (!copyWASDToDpad) return c;
+    // When enabled, remap WASD to arrow keys
+    return c==87?38 : c==83?40 : c==65?37 : c==68?39 : c;
+};
 
 ////////////////////////////////////////////////////////////////////
 // gamepad
