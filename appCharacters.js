@@ -778,7 +778,7 @@ class Player extends Character
         // controls
         this.holdingShoot  = !this.playerIndex && (mouseIsDown(0) || keyIsDown(90) || keyIsDown(32)) || gamepadIsDown(2, this.playerIndex);
         this.pressingThrow = !this.playerIndex && (mouseIsDown(2) || keyIsDown(67)) || gamepadIsDown(1, this.playerIndex);
-        this.pressedDodge  = !this.playerIndex && (mouseIsDown(1) || keyIsDown(88)) || gamepadIsDown(3, this.playerIndex);
+        this.pressedDodge  = !this.playerIndex && (mouseIsDown(1) || keyIsDown(16)) || gamepadIsDown(3, this.playerIndex); // Shift key for roll
 
         // aiming with arrow keys - Up/Down for vertical aim
         if (!this.playerIndex)
@@ -790,9 +790,17 @@ class Player extends Character
             const aimDirection = this.mirror ? -1 : 1;
             
             if (keyIsDown(38)) // Up Arrow - aim up
-                this.aimAngle = min(this.aimAngle + aimSpeed * aimDirection, maxAimAngle);
+            {
+                this.aimAngle += aimSpeed * aimDirection;
+                // Clamp to max angle limits regardless of direction
+                this.aimAngle = clamp(this.aimAngle, maxAimAngle, -maxAimAngle);
+            }
             if (keyIsDown(40)) // Down Arrow - aim down
-                this.aimAngle = max(this.aimAngle - aimSpeed * aimDirection, -maxAimAngle);
+            {
+                this.aimAngle -= aimSpeed * aimDirection;
+                // Clamp to max angle limits regardless of direction
+                this.aimAngle = clamp(this.aimAngle, maxAimAngle, -maxAimAngle);
+            }
             
             // Decay aim angle back to horizontal when not aiming
             if (!keyIsDown(38) && !keyIsDown(40))

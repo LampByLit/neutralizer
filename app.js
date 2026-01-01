@@ -204,7 +204,9 @@ engineInit(
     let enemiesCount = 0;
     for (const o of engineCollideObjects)
     {
-        if (o.isCharacter && o.team  == team_enemy)
+        // Only count living, non-destroyed enemy characters with health > 0
+        // Also check that it's actually an enemy (has team property set correctly)
+        if (o.isCharacter && o.team == team_enemy && !o.destroyed && o.health > 0 && o.health !== undefined)
         {
             ++enemiesCount;
             const pos = vec2(mainCanvas.width/2 + (o.pos.x - cameraPos.x)*30,mainCanvas.height-20);
