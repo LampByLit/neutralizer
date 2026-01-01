@@ -466,17 +466,48 @@ function generateLevel()
         for(let i = 0; i < malefactorCount; i++)
         {
             let malefactorSpawned = 0;
+            // Try with distance requirement first
             for(let attempts = 100; !malefactorSpawned && attempts--;)
             {
                 const pos = vec2(randSeeded(levelSize.x-40, 40), levelSize.y);
                 raycastHit = tileCollisionRaycast(pos, vec2(pos.x, 0));
-                if (raycastHit && abs(checkpointPos.x-pos.x) > 30)
+                if (raycastHit && abs(checkpointPos.x-pos.x) > 20)
                 {
                     const spawnPos = raycastHit.add(vec2(randSeeded(10, -10), 2));
                     new Malefactor(spawnPos);
                     ++totalMalefactorsSpawnedRef.value;
                     ++totalEnemiesSpawnedRef.value;
                     malefactorSpawned = 1;
+                }
+            }
+            // If still not spawned, try without distance requirement (spawn anywhere)
+            if (!malefactorSpawned)
+            {
+                for(let attempts = 200; !malefactorSpawned && attempts--;)
+                {
+                    const pos = vec2(randSeeded(levelSize.x-40, 40), levelSize.y);
+                    raycastHit = tileCollisionRaycast(pos, vec2(pos.x, 0));
+                    if (raycastHit)
+                    {
+                        const spawnPos = raycastHit.add(vec2(randSeeded(10, -10), 2));
+                        new Malefactor(spawnPos);
+                        ++totalMalefactorsSpawnedRef.value;
+                        ++totalEnemiesSpawnedRef.value;
+                        malefactorSpawned = 1;
+                    }
+                }
+            }
+            // Final fallback: spawn near checkpoint if all else fails
+            if (!malefactorSpawned)
+            {
+                const fallbackPos = checkpointPos.add(vec2(randSeeded(50, -50), 0));
+                raycastHit = tileCollisionRaycast(fallbackPos, vec2(fallbackPos.x, 0));
+                if (raycastHit)
+                {
+                    const spawnPos = raycastHit.add(vec2(0, 2));
+                    new Malefactor(spawnPos);
+                    ++totalMalefactorsSpawnedRef.value;
+                    ++totalEnemiesSpawnedRef.value;
                 }
             }
         }
