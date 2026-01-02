@@ -962,8 +962,12 @@ class LaserBeam extends EngineObject
 
     collideWithTile(data, pos)
     {
-        // Laser does not damage tiles - return 0 to pass through
-        return 0;
+        if (data <= 0)
+            return 0;
+        
+        // Laser hits tile - destroy it (but doesn't damage tiles)
+        this.kill();
+        return 1;
     }
 
     kill()
@@ -1249,6 +1253,7 @@ class JumperWeapon extends Weapon
         this.hidden = 1; // Don't render the weapon sprite (helmet is rendered separately)
         this.wasJumping = 0; // Track if jump was active last frame
         this.fTriggeredJump = 0; // Track if current jump was triggered by F key
+        this.wasPressingF = 0; // Track if F was pressed last frame
     }
     
     update()
@@ -1262,41 +1267,21 @@ class JumperWeapon extends Weapon
         // Check if F key is pressed (key code 70)
         const pressingF = !this.parent.playerIndex && keyIsDown(70);
         const fJustPressed = !this.parent.playerIndex && keyWasPressed(70);
+        const fJustPressedThisFrame = pressingF && !this.wasPressingF; // Detect F press even if keyWasPressed missed it
         
         // Track jump state
         const isJumping = this.parent.jumpTimer.active();
         const wasJumping = this.wasJumping;
-        const wasOnGround = this.parent.groundObject || this.parent.groundTimer.active();
+        const isOnGround = this.parent.groundObject || this.parent.groundTimer.active();
         this.wasJumping = isJumping;
+        this.wasPressingF = pressingF;
         
-        // If F was just pressed while on ground, mark that F will trigger this jump
-        if (fJustPressed && wasOnGround)
+        // If F was just pressed (this frame) and we're on ground and not jumping, trigger high jump directly
+        // Weapon updates after Character, so we can trigger jump even if Character didn't process it
+        if ((fJustPressed || fJustPressedThisFrame) && isOnGround && !isJumping && !this.parent.preventJumpTimer.active())
         {
             this.fTriggeredJump = 1;
-            // Set pressedJumpTimer to trigger jump
-            this.parent.pressedJumpTimer.set(.3);
-        }
-        
-        // If F is being held, maintain jump state (weapon updates after player, so this overrides)
-        if (pressingF)
-        {
-            // Keep pressedJumpTimer active while F is held
-            if (wasOnGround)
-                this.parent.pressedJumpTimer.set(.3);
-            // Set holdingJump for jump continuation
-            this.parent.holdingJump = 1;
-        }
-        
-        // If jump just ended, reset the F trigger flag
-        if (wasJumping && !isJumping)
-        {
-            this.fTriggeredJump = 0;
-        }
-        
-        // Boost jump height ONLY if F triggered the jump
-        if (this.fTriggeredJump && !wasJumping && isJumping && this.parent.velocity.y > 0)
-        {
-            // Much higher jump - 3x normal jump velocity (.15 -> .45)
+            // Directly trigger high jump
             if (this.parent.climbingWall)
             {
                 this.parent.velocity.y = .6; // Higher wall jump (normal is .25) - 2.4x boost
@@ -1305,8 +1290,37 @@ class JumperWeapon extends Weapon
             {
                 this.parent.velocity.y = .45; // Much higher jump (normal is .15) - 3x boost
             }
-            // Longer jump timer for more air time (also applies to wall jumps)
-            this.parent.jumpTimer.set(.4); // Longer than normal .2
+            this.parent.jumpTimer.set(.4); // Longer jump timer
+            this.parent.preventJumpTimer.set(.5);
+            playSound(sound_jump, this.parent.pos);
+        }
+        // If jump just started this frame and F is pressed, boost it (in case Character triggered normal jump)
+        else if (!wasJumping && isJumping && pressingF && this.parent.velocity.y > 0 && this.parent.velocity.y < .3)
+        {
+            // Character.update() triggered a normal jump, boost it to high jump
+            this.fTriggeredJump = 1;
+            if (this.parent.climbingWall)
+            {
+                this.parent.velocity.y = .6; // Higher wall jump
+            }
+            else
+            {
+                this.parent.velocity.y = .45; // Much higher jump
+            }
+            this.parent.jumpTimer.set(.4); // Longer jump timer
+        }
+        
+        // If F is being held, maintain jump state for continuation
+        if (pressingF)
+        {
+            // Set holdingJump for jump continuation
+            this.parent.holdingJump = 1;
+        }
+        
+        // If jump just ended, reset the F trigger flag
+        if (wasJumping && !isJumping)
+        {
+            this.fTriggeredJump = 0;
         }
         
         // Boost jump continuation while holding F and jumping (only if F triggered it)
