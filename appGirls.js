@@ -387,13 +387,16 @@ class Girl extends Character
         // Make sure color is visible (full opacity) - use bright pink so it's obvious
         const visibleColor = new Color(1.0, 0.5, 0.8, 1.0); // Bright pink, full opacity
         
+        // DEBUG: Draw a simple colored rect first to verify render is working
+        drawRect(bodyPos, vec2(sizeScale), visibleColor, 0);
+        
         if (typeof drawTile2 === 'function')
         {
             drawTile2(bodyPos, vec2(sizeScale), this.tileIndex, this.tileSize, visibleColor, this.angle, this.mirror, additive);
         }
         else
         {
-            // Fallback to regular drawTile with a visible tile from tiles.png if drawTile2 doesn't work
+            // Emergency fallback - use regular drawTile with a visible tile from tiles.png if drawTile2 doesn't work
             drawTile(bodyPos, vec2(sizeScale), 3, vec2(8), visibleColor, this.angle, this.mirror, additive);
         }
     }
