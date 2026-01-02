@@ -362,6 +362,10 @@ class Girl extends Character
     
     render()
     {
+        // Debug: log render calls
+        if (frame % 60 == 0) // Log once per second
+            console.log('Girl render called, pos:', this.pos, 'cameraPos:', cameraPos, 'renderWindowSize:', renderWindowSize);
+        
         // Always render persistent objects (like players)
         // Skip visibility check for persistent objects to ensure they render
         if (!this.persistent)

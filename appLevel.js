@@ -1391,7 +1391,13 @@ function nextLevel()
             
             // Spawn girl - they auto-add to engineObjects via constructor
             const girl = new Girl(groundPos);
-            console.log('Spawned girl at:', groundPos, 'girl object:', girl);
+            console.log('Spawned girl at:', groundPos, 'girl object:', girl, 'in engineObjects:', engineObjects.indexOf(girl) >= 0);
+            
+            // Force ensure they're in collision array
+            if (girl.setCollision)
+            {
+                girl.setCollision();
+            }
         }
     }
     //new Enemy(checkpointPos.add(vec2(3))); // test enemy
