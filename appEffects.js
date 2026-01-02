@@ -222,13 +222,14 @@ function explosion(pos, radius=2)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-function nukeExplosion(pos, radius=10)
+function nukeExplosion(pos, radius=15)
 {
     ASSERT(radius > 0);
     if (levelWarmup)
         return;
 
-    const damage = radius*2;
+    // Much more powerful damage - 4x multiplier instead of 2x
+    const damage = radius*4;
 
     // destroy level
     for(let x = -radius; x < radius; ++x)
@@ -261,21 +262,21 @@ function nukeExplosion(pos, radius=10)
             d < radius*1.5 && o.burn && o.burn();
         }
 
-        // push
+        // push (much stronger force for nuke)
         const p = percent(d, radius, 2*radius);
-        const force = o.pos.subtract(pos).normalize(p*radius*.2);
+        const force = o.pos.subtract(pos).normalize(p*radius*.4); // Double the push force
         o.applyForce && o.applyForce(force);
         if (o.isDead && o.isDead())
-            o.angleVelocity += randSign()*rand(p*radius/4,.3);
+            o.angleVelocity += randSign()*rand(p*radius/2,.5); // Stronger rotation
     });
 
     playSound(sound_explosion, pos);
     debugFire && debugCircle(pos, maxRangeSquared**.5, '#f00', 2);
     debugFire && debugCircle(pos, radius**.5, '#ff0', 2);
 
-    // Optimized particles for nuke - capped emission rates
-    const maxParticleRate = 200; // Cap at 200 particles/sec instead of 500
-    const maxFireRate = 300; // Cap at 300 particles/sec instead of 1000
+    // Optimized particles for nuke - capped emission rates (slightly higher for larger radius)
+    const maxParticleRate = 250; // Cap at 250 particles/sec for larger nuke
+    const maxFireRate = 400; // Cap at 400 particles/sec for larger nuke
     
     // smoke (reduced emission)
     new ParticleEmitter(

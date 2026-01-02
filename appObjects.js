@@ -502,8 +502,8 @@ class HammerProjectile extends GameObject
         this.destroyed = 1;
         this.health = 0;
         
-        // Explode with optimized nuke explosion (radius 10, but with capped particles)
-        nukeExplosion(this.pos, 10);
+        // Explode with massive nuke explosion (radius 15 - very powerful blast)
+        nukeExplosion(this.pos, 15);
         this.destroy();
     }
     
