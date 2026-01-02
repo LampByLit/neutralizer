@@ -496,11 +496,45 @@ function generateLevel()
     if (skyParticles)
         skyParticles.destroy();
 
-    // remove all objects that are not persistnt or are descendants of something persitant
+    // remove all objects that are not persistent or are descendants of something persistent
+    // Save persistent girls before destroying
+    const persistentGirls = [];
+    if (typeof girls !== 'undefined')
+    {
+        for(const girl of girls)
+        {
+            if (girl && !girl.isDead() && !girl.destroyed && girl.persistent)
+            {
+                persistentGirls.push(girl);
+            }
+        }
+    }
+    
     for(const o of engineObjects)
-        o.destroy();
+    {
+        // Don't destroy persistent girls - they'll be restored after level generation
+        if (!(o.isCharacter && o.persistent && typeof girls !== 'undefined' && girls.indexOf(o) >= 0))
+        {
+            o.destroy();
+        }
+    }
     engineObjects = [];
     engineCollideObjects = [];
+    
+    // Restore persistent girls to arrays (they'll be moved to checkpoint in nextLevel)
+    for(const girl of persistentGirls)
+    {
+        if (girl && !girl.destroyed)
+        {
+            engineObjects.push(girl);
+            if (girl.setCollision)
+            {
+                girl.setCollision();
+                if (engineCollideObjects.indexOf(girl) < 0)
+                    engineCollideObjects.push(girl);
+            }
+        }
+    }
 
     // clear tile layer references
     tileLayer = null;
@@ -1145,6 +1179,19 @@ function nextLevel()
     playerLives = level == 0 ? 3 : playerLives + 4; // start with 3 lives, then add 4 for beating a level plus 1 for respawning
     ++level;
     
+    // Save surviving girls before level generation (they'll be moved to checkpoint after)
+    const survivingGirls = [];
+    if (typeof girls !== 'undefined')
+    {
+        for(const girl of girls)
+        {
+            if (girl && !girl.isDead() && !girl.destroyed)
+            {
+                survivingGirls.push(girl);
+            }
+        }
+    }
+    
     // set level limits
     const limits = levelLimits[level] || levelLimits[5]; // use level 5 limits for levels beyond 5
     levelMaxEnemies = limits[0];
@@ -1274,5 +1321,40 @@ function nextLevel()
     // spawn player
     players = [];
     new Player(checkpointPos);
+    
+    // Spawn girls: 2 new girls + restore surviving girls
+    if (typeof girls !== 'undefined')
+    {
+        // Restore surviving girls to checkpoint (they're already in engineObjects from generateLevel)
+        for(const girl of survivingGirls)
+        {
+            if (girl && !girl.isDead() && !girl.destroyed)
+            {
+                // Move to checkpoint with slight offset
+                girl.pos = checkpointPos.add(vec2(rand(1, -1), rand(0.5, -0.5)));
+                girl.velocity = vec2();
+                // Make sure they're in the arrays
+                if (engineObjects.indexOf(girl) < 0)
+                    engineObjects.push(girl);
+                if (girl.setCollision && engineCollideObjects.indexOf(girl) < 0)
+                {
+                    girl.setCollision();
+                    engineCollideObjects.push(girl);
+                }
+                // Re-add to girls array if not already there
+                if (girls.indexOf(girl) < 0)
+                    girls.push(girl);
+            }
+        }
+        
+        // Spawn 2 new girls at checkpoint (with offsets to avoid clustering)
+        const girlsToSpawn = 2;
+        for(let i = 0; i < girlsToSpawn; i++)
+        {
+            const offsetX = (i - 0.5) * 2; // Spread them out: -1, +1
+            const offsetY = rand(0.5, -0.5);
+            new Girl(checkpointPos.add(vec2(offsetX, offsetY)));
+        }
+    }
     //new Enemy(checkpointPos.add(vec2(3))); // test enemy
 }
