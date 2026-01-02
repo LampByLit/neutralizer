@@ -292,8 +292,8 @@ class Prop extends GameObject
         if (this.type == propType_barrel_water)
             makeWater(this.pos);
 
-        // Drop item from wooden crates (10% chance)
-        if (this.type == propType_crate_wood && rand() < .1)
+        // Drop item from wooden crates (20% chance)
+        if (this.type == propType_crate_wood && rand() < .2)
         {
             const itemTypes = getAllItemTypes();
             const randomItemType = itemTypes[rand(itemTypes.length)|0];
@@ -402,6 +402,83 @@ class Grenade extends GameObject
         drawTile(this.pos, vec2(2), 0, vec2(16), new Color(1,0,0,.2-.2*Math.cos(a*2*PI)));
         drawTile(this.pos, vec2(1), 0, vec2(16), new Color(1,0,0,.2-.2*Math.cos(a*2*PI)));
         drawTile(this.pos, vec2(.5), 0, vec2(16), new Color(1,1,1,.2-.2*Math.cos(a*2*PI)));
+        setBlendMode(0);
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class HammerProjectile extends GameObject
+{
+    constructor(pos, attacker) 
+    {
+        super(pos, vec2(.2), 5, vec2(8)); // Same size and sprite as grenade
+
+        this.health = this.healthMax = 1e3;
+        this.attacker = attacker;
+        this.team = attacker.team;
+        this.elasticity = .3;
+        this.friction = .9;
+        this.angleDamping = .96;
+        this.renderOrder = 1e8;
+        this.gravityScale = 1; // Affected by gravity for ballistic trajectory
+        this.damage = 5; // 5x bullet damage
+        this.hasLanded = 0; // Track if projectile has landed
+        this.setCollision();
+        this.color = new Color(0, 0, 0, 1); // All black
+    }
+
+    update()
+    {
+        super.update();
+
+        // Check if projectile has landed (on ground and not moving much)
+        if (!this.hasLanded && this.groundObject && this.velocity.lengthSquared() < .01)
+        {
+            this.hasLanded = 1;
+        }
+
+        // Check for enemy collisions (both while flying and after landing as a trap)
+        forEachObject(this.pos, this.size, (o)=>
+        {
+            if (o.isGameObject && !o.parent && o.team != this.team)
+            {
+                if (o.isCharacter)
+                {
+                    // Enemy touched the hammer - deal damage and disappear
+                    o.damage(this.damage, this);
+                    this.destroy();
+                    return;
+                }
+            }
+        });
+    }
+    
+    collideWithObject(o)
+    {
+        // After landing, act as trap - if enemy touches it, deal damage
+        if (this.hasLanded && o.isGameObject && !o.parent && o.team != this.team)
+        {
+            if (o.isCharacter)
+            {
+                // Enemy touched the hammer - deal damage and disappear
+                o.damage(this.damage, this);
+                this.destroy();
+                return 1;
+            }
+        }
+        
+        return super.collideWithObject(o);
+    }
+       
+    render()
+    {
+        // Draw black hammer sprite
+        drawTile(this.pos, vec2(.5), this.tileIndex, this.tileSize, this.color, this.angle);
+
+        // Static shine effect (white glow)
+        setBlendMode(1);
+        drawTile(this.pos, vec2(.6), 0, vec2(16), new Color(1, 1, 1, .3), this.angle);
         setBlendMode(0);
     }
 }
@@ -1341,7 +1418,73 @@ class HammerWeapon extends Weapon
     constructor(pos, parent)
     {
         super(pos, parent);
-        // Placeholder - behavior will be configured later
+        this.fireTimeBuffer = 0;
+        this.fireRate = 1.5; // Same fire rate as cannon
+        this.hidden = 1; // Don't render the weapon sprite (helmet is rendered separately)
+    }
+    
+    update()
+    {
+        super.update();
+        
+        // Only handle hammer throwing for player
+        if (!this.parent.isPlayer)
+            return;
+        
+        this.fireTimeBuffer += timeDelta;
+        
+        // Check if F key is pressed (key code 70)
+        const pressingHammer = !this.parent.playerIndex && keyIsDown(70);
+        
+        if (pressingHammer)
+        {
+            const rate = 1/this.fireRate;
+            
+            // Get base aim angle from parent
+            const baseAimAngle = this.parent.aimAngle || 0;
+            
+            // Calculate forward direction based on mirror state and aim angle
+            const forwardDirection = vec2(this.parent.getMirrorSign(1), 0).rotate(baseAimAngle);
+            
+            // Only fire forward (check if direction matches facing direction)
+            const isFiringForward = (this.parent.mirror == 0 && forwardDirection.x >= 0) || 
+                                     (this.parent.mirror == 1 && forwardDirection.x <= 0);
+            
+            if (isFiringForward)
+            {
+                for(; this.fireTimeBuffer > 0; this.fireTimeBuffer -= rate)
+                {
+                    // Calculate weapon position (where hammer comes from)
+                    const sizeScale = this.parent.sizeScale || 1;
+                    const weaponPos = this.parent.pos.add(
+                        vec2(this.parent.getMirrorSign(.55), 0).scale(sizeScale)
+                    );
+                    
+                    // Create hammer projectile
+                    const hammer = new HammerProjectile(weaponPos, this.parent);
+                    
+                    // Use same throw trajectory as grenade
+                    hammer.velocity = this.parent.velocity.add(vec2(this.parent.getMirrorSign(), rand(.8,.7)).normalize(.25+rand(.02)));
+                    hammer.angleVelocity = this.parent.getMirrorSign() * rand(.8,.5);
+                    
+                    // Play jump sound
+                    playSound(sound_jump, weaponPos);
+                    
+                    // Alert enemies
+                    alertEnemies(weaponPos, weaponPos);
+                }
+            }
+            else
+            {
+                // Not firing forward, reset buffer
+                this.fireTimeBuffer = min(this.fireTimeBuffer, 0);
+            }
+        }
+        else
+        {
+            // Not pressing F, reset buffer
+            this.fireTimeBuffer = min(this.fireTimeBuffer, 0);
+        }
     }
 }
 
@@ -1352,7 +1495,64 @@ class RadarWeapon extends Weapon
     constructor(pos, parent)
     {
         super(pos, parent);
-        // Placeholder - behavior will be configured later
+        this.hidden = 1; // Don't render the weapon sprite (helmet is rendered separately)
+        this.targetZoom = defaultCameraScale; // Target zoom level (starts at normal)
+        this.zoomSpeed = 0.05; // Very slow lerp factor for smooth zoom transitions
+        this.isActive = 0; // Track if this weapon is actively controlling zoom
+    }
+    
+    update()
+    {
+        super.update();
+        
+        // Only handle radar zoom for active player
+        if (!this.parent.isPlayer || this.parent.playerIndex != 0)
+            return;
+        
+        // Check if F key is pressed (key code 70)
+        const pressingF = keyIsDown(70);
+        
+        // Set target zoom based on F key state
+        if (pressingF)
+        {
+            // F is held - zoom out to 5x (divide scale by 5 to see more area)
+            this.targetZoom = defaultCameraScale / 5;
+            this.isActive = 1;
+        }
+        else
+        {
+            // F is released - zoom back to normal
+            this.targetZoom = defaultCameraScale;
+            this.isActive = 1;
+        }
+        
+        // Smoothly lerp cameraScale towards target zoom
+        if (this.isActive)
+        {
+            cameraScale += (this.targetZoom - cameraScale) * this.zoomSpeed;
+            
+            // If we're very close to target, snap to it (prevents infinite tiny adjustments)
+            if (abs(cameraScale - this.targetZoom) < 0.1)
+            {
+                cameraScale = this.targetZoom;
+            }
+        }
+    }
+    
+    destroy()
+    {
+        // Reset zoom to normal immediately when weapon is destroyed/unequipped
+        if (this.isActive && this.parent && this.parent.isPlayer && this.parent.playerIndex == 0)
+        {
+            // If currently zoomed out, reset to default immediately
+            // (Since destroy() stops update() from being called, we can't smoothly reset)
+            if (cameraScale < defaultCameraScale * 0.9) // Only reset if significantly zoomed out (smaller scale)
+            {
+                cameraScale = defaultCameraScale;
+            }
+        }
+        
+        super.destroy();
     }
 }
 

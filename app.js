@@ -53,15 +53,15 @@ engineInit(
     // handle title screen input
     if (gameState === 'title')
     {
-        // Level selector (number keys 1-6)
-        for(let i = 1; i <= 6; i++)
-        {
-            const keyCode = 48 + i; // 49 = '1', 50 = '2', etc.
-            if (keyWasPressed(keyCode))
-            {
-                selectedLevel = i;
-            }
-        }
+        // Level selector (number keys 1-6) - COMMENTED OUT
+        // for(let i = 1; i <= 6; i++)
+        // {
+        //     const keyCode = 48 + i; // 49 = '1', 50 = '2', etc.
+        //     if (keyWasPressed(keyCode))
+        //     {
+        //         selectedLevel = i;
+        //     }
+        // }
         
         // Start game
         if (keyWasPressed(32) || gamepadWasPressed(0))
@@ -287,23 +287,23 @@ engineInit(
             mainContext.fillText('MALEFACTOR', mainCanvas.width/2, mainCanvas.height/2 - 100);
         }
         
-        // Level selector
-        mainContext.textAlign = 'center';
-        mainContext.fillStyle = new Color(1,1,1).rgba();
-        mainContext.font = 'bold 24px JetBrains Mono';
-        mainContext.fillText('Select Level (Press 1-6):', mainCanvas.width/2, mainCanvas.height/2 + 20);
-        
-        // Highlight selected level
-        const levelY = mainCanvas.height/2 + 55;
-        for(let i = 1; i <= 6; i++)
-        {
-            const x = mainCanvas.width/2 - 100 + (i - 1) * 33;
-            const color = i === selectedLevel ? new Color(1,1,0) : new Color(0.7,0.7,0.7);
-            mainContext.fillStyle = color.rgba();
-            mainContext.font = 'bold 36px JetBrains Mono';
-            mainContext.textAlign = 'center';
-            mainContext.fillText(i.toString(), x, levelY);
-        }
+        // Level selector - COMMENTED OUT
+        // mainContext.textAlign = 'center';
+        // mainContext.fillStyle = new Color(1,1,1).rgba();
+        // mainContext.font = 'bold 24px JetBrains Mono';
+        // mainContext.fillText('Select Level (Press 1-6):', mainCanvas.width/2, mainCanvas.height/2 + 20);
+        // 
+        // // Highlight selected level
+        // const levelY = mainCanvas.height/2 + 55;
+        // for(let i = 1; i <= 6; i++)
+        // {
+        //     const x = mainCanvas.width/2 - 100 + (i - 1) * 33;
+        //     const color = i === selectedLevel ? new Color(1,1,0) : new Color(0.7,0.7,0.7);
+        //     mainContext.fillStyle = color.rgba();
+        //     mainContext.font = 'bold 36px JetBrains Mono';
+        //     mainContext.textAlign = 'center';
+        //     mainContext.fillText(i.toString(), x, levelY);
+        // }
         
         // Press to start text
         mainContext.textAlign = 'center';
@@ -321,6 +321,8 @@ engineInit(
         mainContext.fillText('C = Grenade', mainCanvas.width/2, controlsY + lineHeight * 3);
         mainContext.fillText('Space = Shoot', mainCanvas.width/2, controlsY + lineHeight * 4);
         mainContext.fillText('Shift = Roll', mainCanvas.width/2, controlsY + lineHeight * 5);
+        mainContext.fillText('F = Weapon', mainCanvas.width/2, controlsY + lineHeight * 6);
+        mainContext.fillText('Q = Unequip', mainCanvas.width/2, controlsY + lineHeight * 7);
     }
     else if (gameState === 'playing')
     {

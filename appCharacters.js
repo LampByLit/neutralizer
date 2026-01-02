@@ -1797,6 +1797,20 @@ class Player extends Character
         }
     }
     
+    kill(damagingObject)
+    {
+        // Call parent kill method (destroys weapon, etc.)
+        super.kill(damagingObject);
+        
+        // Clear equipped weapon so helmet is lost on death
+        // This prevents the helmet from being restored when player respawns
+        if (this.equippedWeaponType && this.equippedWeaponType != 'Weapon')
+        {
+            playerEquippedWeapons[this.playerIndex] = undefined;
+            this.equippedWeaponType = 'Weapon';
+        }
+    }
+    
     equipWeapon(weaponType)
     {
         // Destroy current weapon if it exists

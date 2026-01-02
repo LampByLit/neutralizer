@@ -38,7 +38,7 @@ const levelLimits = {
     3: [50, 10, 15, 0, 0],
     4: [1, 0, 0, 1, 0],  // ONLY malefactors: 1 malefactor
     5: [60, 20, 15, 10, 1],  // 60 enemies total, including 10 malefactors and 1 foe
-    6: [1, 0, 0, 0, 0]  // Level 6: Flat level with 1 weak enemy and many crates
+    // 6: [1, 0, 0, 0, 0]  // Level 6: Flat level with 1 weak enemy and many crates - REMOVED
 };
 let levelMaxEnemies, levelMaxSlimes, levelMaxBastards, levelMaxMalefactors, levelMaxFoes;
 let totalEnemiesSpawned, totalSlimesSpawned, totalBastardsSpawned, totalMalefactorsSpawned, totalFoesSpawned;
@@ -68,29 +68,29 @@ function buildTerrain(size)
     tileBackground = [];
     initTileCollision(size);
     
-    // Level 6: Flat terrain
-    if (level == 6)
-    {
-        const flatGroundLevel = 50; // Fixed ground level for flat terrain
-        for(let x=0; x < size.x; x++)
-        {
-            for(let y=0; y < size.y; y++)
-            {
-                const pos = vec2(x,y);
-                let frontTile = tileType_empty;
-                if (y < flatGroundLevel)
-                    frontTile = tileType_dirt;
-                
-                let backTile = tileType_empty;
-                if (y < flatGroundLevel)
-                    backTile = tileType_dirt;
-                
-                setTileCollisionData(pos, frontTile);
-                setTileBackgroundData(pos, backTile);
-            }
-        }
-        return; // Early return for level 6
-    }
+    // Level 6: Flat terrain - REMOVED
+    // if (level == 6)
+    // {
+    //     const flatGroundLevel = 50; // Fixed ground level for flat terrain
+    //     for(let x=0; x < size.x; x++)
+    //     {
+    //         for(let y=0; y < size.y; y++)
+    //         {
+    //             const pos = vec2(x,y);
+    //             let frontTile = tileType_empty;
+    //             if (y < flatGroundLevel)
+    //                 frontTile = tileType_dirt;
+    //             
+    //             let backTile = tileType_empty;
+    //             if (y < flatGroundLevel)
+    //                 backTile = tileType_dirt;
+    //             
+    //             setTileCollisionData(pos, frontTile);
+    //             setTileBackgroundData(pos, backTile);
+    //         }
+    //     }
+    //     return; // Early return for level 6
+    // }
     
     // Normal terrain generation for other levels
     let startGroundLevel = rand(40, 60);
@@ -522,91 +522,91 @@ function generateLevel()
     const totalFoesSpawnedRef = { value: 0 };
     const totalEnemiesSpawnedRef = { value: 0 };
     
-    // Level 6: Special generation - flat level with many crates and 1 weak enemy
-    if (level == 6)
-    {
-        // Spawn many many many wooden crates across the level
-        const crateCount = 200; // Many crates!
-        const groundY = 50; // Flat ground level
-        for(let i = crateCount; i--;)
-        {
-            const x = randSeeded(levelSize.x - 10, 5);
-            const y = groundY + 0.5; // On top of ground
-            const pos = vec2(x, y);
-            // Only spawn if not too close to checkpoint
-            if (abs(checkpointPos.x - x) > 10)
-            {
-                new Prop(pos, propType_crate_wood);
-            }
-        }
-        
-        // Spawn 1 weak enemy (guaranteed - if random attempts fail, use fallback)
-        let enemySpawned = 0;
-        for(let attempts = 50; !enemySpawned && attempts--;)
-        {
-            const x = randSeeded(levelSize.x - 20, 10);
-            const y = groundY + 0.5;
-            const pos = vec2(x, y);
-            // Spawn away from checkpoint
-            if (abs(checkpointPos.x - x) > 20)
-            {
-                const enemy = new Enemy(pos);
-                // Force weak enemy type and properties
-                enemy.type = type_weak;
-                enemy.health = enemy.healthMax = 1;
-                enemy.color = new Color(0,1,0);
-                // Reset size to base and scale for weak enemy
-                enemy.size = vec2(.6,.95).scale(.9);
-                enemy.sizeScale = .9;
-                ++totalEnemiesSpawnedRef.value;
-                enemySpawned = 1;
-            }
-        }
-        
-        // Fallback: if random spawning failed, spawn at a guaranteed location
-        if (!enemySpawned)
-        {
-            // Spawn away from checkpoint, ensuring at least 30 units away
-            let spawnX = checkpointPos.x + (checkpointPos.x < levelSize.x/2 ? 40 : -40);
-            spawnX = clamp(spawnX, 20, levelSize.x - 20); // Keep within level bounds
-            const spawnPos = vec2(spawnX, groundY + 0.5);
-            
-            const enemy = new Enemy(spawnPos);
-            // Force weak enemy type and properties
-            enemy.type = type_weak;
-            enemy.health = enemy.healthMax = 1;
-            enemy.color = new Color(0,1,0);
-            // Reset size to base and scale for weak enemy
-            enemy.size = vec2(.6,.95).scale(.9);
-            enemy.sizeScale = .9;
-            ++totalEnemiesSpawnedRef.value;
-        }
-        
-        // Skip normal base generation and enemy spawning for level 6
-        // Sync the refs back to globals
-        totalEnemiesSpawned = totalEnemiesSpawnedRef.value;
-        totalSlimesSpawned = totalSlimesSpawnedRef.value;
-        totalBastardsSpawned = totalBastardsSpawnedRef.value;
-        totalMalefactorsSpawned = totalMalefactorsSpawnedRef.value;
-        totalFoesSpawned = totalFoesSpawnedRef.value;
-        
-        // Build checkpoints for level 6
-        for(let x=0; x<levelSize.x-9; )
-        {
-            x += rand(100,70);
-            const pos = vec2(x, levelSize.y);
-            raycastHit = tileCollisionRaycast(pos, vec2(pos.x, 0));
-            if (raycastHit && abs(checkpointPos.x-pos.x) > 50)
-            {
-                const pos = raycastHit.add(vec2(0,1));
-                new Checkpoint(pos);
-            }
-        }
-        
-        // Clear edge tiles
-        clearEdgeTiles(levelSize, 20);
-        return; // Early return - level 6 is done
-    }
+    // Level 6: Special generation - flat level with many crates and 1 weak enemy - REMOVED
+    // if (level == 6)
+    // {
+    //     // Spawn many many many wooden crates across the level
+    //     const crateCount = 200; // Many crates!
+    //     const groundY = 50; // Flat ground level
+    //     for(let i = crateCount; i--;)
+    //     {
+    //         const x = randSeeded(levelSize.x - 10, 5);
+    //         const y = groundY + 0.5; // On top of ground
+    //         const pos = vec2(x, y);
+    //         // Only spawn if not too close to checkpoint
+    //         if (abs(checkpointPos.x - x) > 10)
+    //         {
+    //             new Prop(pos, propType_crate_wood);
+    //         }
+    //     }
+    //     
+    //     // Spawn 1 weak enemy (guaranteed - if random attempts fail, use fallback)
+    //     let enemySpawned = 0;
+    //     for(let attempts = 50; !enemySpawned && attempts--;)
+    //     {
+    //         const x = randSeeded(levelSize.x - 20, 10);
+    //         const y = groundY + 0.5;
+    //         const pos = vec2(x, y);
+    //         // Spawn away from checkpoint
+    //         if (abs(checkpointPos.x - x) > 20)
+    //         {
+    //             const enemy = new Enemy(pos);
+    //             // Force weak enemy type and properties
+    //             enemy.type = type_weak;
+    //             enemy.health = enemy.healthMax = 1;
+    //             enemy.color = new Color(0,1,0);
+    //             // Reset size to base and scale for weak enemy
+    //             enemy.size = vec2(.6,.95).scale(.9);
+    //             enemy.sizeScale = .9;
+    //             ++totalEnemiesSpawnedRef.value;
+    //             enemySpawned = 1;
+    //         }
+    //     }
+    //     
+    //     // Fallback: if random spawning failed, spawn at a guaranteed location
+    //     if (!enemySpawned)
+    //     {
+    //         // Spawn away from checkpoint, ensuring at least 30 units away
+    //         let spawnX = checkpointPos.x + (checkpointPos.x < levelSize.x/2 ? 40 : -40);
+    //         spawnX = clamp(spawnX, 20, levelSize.x - 20); // Keep within level bounds
+    //         const spawnPos = vec2(spawnX, groundY + 0.5);
+    //         
+    //         const enemy = new Enemy(spawnPos);
+    //         // Force weak enemy type and properties
+    //         enemy.type = type_weak;
+    //         enemy.health = enemy.healthMax = 1;
+    //         enemy.color = new Color(0,1,0);
+    //         // Reset size to base and scale for weak enemy
+    //         enemy.size = vec2(.6,.95).scale(.9);
+    //         enemy.sizeScale = .9;
+    //         ++totalEnemiesSpawnedRef.value;
+    //     }
+    //     
+    //     // Skip normal base generation and enemy spawning for level 6
+    //     // Sync the refs back to globals
+    //     totalEnemiesSpawned = totalEnemiesSpawnedRef.value;
+    //     totalSlimesSpawned = totalSlimesSpawnedRef.value;
+    //     totalBastardsSpawned = totalBastardsSpawnedRef.value;
+    //     totalMalefactorsSpawned = totalMalefactorsSpawnedRef.value;
+    //     totalFoesSpawned = totalFoesSpawnedRef.value;
+    //     
+    //     // Build checkpoints for level 6
+    //     for(let x=0; x<levelSize.x-9; )
+    //     {
+    //         x += rand(100,70);
+    //         const pos = vec2(x, levelSize.y);
+    //         raycastHit = tileCollisionRaycast(pos, vec2(pos.x, 0));
+    //         if (raycastHit && abs(checkpointPos.x-pos.x) > 50)
+    //         {
+    //             const pos = raycastHit.add(vec2(0,1));
+    //             new Checkpoint(pos);
+    //         }
+    //     }
+    //     
+    //     // Clear edge tiles
+    //     clearEdgeTiles(levelSize, 20);
+    //     return; // Early return - level 6 is done
+    // }
 
     // Spawn malefactors directly on levels 4 and 5 (before base generation)
     if (level == 4 || level == 5)
@@ -748,8 +748,8 @@ function generateLevel()
         }
     }
 
-    // random bases until we hit enemy limits (level 4 and 6 skip bases)
-    if (level != 4 && level != 6)
+    // random bases until we hit enemy limits (level 4 skips bases)
+    if (level != 4)
     {
         for(let tries=99;totalEnemiesSpawnedRef.value < levelMaxEnemies;)
         {
@@ -1041,40 +1041,40 @@ function nextLevel()
         }
     }
 
-    // CRITICAL VERIFICATION: Ensure level 6 has at least 1 enemy (guaranteed spawn)
-    if (level == 6)
-    {
-        let enemyCount = 0;
-        forEachObject(0, 0, (o)=>
-        {
-            // Check if it's an enemy character (not malefactor, foe, slime, or bastard)
-            if (o.isCharacter && o.team == team_enemy && !o.destroyed)
-            {
-                // Count regular enemies (type 0-6, not malefactor type 7, and not slime/bastard)
-                if (o.type !== undefined && o.type < 7 && !o.isSlime && !o.isBastard)
-                    ++enemyCount;
-            }
-        }, 0); // Check all objects, not just collide objects
-        
-        // If no enemy found, force spawn one (guaranteed location)
-        if (enemyCount == 0)
-        {
-            const groundY = 50; // Flat ground level for level 6
-            // Spawn away from checkpoint, ensuring at least 20 units away
-            let spawnX = checkpointPos.x + (abs(checkpointPos.x - levelSize.x/2) < 50 ? 30 : -30);
-            spawnX = clamp(spawnX, 20, levelSize.x - 20); // Keep within level bounds
-            const spawnPos = vec2(spawnX, groundY + 0.5);
-            
-            const enemy = new Enemy(spawnPos);
-            // Force weak enemy type and properties
-            enemy.type = type_weak;
-            enemy.health = enemy.healthMax = 1;
-            enemy.color = new Color(0,1,0);
-            // Reset size to base and scale for weak enemy
-            enemy.size = vec2(.6,.95).scale(.9);
-            enemy.sizeScale = .9;
-        }
-    }
+    // CRITICAL VERIFICATION: Ensure level 6 has at least 1 enemy (guaranteed spawn) - REMOVED
+    // if (level == 6)
+    // {
+    //     let enemyCount = 0;
+    //     forEachObject(0, 0, (o)=>
+    //     {
+    //         // Check if it's an enemy character (not malefactor, foe, slime, or bastard)
+    //         if (o.isCharacter && o.team == team_enemy && !o.destroyed)
+    //         {
+    //             // Count regular enemies (type 0-6, not malefactor type 7, and not slime/bastard)
+    //             if (o.type !== undefined && o.type < 7 && !o.isSlime && !o.isBastard)
+    //                 ++enemyCount;
+    //         }
+    //     }, 0); // Check all objects, not just collide objects
+    //     
+    //     // If no enemy found, force spawn one (guaranteed location)
+    //     if (enemyCount == 0)
+    //     {
+    //         const groundY = 50; // Flat ground level for level 6
+    //         // Spawn away from checkpoint, ensuring at least 20 units away
+    //         let spawnX = checkpointPos.x + (abs(checkpointPos.x - levelSize.x/2) < 50 ? 30 : -30);
+    //         spawnX = clamp(spawnX, 20, levelSize.x - 20); // Keep within level bounds
+    //         const spawnPos = vec2(spawnX, groundY + 0.5);
+    //         
+    //         const enemy = new Enemy(spawnPos);
+    //         // Force weak enemy type and properties
+    //         enemy.type = type_weak;
+    //         enemy.health = enemy.healthMax = 1;
+    //         enemy.color = new Color(0,1,0);
+    //         // Reset size to base and scale for weak enemy
+    //         enemy.size = vec2(.6,.95).scale(.9);
+    //         enemy.sizeScale = .9;
+    //     }
+    // }
 
     // hack, subtract off warm up time from main game timer
     //gameTimer.time += warmUpTime;
