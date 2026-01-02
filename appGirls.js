@@ -108,17 +108,22 @@ class Girl extends Character
         }
 
         // ========== SAFETY TELEPORT ==========
-        // If fallen below level, too far from player, or stuck in geometry, teleport back
-        const tooFarFromPlayer = this.pos.distance(player.pos) > 25;
+        // If fallen below level, too far from player, too high, or stuck in geometry, teleport back
+        const tooFarFromPlayer = this.pos.distance(player.pos) > 20;
         const fellBelowLevel = this.pos.y < 0;
+        const tooHighAbovePlayer = this.pos.y > player.pos.y + 15;
         const stuckInWall = getTileCollisionData(this.pos) > 0 && getTileCollisionData(this.pos) != tileType_ladder;
-        if (tooFarFromPlayer || fellBelowLevel || stuckInWall)
+        if (tooFarFromPlayer || fellBelowLevel || tooHighAbovePlayer || stuckInWall)
         {
             // Teleport to player's position (slightly offset)
             this.pos = player.pos.add(vec2(this.girlIndex + 1, 0));
             this.velocity = vec2(0, 0);
             this.groundObject = 0; // Reset ground state
         }
+        
+        // Cap upward velocity to prevent flying into sky
+        if (this.velocity.y > 0.3)
+            this.velocity.y = 0.3;
 
         // ========== ENEMY DETECTION ==========
         const sightCheckFrames = 9;
@@ -364,28 +369,24 @@ class Girl extends Character
         // Handle jump manually to avoid jump sound
         if (this.wantsToJump && wasOnGround && !this.jumpTimer.active())
         {
-            // Apply jump velocity silently
+            // Apply jump velocity silently - same as player
             if (this.climbingWall)
             {
-                this.velocity.y = 0.28;
-            }
-            else if (this.wantsHighJump)
-            {
-                this.velocity.y = 0.22;
+                this.velocity.y = 0.25; // Wall jump (same as player)
             }
             else
             {
-                this.velocity.y = 0.15; // Normal small hop
+                this.velocity.y = 0.15; // Normal jump (same as player)
             }
             this.jumpTimer.set(0.2);
             this.preventJumpTimer.set(0.4);
             this.groundTimer.unset();
         }
         
-        // Jump continuation while holding
+        // Jump continuation (same as player)
         if (this.jumpTimer.active() && this.holdingJump && this.velocity.y > 0)
         {
-            this.velocity.y += 0.012;
+            this.velocity.y += 0.017;
         }
         
         // Ensure weapon protection
