@@ -33,6 +33,7 @@ let selectedLevel = 1; // Keep default to 1 for normal gameplay
 // Title screen music
 let titleMusic = null;
 let titleMusicPlaying = false;
+let titleScreenReady = false; // Track if user has pressed any key to start music
 
 engineInit(
 
@@ -41,6 +42,7 @@ engineInit(
 {
     gameState = 'title';
     cameraScale = startCameraScale;
+    titleScreenReady = false;
     
     // Initialize title screen music
     titleMusic = new Audio('https://mp3.tom7.org/t7es/2016/superior-olive.mp3');
@@ -49,13 +51,6 @@ engineInit(
     titleMusic.onerror = function() {
         console.warn('Failed to load title music');
     };
-    
-    // Try to start playing music immediately
-    titleMusic.play().then(function() {
-        titleMusicPlaying = true;
-    }).catch(function(error) {
-        // Browser may block autoplay, will retry in update loop
-    });
 },
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -72,14 +67,38 @@ engineInit(
     // handle title screen input
     if (gameState === 'title')
     {
-        // Try to start playing title music if not already playing
-        if (titleMusic && !titleMusicPlaying)
+        // Check if user presses any key or mouse button to start music and show "Press Enter" message
+        if (!titleScreenReady)
         {
-            titleMusic.play().then(function() {
-                titleMusicPlaying = true;
-            }).catch(function(error) {
-                // Browser may block autoplay, will retry on next frame
-            });
+            // Check for any key press, mouse click, or gamepad button
+            let anyKeyPressed = false;
+            for(let i = 0; i < inputData[0].length; i++)
+            {
+                if (inputData[0][i] && inputData[0][i].p)
+                {
+                    anyKeyPressed = true;
+                    break;
+                }
+            }
+            // Also check gamepad buttons
+            if (!anyKeyPressed && gamepadWasPressed(0, 0))
+            {
+                anyKeyPressed = true;
+            }
+            
+            if (anyKeyPressed)
+            {
+                titleScreenReady = true;
+                // Start playing title music
+                if (titleMusic && !titleMusicPlaying)
+                {
+                    titleMusic.play().then(function() {
+                        titleMusicPlaying = true;
+                    }).catch(function(error) {
+                        console.warn('Could not play title music:', error);
+                    });
+                }
+            }
         }
         
         // Level selector (number keys 1-6) - COMMENTED OUT
@@ -92,8 +111,8 @@ engineInit(
         //     }
         // }
         
-        // Start game
-        if (keyWasPressed(32) || gamepadWasPressed(0))
+        // Start game with Enter key (key code 13) or gamepad button
+        if (titleScreenReady && (keyWasPressed(13) || gamepadWasPressed(0)))
         {
             // Stop title music when game starts
             if (titleMusic && titleMusicPlaying)
@@ -204,15 +223,17 @@ engineInit(
     {
         // return to title screen after game over
         gameState = 'title';
-        // Reset music flag so it will restart when title screen is shown
+        // Reset music flag and title screen state so it will restart when title screen is shown
         titleMusicPlaying = false;
+        titleScreenReady = false;
     }
     else if (gameState === 'win' && gameCompleteTimer.get() > 4)
     {
         // return to title screen after win
         gameState = 'title';
-        // Reset music flag so it will restart when title screen is shown
+        // Reset music flag and title screen state so it will restart when title screen is shown
         titleMusicPlaying = false;
+        titleScreenReady = false;
     }
 },
 
@@ -345,11 +366,18 @@ engineInit(
         //     mainContext.fillText(i.toString(), x, levelY);
         // }
         
-        // Press to start text
+        // Press to start text - show different message based on state
         mainContext.textAlign = 'center';
         mainContext.fillStyle = new Color(1,1,1).rgba();
         mainContext.font = 'bold 32px JetBrains Mono';
-        mainContext.fillText('Press SPACE to Start', mainCanvas.width/2, mainCanvas.height/2 + 70);
+        if (!titleScreenReady)
+        {
+            mainContext.fillText('Press Any Key', mainCanvas.width/2, mainCanvas.height/2 + 70);
+        }
+        else
+        {
+            mainContext.fillText('Press Enter to Begin', mainCanvas.width/2, mainCanvas.height/2 + 70);
+        }
 
         // Controls subtitle
         mainContext.font = 'bold 20px JetBrains Mono';
