@@ -1337,7 +1337,13 @@ function nextLevel()
     };
     
     // Spawn girls: 2 new girls + restore surviving girls
-    if (typeof girls !== 'undefined')
+    // Make sure girls array exists (initialize if needed)
+    if (typeof girls === 'undefined')
+    {
+        girls = [];
+    }
+    
+    if (girls !== null)
     {
         // Restore surviving girls to ground near checkpoint (they're already in engineObjects from generateLevel)
         for(const girl of survivingGirls)
@@ -1375,8 +1381,17 @@ function nextLevel()
         for(let i = 0; i < girlsToSpawn; i++)
         {
             const offsetX = (i - 0.5) * 4; // Spread them out: -2, +2
-            const groundPos = findGroundPosNearCheckpoint(offsetX);
-            new Girl(groundPos);
+            let groundPos = findGroundPosNearCheckpoint(offsetX);
+            
+            // Ensure position is valid - if raycast failed, use checkpoint directly
+            if (!groundPos || groundPos.y < 0 || groundPos.y > levelSize.y + 10)
+            {
+                groundPos = checkpointPos.add(vec2(offsetX, 0));
+            }
+            
+            // Spawn girl - they auto-add to engineObjects via constructor
+            const girl = new Girl(groundPos);
+            console.log('Spawned girl at:', groundPos, 'girl object:', girl);
         }
     }
     //new Enemy(checkpointPos.add(vec2(3))); // test enemy

@@ -359,9 +359,13 @@ class Girl extends Character
     
     render()
     {
-        // Always render if persistent (like players)
-        if (!this.persistent && !isOverlapping(this.pos, this.size, cameraPos, renderWindowSize))
-            return;
+        // Always render persistent objects (like players)
+        // Skip visibility check for persistent objects to ensure they render
+        if (!this.persistent)
+        {
+            if (!isOverlapping(this.pos, this.size, cameraPos, renderWindowSize))
+                return;
+        }
 
         // Set tile to use - use bodyTile directly
         this.tileIndex = this.isDead() ? this.bodyTile : this.bodyTile;
