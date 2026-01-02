@@ -15,14 +15,11 @@ const enableAsserts = 1;
 const debugPointSize = .5;
 
 let showWatermark = 1;
-let godMode = 0;
 let debugRects = [];
 let debugOverlay = 0;
 let debugPhysics = 0;
 let debugParticles = 0;
 let debugCanvas = -1;
-let debugTakeScreenshot;
-let downloadLink;
 
 // debug helper functions
 const ASSERT = enableAsserts ? (...assert)=> console.assert(...assert) : ()=>{};
@@ -40,12 +37,6 @@ const debugLine = (posA, posB, color, thickness=.1, time)=>
     debugRect(posA.add(halfDelta), size, color, time, halfDelta.angle(), 1);
 }
 
-const debugSaveCanvas = (canvas, filename = engineName + '.png') =>
-{
-    downloadLink.download = "screenshot.png";
-    downloadLink.href = canvas.toDataURL('image/png').replace('image/png','image/octet-stream');
-    downloadLink.click();
-}
 const debugAABB = (pA, pB, sA, sB, color)=>
 {
     const minPos = vec2(min(pA.x - sA.x/2, pB.x - sB.x/2), min(pA.y - sA.y/2, pB.y - sB.y/2));
@@ -58,9 +49,6 @@ const debugAABB = (pA, pB, sA, sB, color)=>
 
 const debugInit = ()=>
 {
-    // create link for saving screenshots
-    document.body.appendChild(downloadLink = document.createElement('a'));
-    downloadLink.style.display = 'none';
 }
 
 const debugUpdate = ()=>
@@ -81,15 +69,6 @@ const debugUpdate = ()=>
     {
         debugParticles = !debugParticles;
         debugPhysics = 0;
-    }
-    if (keyWasPressed(51)) // 3
-    {
-        godMode = !godMode;
-    }
-        
-    if (keyWasPressed(53)) // 5
-    {
-        debugTakeScreenshot = 1;
     }
     if (keyWasPressed(54)) // 6
     {
@@ -116,12 +95,6 @@ const debugUpdate = ()=>
 
 const debugRender = ()=>
 {
-    if (debugTakeScreenshot)
-    {
-        debugSaveCanvas(mainCanvas);
-        debugTakeScreenshot = 0;
-    }
-
     if (debugOverlay)
     {
         for(const o of engineObjects)
@@ -243,10 +216,6 @@ const debugRender = ()=>
             mainContext.fillText('1: Debug Physics', x, y += h);
             mainContext.fillStyle = debugParticles ? '#f00' : '#fff';
             mainContext.fillText('2: Debug Particles', x, y += h);
-            mainContext.fillStyle = godMode ? '#f00' : '#fff';
-            mainContext.fillText('3: God Mode', x, y += h);
-            mainContext.fillStyle = '#fff';
-            mainContext.fillText('5: Save Screenshot', x, y += h);
             //mainContext.fillStyle = debugParticleEditor ? '#f00' : '#fff';
             //mainContext.fillText('6: Particle Editor', x, y += h);
         }
@@ -254,7 +223,6 @@ const debugRender = ()=>
         {
             mainContext.fillText(debugPhysics ? 'Debug Physics' : '', x, y += h);
             mainContext.fillText(debugParticles ? 'Debug Particles' : '', x, y += h);
-            mainContext.fillText(godMode ? 'God Mode' : '', x, y += h);
         }
     
         mainContext.shadowBlur = 0;

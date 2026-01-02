@@ -1,5 +1,3 @@
-![Space Huggers - A JS13k Game by Frank Force](/screenshot.png)
-
 The empire is spreading like a plague across the galaxy and building outposts on remote planets.
 You are an elite rebel soldier tasked with wiping out those bases.
 Explore strange planets using your tools of destruction and eliminate the invaders!

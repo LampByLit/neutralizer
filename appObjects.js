@@ -87,13 +87,10 @@ class GameObject extends EngineObject
         if (!this.canBurn || this.burnTimer.isSet() || this.extinguishTimer.active())
             return;
 
-        if (godMode && this.isPlayer)
-            return;
-
         if (this.team == team_player)
         {
             // safety window after spawn
-            if (godMode || this.getAliveTime() < 2)
+            if (this.getAliveTime() < 2)
                 return;
         }
 
@@ -784,6 +781,119 @@ class SlimeWeapon extends EngineObject
                 // Apply small random rotation to direction vector for spread
                 const spreadAngle = rand(spread, -spread);
                 particle.velocity = direction.rotate(spreadAngle).scale(particleSpeed);
+            }
+        }
+        else
+        {
+            this.fireTimeBuffer = min(this.fireTimeBuffer, 0);
+            // Face player even when not shooting
+            if (this.parent.sawPlayerTimer && this.parent.sawPlayerTimer.isSet())
+            {
+                const playerPos = this.parent.sawPlayerPos;
+                const direction = playerPos.subtract(this.pos).normalize();
+                const aimAngle = direction.angle();
+                this.localAngle = -aimAngle * this.getMirrorSign();
+            }
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class FoeWeapon extends EngineObject 
+{
+    constructor(pos, parent) 
+    { 
+        super(pos, vec2(.6), 4, vec2(8));
+
+        this.isWeapon = 1;
+        this.fireTimeBuffer = this.localAngle = 0;
+        this.burstTimer = new Timer;
+        this.burstActive = 0;
+        this.burstDuration = 2.5; // Longer bursts for more aggression
+        this.burstCooldown = 0.8; // Shorter cooldown for more aggression
+        
+        this.renderOrder = parent.renderOrder+1;
+        this.hidden = 1; // Don't render the weapon (foe shoots from head, not gun)
+
+        parent.weapon = this;
+        parent.addChild(this, this.localOffset = vec2(.55,0));
+    }
+    
+    render()
+    {
+        // Don't render - foe shoots from head, not a visible weapon
+        return;
+    }
+
+    update()
+    {
+        super.update();
+
+        const particleSpeed = .3;
+        const particleRate = 60; // Higher particle rate for thicker spray
+        const spread = .05; // Wider spread per spray (0.05 vs 0.01)
+        const sprayAngles = [-22.5 * PI / 180, 0, 22.5 * PI / 180]; // 3 sprays at -22.5°, 0°, +22.5°
+
+        this.mirror = this.parent.mirror;
+
+        // Burst pattern: active for burstDuration, then cooldown
+        if (!this.burstTimer.isSet())
+        {
+            // Start first burst
+            this.burstActive = 1;
+            this.burstTimer.set(this.burstDuration);
+        }
+        else if (this.burstTimer.elapsed())
+        {
+            if (this.burstActive)
+            {
+                // Burst finished, start cooldown
+                this.burstActive = 0;
+                this.burstTimer.set(this.burstCooldown);
+            }
+            else
+            {
+                // Cooldown finished, start new burst
+                this.burstActive = 1;
+                this.burstTimer.set(this.burstDuration);
+            }
+        }
+
+        // Only shoot when parent sees player and burst is active
+        if (this.parent.sawPlayerTimer && this.parent.sawPlayerTimer.isSet() && 
+            this.parent.sawPlayerTimer.get() < 10 && this.burstActive)
+        {
+            this.fireTimeBuffer += timeDelta;
+            const rate = 1/particleRate;
+            
+            // Get direction to player from center of foe (no head, so use center position)
+            const shootPos = this.parent.pos.add(vec2(0, 0.2).scale(this.parent.sizeScale || 1)); // Center-ish position
+            const playerPos = this.parent.sawPlayerPos;
+            const toPlayer = playerPos.subtract(shootPos);
+            const baseDirection = toPlayer.normalize();
+            const baseAngle = baseDirection.angle();
+            
+            for(; this.fireTimeBuffer > 0; this.fireTimeBuffer -= rate)
+            {
+                // Create 3 simultaneous sprays at different angles, all generally toward player
+                for(let sprayIndex = 0; sprayIndex < 3; sprayIndex++)
+                {
+                    // Calculate angle for this spray (base angle toward player + spray offset)
+                    const sprayAngle = baseAngle + sprayAngles[sprayIndex];
+                    // Create direction vector from angle (pointing toward player)
+                    const sprayDirection = vec2(Math.cos(sprayAngle), Math.sin(sprayAngle));
+                    
+                    // Create slime particle from shoot position
+                    const particle = new SlimeParticle(shootPos, this.parent);
+                    
+                    // Make particles thicker (larger size)
+                    particle.size = particle.size.scale(1.5); // 1.5x larger particles
+                    
+                    // Fire particle in spray direction with spread (spread is relative to spray direction)
+                    const spreadAngle = rand(spread, -spread);
+                    particle.velocity = sprayDirection.rotate(spreadAngle).scale(particleSpeed);
+                }
             }
         }
         else

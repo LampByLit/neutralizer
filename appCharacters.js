@@ -314,7 +314,7 @@ class Character extends GameObject
         if (this.team == team_player)
         {
             // safety window after spawn
-            if (godMode || this.getAliveTime() < 2)
+            if (this.getAliveTime() < 2)
                 return;
         }
 
@@ -433,7 +433,8 @@ const type_grenade= 4;
 const type_slime  = 5;
 const type_bastard= 6;
 const type_malefactor = 7;
-const type_count  = 8;
+const type_foe    = 8;
+const type_count  = 9;
 
 function alertEnemies(pos, playerPos)
 {
@@ -868,6 +869,150 @@ class Slime extends Enemy
             const blinkScale = this.canBlink ? .5 + .5*Math.cos(this.blinkTimer.getPercent()*PI*2) : 1;
             drawTile(this.pos.add(vec2(this.getMirrorSign(.05),.46).scale(sizeScale).rotate(-this.angle)),vec2(sizeScale/2, blinkScale*sizeScale/2),this.headTile+1,vec2(8), eyeColor, this.angle, this.mirror, this.additiveColor);
         }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class Foe extends Enemy
+{
+    constructor(pos) 
+    { 
+        super(pos);
+        
+        // Override type to be foe
+        this.type = type_foe;
+        
+        // Foe is huge (5x size) and slow like slime
+        this.size = this.size.scale(this.sizeScale = 5.0);
+        this.health = this.healthMax = 100; // Twice malefactor health (50 * 2)
+        
+        // Green slime color (same as slime)
+        this.color = new Color(0, 1, 0);
+        this.eyeColor = new Color(0, 0.8, 0);
+        
+        // Foe-specific properties
+        // Use unused sprite tile from bottom of sprite sheet for foe body
+        // Assuming 16 tiles per row, using high indices that are at the bottom rows
+        this.foeTile = 30; // Foe sprite tile (from bottom of sprite sheet)
+        this.foeTileSize = vec2(16); // Same size as slime sprite
+        this.trailPositions = []; // Store positions for trail
+        this.maxTrailLength = 15; // Longer trail than slime
+        this.lastTrailPos = this.pos.copy();
+        this.trailTimer = new Timer;
+        
+        // Foe moves faster than slime - aggressive chaser
+        this.maxSpeed = maxCharacterSpeed * 0.6; // Faster than slime (0.4) but still slower than normal
+        this.maxVisionRange = 25; // Much longer vision range
+        
+        // Replace weapon with foe weapon
+        this.weapon && this.weapon.destroy();
+        new FoeWeapon(this.pos, this);
+        
+        // Foe doesn't burn
+        this.canBurn = 0;
+        
+        // Initialize trail timer
+        this.trailTimer.set(0.1);
+    }
+    
+    update()
+    {
+        // Update trail
+        if (this.trailTimer.elapsed())
+        {
+            this.trailTimer.set(0.1); // Add to trail every 0.1 seconds
+            const dist = this.pos.distance(this.lastTrailPos);
+            if (dist > 0.2) // Only add if moved enough
+            {
+                this.trailPositions.push(this.pos.copy());
+                if (this.trailPositions.length > this.maxTrailLength)
+                    this.trailPositions.shift();
+                this.lastTrailPos = this.pos.copy();
+            }
+        }
+        
+        // EXTREMELY AGGRESSIVE: Always chase player when seen
+        if (this.sawPlayerTimer && this.sawPlayerTimer.isSet() && this.sawPlayerTimer.get() < 10)
+        {
+            const playerDirection = sign(this.sawPlayerPos.x - this.pos.x);
+            
+            // Always move toward player aggressively
+            if (rand() < 0.05) // Small chance to stop briefly
+                this.moveInput.x = 0;
+            else
+                this.moveInput.x = playerDirection * rand(0.8, 0.6); // Strong movement toward player
+            
+            // Always try to get to player's vertical position
+            this.moveInput.y = clamp(this.sawPlayerPos.y - this.pos.y, 0.7, -0.7);
+            
+            // Face player always
+            this.mirror = this.sawPlayerPos.x < this.pos.x;
+            
+            // Frequent jumps to chase player
+            if (rand() < 0.03)
+            {
+                this.pressedJumpTimer.set(0.1);
+                this.holdJumpTimer.set(rand(0.2));
+            }
+        }
+        else
+        {
+            // Scale down movement input when not chasing
+            if (this.moveInput)
+            {
+                this.moveInput = this.moveInput.scale(0.4);
+            }
+        }
+        
+        super.update();
+        
+        // Clamp velocity to foe's max speed
+        if (abs(this.velocity.x) > this.maxSpeed)
+            this.velocity.x = sign(this.velocity.x) * this.maxSpeed;
+    }
+    
+    render()
+    {
+        if (!isOverlapping(this.pos, this.size, cameraPos, renderWindowSize))
+            return;
+        
+        const sizeScale = this.sizeScale;
+        const color = this.color.scale(this.burnColorPercent(), 1);
+        
+        // Draw trail (green translucent blobs) - larger than slime
+        if (this.trailPositions.length > 0)
+        {
+            setBlendMode(0); // Regular blend for translucent effect
+            for(let i = 0; i < this.trailPositions.length; i++)
+            {
+                const trailPos = this.trailPositions[i];
+                const alpha = (i + 1) / this.trailPositions.length * 0.3; // Fade out trail
+                const trailSize = sizeScale * 0.6 * (i + 1) / this.trailPositions.length;
+                const trailColor = new Color(0, 1, 0, alpha);
+                drawTile(trailPos, vec2(trailSize), -1, undefined, trailColor);
+            }
+            setBlendMode(0);
+        }
+        
+        // Draw translucent green liquid blob around foe (more blobs for larger size)
+        setBlendMode(0);
+        const translucentColor = new Color(0, 1, 0, 0.3);
+        const blobSize = sizeScale * 1.2; // Large chunks for liquid effect
+        // Draw multiple overlapping blobs to create liquid effect (more for larger foe)
+        drawTile(this.pos.add(vec2(-0.2, 0.15).scale(sizeScale)), vec2(blobSize), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(0.2, 0.15).scale(sizeScale)), vec2(blobSize), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(0, -0.15).scale(sizeScale)), vec2(blobSize), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(0, 0.2).scale(sizeScale)), vec2(blobSize * 0.9), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(-0.1, 0).scale(sizeScale)), vec2(blobSize * 0.8), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(0.1, 0).scale(sizeScale)), vec2(blobSize * 0.8), -1, undefined, translucentColor);
+        setBlendMode(0);
+        
+        // Draw main foe body sprite
+        const bodyPos = this.pos.add(vec2(0, -0.1 + 0.06 * Math.sin(this.walkCyclePercent * PI)).scale(sizeScale));
+        drawTile(bodyPos, vec2(sizeScale), this.foeTile, this.foeTileSize, color, this.angle, this.mirror);
+        
+        // No head - foe is just a body
     }
 }
 

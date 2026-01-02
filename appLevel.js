@@ -30,16 +30,16 @@ let skyParticles, skyRain, skySoundTimer = new Timer;
 let gameTimer = new Timer, levelTimer = new Timer, levelEndTimer = new Timer, gameOverTimer = new Timer, gameCompleteTimer = new Timer;
 let gameState = 'title'; // game states: 'title', 'playing', 'gameOver', 'win'
 
-// level enemy limits: [maxEnemies, maxSlimes, maxBastards, maxMalefactors]
+// level enemy limits: [maxEnemies, maxSlimes, maxBastards, maxMalefactors, maxFoes]
 const levelLimits = {
-    1: [20, 1, 0, 0],
-    2: [40, 3, 0, 0],
-    3: [50, 10, 15, 0],
-    4: [1, 0, 0, 1],  // ONLY malefactors: 1 malefactor
-    5: [100, 30, 20, 3]  // 100 enemies total, including 3 malefactors
+    1: [20, 1, 0, 0, 0],
+    2: [40, 3, 0, 0, 0],
+    3: [50, 10, 15, 0, 0],
+    4: [1, 0, 0, 1, 0],  // ONLY malefactors: 1 malefactor
+    5: [60, 20, 15, 10, 1]  // 60 enemies total, including 10 malefactors and 1 foe
 };
-let levelMaxEnemies, levelMaxSlimes, levelMaxBastards, levelMaxMalefactors;
-let totalEnemiesSpawned, totalSlimesSpawned, totalBastardsSpawned, totalMalefactorsSpawned;
+let levelMaxEnemies, levelMaxSlimes, levelMaxBastards, levelMaxMalefactors, levelMaxFoes;
+let totalEnemiesSpawned, totalSlimesSpawned, totalBastardsSpawned, totalMalefactorsSpawned, totalFoesSpawned;
 
 let tileBackground, keyItemSpawned;
 const setTileBackgroundData = (pos, data=0)=>
@@ -482,20 +482,22 @@ function generateLevel()
     }
     checkpointPos = raycastHit.add(vec2(0,1));
 
-    // track total enemies, slimes, bastards, and malefactors spawned for this level
+    // track total enemies, slimes, bastards, malefactors, and foes spawned for this level
     totalEnemiesSpawned = 0;
     totalSlimesSpawned = 0;
     totalBastardsSpawned = 0;
     totalMalefactorsSpawned = 0;
+    totalFoesSpawned = 0;
     const totalSlimesSpawnedRef = { value: 0 };
     const totalBastardsSpawnedRef = { value: 0 };
     const totalMalefactorsSpawnedRef = { value: 0 };
+    const totalFoesSpawnedRef = { value: 0 };
     const totalEnemiesSpawnedRef = { value: 0 };
 
     // Spawn malefactors directly on levels 4 and 5 (before base generation)
     if (level == 4 || level == 5)
     {
-        const malefactorCount = level == 4 ? 1 : 3;
+        const malefactorCount = levelMaxMalefactors;
         for(let i = 0; i < malefactorCount; i++)
         {
             let spawnPos = null;
@@ -585,6 +587,53 @@ function generateLevel()
         }
     }
 
+    // Spawn foe on level 5 (before base generation)
+    if (level == 5 && levelMaxFoes > 0)
+    {
+        let spawnPos = null;
+        let foundPos = null;
+        for(let attempts = 50; !foundPos && attempts--;)
+        {
+            const pos = vec2(randSeeded(levelSize.x-40, 40), levelSize.y);
+            raycastHit = tileCollisionRaycast(pos, vec2(pos.x, 0));
+            if (raycastHit && abs(checkpointPos.x-pos.x) > 50) // Farther from checkpoint than malefactors
+            {
+                const groundY = (raycastHit.y - 0.5) | 0;
+                foundPos = createMalefactorSpawnPlatform(pos.x, groundY, 15, 10); // Larger platform for foe
+            }
+        }
+        if (!foundPos)
+        {
+            // Fallback: spawn away from checkpoint
+            const fallbackX = checkpointPos.x + 80;
+            const fallbackTest = vec2(fallbackX, levelSize.y);
+            raycastHit = tileCollisionRaycast(fallbackTest, vec2(fallbackX, 0));
+            if (raycastHit)
+            {
+                const groundY = (raycastHit.y - 0.5) | 0;
+                foundPos = createMalefactorSpawnPlatform(fallbackX, groundY, 15, 10);
+            }
+        }
+        spawnPos = foundPos;
+        
+        // Spawn the foe on the platform
+        if (spawnPos)
+        {
+            new Foe(spawnPos);
+            ++totalFoesSpawnedRef.value;
+            ++totalEnemiesSpawnedRef.value;
+        }
+        else
+        {
+            // Emergency fallback: spawn at checkpoint with platform
+            const emergencyGroundY = (checkpointPos.y - 1) | 0;
+            spawnPos = createMalefactorSpawnPlatform(checkpointPos.x + 80, emergencyGroundY, 15, 10);
+            new Foe(spawnPos);
+            ++totalFoesSpawnedRef.value;
+            ++totalEnemiesSpawnedRef.value;
+        }
+    }
+
     // random bases until we hit enemy limits (level 4 skips bases, level 5 generates bases for other enemies)
     if (level != 4)
     {
@@ -603,6 +652,7 @@ function generateLevel()
     totalSlimesSpawned = totalSlimesSpawnedRef.value;
     totalBastardsSpawned = totalBastardsSpawnedRef.value;
     totalMalefactorsSpawned = totalMalefactorsSpawnedRef.value;
+    totalFoesSpawned = totalFoesSpawnedRef.value;
 
     // build checkpoints
     for(let x=0; x<levelSize.x-9; )
@@ -798,6 +848,7 @@ function nextLevel()
     levelMaxSlimes = limits[1];
     levelMaxBastards = limits[2];
     levelMaxMalefactors = limits[3];
+    levelMaxFoes = limits[4] || 0;
     levelEnemyCount = levelMaxEnemies; // keep for compatibility with existing code
     levelSeed = randSeed = rand(1e9)|0;
     levelSize = level == 1 ? vec2(300,200) : vec2(min(level*99,400),200);
