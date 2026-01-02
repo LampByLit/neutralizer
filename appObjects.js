@@ -476,6 +476,29 @@ class HammerProjectile extends GameObject
         });
     }
     
+    damage(damage, damagingObject)
+    {
+        // If hit by an explosion (damage >= 6, which is grenade explosion damage of radius*2),
+        // trigger nuke explosion like jackrock
+        if (damage >= 6)
+        {
+            this.nuke();
+            return 0; // Don't apply normal damage, we're exploding
+        }
+        
+        return super.damage(damage, damagingObject);
+    }
+    
+    nuke()
+    {
+        if (this.destroyed)
+            return;
+            
+        // Explode with same radius as jackrock (10)
+        explosion(this.pos, 10);
+        this.destroy();
+    }
+    
     collideWithObject(o)
     {
         // After landing, act as trap - if enemy touches it, deal damage
