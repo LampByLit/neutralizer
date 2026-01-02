@@ -496,43 +496,37 @@ function generateLevel()
     if (skyParticles)
         skyParticles.destroy();
 
-    // remove all objects that are not persistent or are descendants of something persistent
-    // Save persistent girls before destroying
-    const persistentGirls = [];
-    if (typeof girls !== 'undefined')
-    {
-        for(const girl of girls)
-        {
-            if (girl && !girl.isDead() && !girl.destroyed && girl.persistent)
-            {
-                persistentGirls.push(girl);
-            }
-        }
-    }
-    
+    // remove all objects that are not persistnt or are descendants of something persitant
+    // But preserve surviving girls and their children (weapons)
+    const girlsToPreserve = [];
+    const objectsToPreserve = [];
     for(const o of engineObjects)
     {
-        // Don't destroy persistent girls - they'll be restored after level generation
-        if (!(o.isCharacter && o.persistent && typeof girls !== 'undefined' && girls.indexOf(o) >= 0))
+        if (o.isGirl && !o.destroyed && !o.isDead())
         {
-            o.destroy();
+            girlsToPreserve.push(o);
+            objectsToPreserve.push(o);
+            // Also preserve children (weapons)
+            for(const child of o.children || [])
+            {
+                if (child && !child.destroyed)
+                    objectsToPreserve.push(child);
+            }
         }
+        else
+            o.destroy();
     }
     engineObjects = [];
     engineCollideObjects = [];
     
-    // Restore persistent girls to arrays (they'll be moved to checkpoint in nextLevel)
-    for(const girl of persistentGirls)
+    // Restore preserved girls and their children to engineObjects
+    for(const obj of objectsToPreserve)
     {
-        if (girl && !girl.destroyed)
+        if (obj && !obj.destroyed)
         {
-            engineObjects.push(girl);
-            if (girl.setCollision)
-            {
-                girl.setCollision();
-                if (engineCollideObjects.indexOf(girl) < 0)
-                    engineCollideObjects.push(girl);
-            }
+            engineObjects.push(obj);
+            if (obj.setCollision && obj.collideSolidObjects)
+                engineCollideObjects.push(obj);
         }
     }
 
@@ -1179,19 +1173,6 @@ function nextLevel()
     playerLives = level == 0 ? 3 : playerLives + 4; // start with 3 lives, then add 4 for beating a level plus 1 for respawning
     ++level;
     
-    // Save surviving girls before level generation (they'll be moved to checkpoint after)
-    const survivingGirls = [];
-    if (typeof girls !== 'undefined')
-    {
-        for(const girl of girls)
-        {
-            if (girl && !girl.isDead() && !girl.destroyed)
-            {
-                survivingGirls.push(girl);
-            }
-        }
-    }
-    
     // set level limits
     const limits = levelLimits[level] || levelLimits[5]; // use level 5 limits for levels beyond 5
     levelMaxEnemies = limits[0];
@@ -1321,78 +1302,9 @@ function nextLevel()
     // spawn player
     players = [];
     new Player(checkpointPos);
-    
-    // Helper function to find ground position near checkpoint
-    // Just use checkpoint Y position since checkpoint is already on valid ground
-    const findGroundPosNearCheckpoint = (offsetX) =>
-    {
-        // Use checkpoint Y directly (it's already on ground) with horizontal offset
-        return checkpointPos.add(vec2(offsetX, 0));
-    };
-    
-    // Spawn girls: 2 new girls + restore surviving girls
-    // Make sure girls array exists (initialize if needed)
-    if (typeof girls === 'undefined')
-    {
-        girls = [];
-    }
-    
-    if (girls !== null)
-    {
-        // Restore surviving girls to ground near checkpoint (they're already in engineObjects from generateLevel)
-        for(const girl of survivingGirls)
-        {
-            if (girl && !girl.isDead() && !girl.destroyed)
-            {
-                // Find ground position near checkpoint with slight offset
-                const offsetX = rand(3, -3); // Random offset within 3 units
-                const groundPos = findGroundPosNearCheckpoint(offsetX);
-                girl.pos = groundPos;
-                girl.velocity = vec2();
-                
-                // Recreate weapon if it was destroyed during level transition
-                if (!girl.weapon || girl.weapon.destroyed)
-                {
-                    new GirlWeapon(girl.pos, girl);
-                }
-                
-                // Make sure they're in the arrays
-                if (engineObjects.indexOf(girl) < 0)
-                    engineObjects.push(girl);
-                if (girl.setCollision && engineCollideObjects.indexOf(girl) < 0)
-                {
-                    girl.setCollision();
-                    engineCollideObjects.push(girl);
-                }
-                // Re-add to girls array if not already there
-                if (girls.indexOf(girl) < 0)
-                    girls.push(girl);
-            }
-        }
-        
-        // Spawn 2 new girls on ground near checkpoint (with offsets to avoid clustering)
-        const girlsToSpawn = 2;
-        for(let i = 0; i < girlsToSpawn; i++)
-        {
-            const offsetX = (i - 0.5) * 4; // Spread them out: -2, +2
-            let groundPos = findGroundPosNearCheckpoint(offsetX);
-            
-            // Ensure position is valid - if raycast failed, use checkpoint directly
-            if (!groundPos || groundPos.y < 0 || groundPos.y > levelSize.y + 10)
-            {
-                groundPos = checkpointPos.add(vec2(offsetX, 0));
-            }
-            
-            // Spawn girl - they auto-add to engineObjects via constructor
-            const girl = new Girl(groundPos);
-            console.log('Spawned girl at:', groundPos, 'girl object:', girl, 'in engineObjects:', engineObjects.indexOf(girl) >= 0);
-            
-            // Force ensure they're in collision array
-            if (girl.setCollision)
-            {
-                girl.setCollision();
-            }
-        }
-    }
     //new Enemy(checkpointPos.add(vec2(3))); // test enemy
+    
+    // spawn girls (surviving girls from previous level + 2 new ones)
+    respawnSurvivingGirls(checkpointPos);
+    spawnGirls(checkpointPos);
 }

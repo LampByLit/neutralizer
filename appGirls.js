@@ -1,161 +1,53 @@
 /*
-    Girls - Friendly NPCs that help the player
-    They follow the player, shoot enemies, and take cover
+    Friendly NPC Girls
+    Extends Character to create helpful companions
 */
 
 'use strict';
 
-// Global array to track all girls
-let girls = [];
-
-///////////////////////////////////////////////////////////////////////////////
-
-class GirlWeapon extends Weapon
-{
-    constructor(pos, parent)
-    {
-        super(pos, parent);
-        this.shootCooldownTimer = new Timer;
-        this.shootCooldownTimer.set(3); // 3 second cooldown before first shot
-        this.lastShotTime = 0;
-    }
-
-    update()
-    {
-        // Override fire rate to enforce 3 second cooldown
-        const fireRate = 8;
-        const bulletSpeed = .5;
-        const spread = .1;
-
-        this.mirror = this.parent.mirror;
-        
-        // Check cooldown
-        if (this.shootCooldownTimer.active())
-        {
-            this.triggerIsDown = 0;
-            this.fireTimeBuffer = 0;
-        }
-        else if (this.parent.holdingShoot)
-        {
-            // Can shoot - single bullet with 3 second cooldown
-            this.fireTimeBuffer += timeDelta;
-            const rate = 1/fireRate;
-            
-            if (this.fireTimeBuffer >= rate)
-            {
-                // Fire single bullet
-                this.fireTimeBuffer = 0;
-                this.shootCooldownTimer.set(3); // Set 3 second cooldown
-                
-                // Get aim angle from parent
-                const baseAimAngle = this.parent.aimAngle || 0;
-                
-                // Apply recoil
-                const recoilAngle = -(baseAimAngle - rand(.2,.15)) * this.getMirrorSign();
-                this.localAngle = recoilAngle;
-                this.recoilTimer.set(rand(.4,.3));
-                
-                // Create bullet
-                const bullet = new Bullet(this.pos, this.parent);
-                const direction = vec2(this.getMirrorSign(bulletSpeed), 0).rotate(baseAimAngle);
-                bullet.velocity = direction.rotate(rand(spread,-spread));
-
-                // Shell effect
-                this.shellEmitter.localAngle = -.8*this.getMirrorSign();
-                this.shellEmitter.emitParticle();
-                playSound(sound_shoot, this.pos);
-            }
-            
-            this.triggerIsDown = 1;
-        }
-        else
-        {
-            this.triggerIsDown = 0;
-            this.fireTimeBuffer = 0;
-        }
-        
-        // Update weapon angle and position (from parent Weapon class)
-        const baseAimAngle = this.parent.aimAngle || 0;
-        const spriteAngle = -baseAimAngle * this.getMirrorSign();
-        
-        const meleeAngleOffset = this.parent.meleeTimer && this.parent.meleeTimer.active() ? 1.2 * Math.sin(this.parent.meleeTimer.getPercent() * PI) * this.getMirrorSign() : 0;
-        const meleeExtendOffset = this.parent.meleeTimer && this.parent.meleeTimer.active() ? .3 * Math.sin(this.parent.meleeTimer.getPercent() * PI) : 0;
-
-        if (meleeExtendOffset)
-        {
-            const sizeScale = this.parent.sizeScale || 1;
-            const baseOffset = this.localOffset ? this.localOffset.scale(sizeScale) : vec2(.55, 0);
-            this.localPos = baseOffset.add(vec2(meleeExtendOffset * this.getMirrorSign(), 0));
-        }
-
-        if (this.recoilTimer.active())
-            this.localAngle = lerp(this.recoilTimer.getPercent(), spriteAngle, this.localAngle);
-        else
-            this.localAngle = spriteAngle + meleeAngleOffset;
-        
-        // Call parent update for shell emitter and other base functionality
-        // But we've already handled firing, so prevent parent from firing again
-        const savedTrigger = this.triggerIsDown;
-        const savedFireBuffer = this.fireTimeBuffer;
-        this.triggerIsDown = 0; // Prevent parent from firing
-        this.fireTimeBuffer = 0; // Clear fire buffer
-        super.update();
-        // Restore our state
-        this.triggerIsDown = savedTrigger;
-        this.fireTimeBuffer = savedFireBuffer;
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
+// Global array to track surviving girls across levels
+let survivingGirls = [];
 
 class Girl extends Character
 {
-    constructor(pos)
-    {
-        super(pos, 0.7); // Size scale 0.7
-        
-        // Debug log
-        console.log('Girl constructor called at pos:', pos, 'this:', this);
+    constructor(pos) 
+    { 
+        super(pos, 0.7); // sizeScale = 0.7
 
         this.team = team_player;
-        this.persistent = 1; // Survive level transitions
         this.health = this.healthMax = 1;
-        this.noFallDamage = 1; // No fall damage
-        this.jumpPower = 0.3; // High jump power
+        this.persistent = 1; // Survive level transitions
         
-        // Girl sprite - use tile 22 from tiles2.png (same as Spider, for testing - change to 30 later)
-        // TODO: Change to tile 30 once confirmed it exists in tiles2.png
-        this.bodyTile = 22; // Temporarily using tile 22 (Spider tile) to test rendering
-        this.tileSize = vec2(8); // tiles2.png tile size
-        this.bodyHeight = 0.1 * this.sizeScale; // Body offset from ground (required for rendering)
-        
-        // Girl color - pink/purple theme
-        this.color = new Color(1, 0.5, 0.8); // Pink
-        this.eyeColor = new Color(1, 0.2, 0.9); // Pink eyes
-        this.color = this.color.mutate(0.1); // Slight variation
-        
-        this.renderOrder = 15; // Render between enemies and players
-        
-        // AI state
+        // AI timers
         this.sawEnemyTimer = new Timer;
-        this.sawEnemyPos = null;
-        this.followDistance = 2 + rand() * 2; // Varying follow distance (2-4 units)
-        this.coverTimer = new Timer;
-        this.dodgeCooldownTimer = new Timer;
-        this.holdJumpTimer = new Timer; // Initialize holdJumpTimer for holding jump
+        this.shootTimer = new Timer;
+        this.holdJumpTimer = new Timer;
+        this.followDistanceTimer = new Timer;
+        
+        // Vision and behavior
+        this.maxVisionRange = 20; // Much better vision than enemies (12-15)
+        this.followDistance = 3.5; // Base follow distance
+        this.targetEnemy = null;
+        
+        // Appearance - using tiles2.png, no head/eyes
+        // Use a full character sprite from tiles2.png (full tile, not small item)
+        // Using tile 23 as a full character sprite (spiders use 20-22, so 23+ should be available)
+        this.bodyTile = 23; // Full character sprite from tiles2.png
+        this.tileSize = vec2(8); // Full character tile size (8x8 pixels, same as other characters)
+        this.color = new Color(1, 0.6, 0.8); // Pinkish color
+        this.sizeScale = 0.7;
+        
+        // Weapon
+        new Weapon(this.pos, this);
+        
+        // Random offset for follow behavior variation
+        this.followOffset = rand(2*PI);
         this.sightCheckFrame = rand(9)|0;
-        this.maxVisionRange = 10;
-        
-        // Create weapon with 3 second cooldown
-        new GirlWeapon(this.pos, this);
-        
-        // Add to girls array
-        girls.push(this);
     }
     
     update()
     {
-        if (!aiEnable || levelWarmup || this.isDead() || !this.inUpdateWindow())
+        if (this.isDead() || !this.inUpdateWindow())
         {
             if (this.weapon)
                 this.weapon.triggerIsDown = 0;
@@ -166,254 +58,278 @@ class Girl extends Character
         if (this.weapon)
             this.weapon.localPos = this.weapon.localOffset.scale(this.sizeScale);
 
-        // Find nearest living player to follow
-        let nearestPlayer = null;
-        let nearestPlayerDist = 1e9;
-        for(const player of players)
+        // Find player to follow
+        const player = players[0];
+        if (!player || player.isDead())
         {
-            if (player && !player.isDead())
-            {
-                const dist = this.pos.distanceSquared(player.pos);
-                if (dist < nearestPlayerDist)
-                {
-                    nearestPlayerDist = dist;
-                    nearestPlayer = player;
-                }
-            }
+            // No player, idle behavior
+            this.moveInput.x = 0;
+            this.moveInput.y = 0;
+            if (this.weapon)
+                this.weapon.triggerIsDown = 0;
+            super.update();
+            return;
         }
 
-        // Check for enemies (similar to enemy vision checks)
+        // Check for enemies in vision range (every 9 frames like enemies do)
         const sightCheckFrames = 9;
         if (frame % sightCheckFrames == this.sightCheckFrame)
         {
-            const sawRecently = this.sawEnemyTimer.isSet() && this.sawEnemyTimer.get() < 5;
-            const visionRangeSquared = (sawRecently ? this.maxVisionRange * 1.2 : this.maxVisionRange)**2;
+            this.targetEnemy = null;
+            let closestEnemyDistSquared = this.maxVisionRange * this.maxVisionRange;
             
-            let nearestEnemy = null;
-            let nearestEnemyDist = visionRangeSquared;
-            
-            // Check all enemies
-            for(const o of engineCollideObjects)
+            // Find closest enemy
+            forEachObject(this.pos, this.maxVisionRange, (o) =>
             {
-                if (o.isCharacter && o.team == team_enemy && !o.destroyed && !o.isDead())
+                if (o.isCharacter && o.team == team_enemy && !o.isDead() && o.health > 0)
                 {
-                    const distSq = this.pos.distanceSquared(o.pos);
-                    if (distSq < nearestEnemyDist)
+                    const distSquared = this.pos.distanceSquared(o.pos);
+                    if (distSquared < closestEnemyDistSquared)
                     {
-                        // Check line of sight
+                        // Check if we can see the enemy (raycast)
                         const raycastHit = tileCollisionRaycast(this.pos, o.pos);
                         if (!raycastHit)
                         {
-                            nearestEnemyDist = distSq;
-                            nearestEnemy = o;
+                            this.targetEnemy = o;
+                            closestEnemyDistSquared = distSquared;
+                            this.sawEnemyTimer.set();
                         }
                     }
                 }
-            }
+            });
+        }
+
+        // Update follow distance based on enemy proximity
+        if (this.targetEnemy)
+        {
+            // Enemy nearby - stay closer to player for support
+            this.followDistance = 2.5;
+        }
+        else
+        {
+            // No enemy - maintain comfortable distance
+            this.followDistance = 3.5 + 0.5 * Math.sin(time * 0.5 + this.followOffset);
+        }
+
+        // Follow player with smart distance
+        const playerDist = this.pos.distance(player.pos);
+        const playerDir = player.pos.subtract(this.pos);
+        
+        // Calculate desired position (maintain follow distance)
+        let desiredPos = player.pos.copy();
+        if (playerDist > 0.1)
+        {
+            const offsetDir = playerDir.normalize();
+            desiredPos = player.pos.subtract(offsetDir.scale(this.followDistance));
+        }
+
+        // Movement toward desired position
+        const moveDir = desiredPos.subtract(this.pos);
+        const moveDist = moveDir.length();
+        
+        if (moveDist > 0.5)
+        {
+            // Move toward desired position
+            this.moveInput.x = clamp(moveDir.x / moveDist, 1, -1) * 0.6;
+            this.moveInput.y = clamp(moveDir.y / moveDist, 0.7, -0.7);
             
-            if (nearestEnemy)
+            // Face movement direction
+            this.mirror = moveDir.x < 0;
+        }
+        else
+        {
+            // Close enough, minimal movement
+            this.moveInput.x = 0;
+            this.moveInput.y = 0;
+        }
+
+        // Jump to follow player vertically
+        if (player.pos.y < this.pos.y - 1.5 && this.groundObject)
+        {
+            // Player is above, jump up
+            this.pressedJumpTimer.set(0.1);
+            this.holdJumpTimer.set(0.2);
+        }
+        else if (player.pos.y > this.pos.y + 1.5 && this.groundObject && !this.climbingLadder)
+        {
+            // Player is below, can drop down or climb down ladder
+            this.moveInput.y = 0.5;
+        }
+
+        // Wall climbing (like enemies)
+        if (this.moveInput.x && !this.velocity.x && this.velocity.y < 0)
+        {
+            this.velocity.y *= 0.8;
+            this.climbingWall = 1;
+            if (this.groundObject)
             {
-                this.sawEnemyTimer.set();
-                this.sawEnemyPos = nearestEnemy.pos;
+                this.pressedJumpTimer.set(0.1);
+                this.holdJumpTimer.set(rand(0.2));
             }
         }
 
-        this.pressedDodge = this.climbingWall = 0;
-        this.holdingShoot = 0;
-        this.moveInput = vec2();
-        
-        // Survival behavior - similar to enemies
-        if (this.burnTimer.isSet())
+        // Shooting logic - shoot at target enemy with 3 second cooldown
+        if (this.targetEnemy && this.weapon)
         {
-            // Burning, run around
-            this.sawEnemyTimer.unset();
-            
-            // Random jump
-            if (rand() < .01)
-            {
-                this.pressedJumpTimer.set(.1);
-                this.holdJumpTimer.set(rand(.2));
-            }
-            
-            // Random movement
-            if (rand() < .1)
-                this.moveInput.x = randSign() * rand(.6, .3);
-            this.moveInput.y = 0;
-            
-            // Random dodge
-            if (this.groundObject && rand() < .01)
-                this.pressedDodge = 1;
-        }
-        else if (this.sawEnemyTimer.isSet() && this.sawEnemyTimer.get() < 10)
-        {
-            // Enemy detected - combat behavior
-            const timeSinceSawEnemy = this.sawEnemyTimer.get();
-            const enemyDirection = sign(this.sawEnemyPos.x - this.pos.x);
+            // Aim weapon at enemy
+            const enemyDir = this.targetEnemy.pos.subtract(this.pos);
+            const aimAngle = Math.atan2(enemyDir.y, enemyDir.x * this.getMirrorSign());
+            this.weapon.localAngle = aimAngle;
             
             // Face enemy
-            this.mirror = this.sawEnemyPos.x < this.pos.x;
+            this.mirror = this.targetEnemy.pos.x < this.pos.x;
             
-            // Aim weapon at enemy
-            const toEnemy = this.sawEnemyPos.subtract(this.pos);
-            this.aimAngle = toEnemy.angle();
-            
-            // Take cover behavior - move away from enemy if too close
-            const enemyDist = this.pos.distance(this.sawEnemyPos);
-            if (enemyDist < 3 && rand() < .1)
+            // Shoot with 3 second cooldown
+            if (!this.shootTimer.isSet() || this.shootTimer.get() >= 3.0)
             {
-                // Move away from enemy
-                this.moveInput.x = -enemyDirection * rand(.5, .3);
-                
-                // Try to dodge
-                if (this.groundObject && !this.dodgeCooldownTimer.isSet() && rand() < .3)
+                // Check if enemy is still in range and visible
+                const distSquared = this.pos.distanceSquared(this.targetEnemy.pos);
+                if (distSquared < this.maxVisionRange * this.maxVisionRange)
                 {
-                    this.pressedDodge = 1;
-                    this.dodgeCooldownTimer.set(2);
+                    const raycastHit = tileCollisionRaycast(this.pos, this.targetEnemy.pos);
+                    if (!raycastHit)
+                    {
+                        this.weapon.triggerIsDown = 1;
+                        this.shootTimer.set(0);
+                        // Alert enemies when shooting (like player does)
+                        alertEnemies(this.pos, this.targetEnemy.pos);
+                    }
+                    else
+                    {
+                        this.weapon.triggerIsDown = 0;
+                    }
                 }
-            }
-            else if (enemyDist > 8)
-            {
-                // Move closer to enemy (but not too close)
-                this.moveInput.x = enemyDirection * rand(.4, .2);
-            }
-            
-            // Vertical movement to match enemy height
-            if (abs(this.sawEnemyPos.y - this.pos.y) > 1)
-            {
-                this.moveInput.y = clamp(this.sawEnemyPos.y - this.pos.y, .5, -.5);
-            }
-            
-            // Shoot at enemy if in range and cooldown is ready
-            if (enemyDist < 12 && abs(this.sawEnemyPos.y - this.pos.y) < 4)
-            {
-                if (this.weapon && this.weapon.shootCooldownTimer && 
-                    (!this.weapon.shootCooldownTimer.isSet() || this.weapon.shootCooldownTimer.elapsed()))
+                else
                 {
-                    this.holdingShoot = 1;
+                    this.weapon.triggerIsDown = 0;
                 }
-            }
-            
-            // Random jump for mobility
-            if (rand() < .005)
-            {
-                this.pressedJumpTimer.set(.1);
-                this.holdJumpTimer.set(rand(.2));
-            }
-        }
-        else if (nearestPlayer)
-        {
-            // Follow player behavior
-            const playerDist = this.pos.distance(nearestPlayer.pos);
-            const playerDirection = sign(nearestPlayer.pos.x - this.pos.x);
-            
-            // Face player direction
-            this.mirror = nearestPlayer.pos.x < this.pos.x;
-            
-            // Follow player - maintain follow distance
-            if (playerDist > this.followDistance + 1)
-            {
-                // Too far, move closer
-                this.moveInput.x = playerDirection * rand(.6, .4);
-            }
-            else if (playerDist < this.followDistance - 0.5)
-            {
-                // Too close, back off slightly
-                this.moveInput.x = -playerDirection * rand(.3, .1);
             }
             else
             {
-                // Good distance, minimal movement
-                if (rand() < .05)
-                    this.moveInput.x = randSign() * rand(.2, .1);
+                this.weapon.triggerIsDown = 0;
             }
-            
-            // Match player height
-            if (abs(nearestPlayer.pos.y - this.pos.y) > 1)
+        }
+        else
+        {
+            // No target, lower weapon
+            if (this.weapon)
             {
-                this.moveInput.y = clamp(nearestPlayer.pos.y - this.pos.y, .5, -.5);
-            }
-            
-            // Avoid clustering with other girls
-            for(const girl of girls)
-            {
-                if (girl != this && !girl.isDead())
-                {
-                    const dist = this.pos.distance(girl.pos);
-                    if (dist < 1.5)
-                    {
-                        // Too close to another girl, move away
-                        const awayDir = sign(this.pos.x - girl.pos.x);
-                        this.moveInput.x = awayDir * rand(.4, .2);
-                    }
-                }
-            }
-            
-            // Random jump for mobility
-            if (rand() < .003)
-            {
-                this.pressedJumpTimer.set(.1);
-                this.holdJumpTimer.set(rand(.2));
+                this.weapon.localAngle = lerp(0.1, 0.7, this.weapon.localAngle);
+                this.weapon.triggerIsDown = 0;
             }
         }
 
-        this.holdingJump = (this.holdJumpTimer && this.holdJumpTimer.active()) || 0;
+        this.holdingShoot = this.weapon && this.weapon.triggerIsDown;
+        this.holdingJump = this.holdJumpTimer.active();
+
+        // Store state before parent update for jump override
+        const wasOnGround = this.groundObject || this.climbingWall || this.climbingLadder;
+        const wasPressingJump = this.pressedJumpTimer.active();
+        const wasPreventJump = this.preventJumpTimer.active();
+
+        // Call parent update
         super.update();
+
+        // Override jump velocity for higher jumps (after parent sets it)
+        if (wasPressingJump && wasOnGround && !wasPreventJump && this.jumpTimer.active())
+        {
+            if (this.climbingWall)
+            {
+                this.velocity.y = 0.6; // Higher wall jump (player is 0.25)
+            }
+            else
+            {
+                this.velocity.y = 0.45; // Much higher jump (player is 0.15)
+            }
+            this.jumpTimer.set(0.4); // Longer jump timer
+        }
     }
-    
+
+    // Override collision to pass through player
+    collideWithObject(o)
+    {
+        // Pass through player
+        if (o.isPlayer)
+            return 0; // No collision
+        
+        // Pass through other girls
+        if (o.isGirl)
+            return 0;
+        
+        // Normal collision for everything else
+        return super.collideWithObject(o);
+    }
+
     render()
     {
-        // Debug: log render calls
-        if (frame % 60 == 0) // Log once per second
-            console.log('Girl render called, pos:', this.pos, 'cameraPos:', cameraPos, 'renderWindowSize:', renderWindowSize);
-        
-        // Always render persistent objects (like players)
-        // Skip visibility check for persistent objects to ensure they render
-        if (!this.persistent)
-        {
-            if (!isOverlapping(this.pos, this.size, cameraPos, renderWindowSize))
-                return;
-        }
+        if (!isOverlapping(this.pos, this.size, cameraPos, renderWindowSize))
+            return;
 
-        // Set tile to use - use bodyTile directly
-        this.tileIndex = this.isDead() ? this.bodyTile : this.bodyTile;
+        // Set tile to use (walking animation)
+        this.tileIndex = this.isDead() ? this.bodyTile : 
+                        (this.climbingLadder || this.groundTimer.active() ? 
+                         this.bodyTile + 2*(this.walkCyclePercent|0) : 
+                         this.bodyTile + 1);
 
-        let additive = this.additiveColor.add(this.extraAdditiveColor);
         const sizeScale = this.sizeScale;
         const color = this.color.scale(this.burnColorPercent(), 1);
+        const additive = this.additiveColor.add(this.extraAdditiveColor);
 
-        // Draw BIG OBVIOUS rectangle at exact position first to verify rendering
-        const debugColor = new Color(1.0, 0.0, 1.0, 1.0); // Bright magenta
-        drawRect(this.pos, vec2(1, 1), debugColor, 0); // Big 1x1 rectangle
+        // Draw body using drawTile2 from tiles2.png (no head, no eyes)
+        const bodyPos = this.pos.add(vec2(0, -0.1 + 0.06*Math.sin(this.walkCyclePercent*PI)).scale(sizeScale));
         
-        const bodyPos = this.pos.add(vec2(0, -this.bodyHeight + 0.06*Math.sin(this.walkCyclePercent*PI)).scale(sizeScale));
-        
-        // Draw body using drawTile2 for tiles2.png (complete sprite, no separate head/eyes)
-        // Make sure color is visible (full opacity) - use bright pink so it's obvious
-        const visibleColor = new Color(1.0, 0.5, 0.8, 1.0); // Bright pink, full opacity
-        
-        // Try drawTile2 first
         if (typeof drawTile2 === 'function')
-        {
-            drawTile2(bodyPos, vec2(sizeScale), this.tileIndex, this.tileSize, visibleColor, this.angle, this.mirror, additive);
-        }
-        
-        // ALWAYS also draw with regular drawTile as backup (tile 3 = body tile from tiles.png)
-        drawTile(bodyPos, vec2(sizeScale), 3, vec2(8), visibleColor, this.angle, this.mirror, additive);
+            drawTile2(bodyPos, vec2(sizeScale), this.tileIndex, this.tileSize, color, this.angle, this.mirror, additive);
+        else
+            drawTile(bodyPos, vec2(sizeScale), this.tileIndex, this.tileSize, color, this.angle, this.mirror, additive);
     }
-    
+
     kill(damagingObject)
     {
         if (this.isDead())
             return 0;
 
-        super.kill(damagingObject);
-        
-        // Remove from girls array
-        const index = girls.indexOf(this);
+        // Remove from surviving girls array
+        const index = survivingGirls.indexOf(this);
         if (index >= 0)
-            girls.splice(index, 1);
-        
-        return 1;
+            survivingGirls.splice(index, 1);
+
+        super.kill(damagingObject);
+    }
+}
+
+// Mark girls so we can identify them
+Girl.prototype.isGirl = 1;
+
+// Function to spawn girls at level start
+function spawnGirls(spawnPos)
+{
+    // Always spawn 2 new girls at the beginning of every level
+    for(let i = 0; i < 2; i++)
+    {
+        const offset = vec2(rand(-1, 1), rand(-0.5, 0.5));
+        const girl = new Girl(spawnPos.add(offset));
+        survivingGirls.push(girl);
+    }
+}
+
+// Function to respawn surviving girls from previous level
+function respawnSurvivingGirls(spawnPos)
+{
+    // Filter out dead/destroyed girls
+    survivingGirls = survivingGirls.filter(g => g && !g.destroyed && !g.isDead());
+    
+    // Respawn surviving girls at checkpoint
+    for(const girl of survivingGirls)
+    {
+        if (!girl || girl.destroyed || girl.isDead())
+            continue;
+            
+        // Reset position to checkpoint
+        girl.pos = spawnPos.add(vec2(rand(-1, 1), rand(-0.5, 0.5)));
+        girl.velocity = vec2(0, 0);
+        girl.health = girl.healthMax;
+        girl.deadTimer.unset();
     }
 }
 
