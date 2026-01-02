@@ -81,6 +81,14 @@ class Girl extends Character
     {
         // ALWAYS prevent fall damage tracking
         this.maxFallVelocity = 0;
+        
+        // CRITICAL: If dead or destroyed, remove from survivingGirls immediately
+        if (this.isDead() || this.destroyed || this.health <= 0)
+        {
+            const idx = survivingGirls.indexOf(this);
+            if (idx >= 0)
+                survivingGirls.splice(idx, 1);
+        }
             
         if (this.isDead() || !this.inUpdateWindow())
         {
@@ -107,13 +115,25 @@ class Girl extends Character
             return;
         }
 
-        // ========== SAFETY TELEPORT ==========
-        // If fallen below level, too far from player, too high, or stuck in geometry, teleport back
-        const tooFarFromPlayer = this.pos.distance(player.pos) > 20;
-        const fellBelowLevel = this.pos.y < 0;
-        const tooHighAbovePlayer = this.pos.y > player.pos.y + 15;
+        // ========== VOID DEATH & SAFETY TELEPORT ==========
+        // Falling into void KILLS the girl - no rescue from void holes!
+        const fellIntoVoid = this.pos.y < -5;
+        if (fellIntoVoid)
+        {
+            // She fell into the void - she dies (bypassing noFallDamage)
+            this.health = 0;
+            // Remove from surviving girls immediately
+            const index = survivingGirls.indexOf(this);
+            if (index >= 0)
+                survivingGirls.splice(index, 1);
+            this.destroy();
+            return;
+        }
+        
+        // Safety teleport only for getting stuck in walls or stranded too far
         const stuckInWall = getTileCollisionData(this.pos) > 0 && getTileCollisionData(this.pos) != tileType_ladder;
-        if (tooFarFromPlayer || fellBelowLevel || tooHighAbovePlayer || stuckInWall)
+        const wayTooFar = this.pos.distance(player.pos) > 40; // Only teleport if VERY far
+        if (stuckInWall || wayTooFar)
         {
             // Teleport to player's position (slightly offset)
             this.pos = player.pos.add(vec2(this.girlIndex + 1, 0));
@@ -122,8 +142,8 @@ class Girl extends Character
         }
         
         // Cap upward velocity to prevent flying into sky
-        if (this.velocity.y > 0.3)
-            this.velocity.y = 0.3;
+        if (this.velocity.y > 0.25)
+            this.velocity.y = 0.25;
 
         // ========== ENEMY DETECTION ==========
         const sightCheckFrames = 9;
@@ -158,113 +178,107 @@ class Girl extends Character
         const distToPlayer = toPlayer.length();
         const playerDirection = sign(toPlayer.x) || 1;
         
-        // Adjust follow distance based on combat (closer when fighting)
-        const inCombat = this.targetEnemy && this.sawEnemyTimer.get() < 3;
-        const desiredDist = inCombat ? 1.0 : this.followDistance;
+        // Follow distance - stay close but not clingy
+        const desiredDist = 2.0; // Comfortable following distance
+        const maxFollowDist = 5.0; // Start walking faster beyond this
         
-        // Stagger position slightly for multiple girls (minimal offset)
-        const staggerOffset = Math.sin(this.followOffset) * 0.2 * this.girlIndex;
+        // Stagger position slightly for multiple girls
+        const staggerOffset = this.girlIndex * 0.8;
         
-        // Movement towards player - stay close!
+        // Movement towards player - calm walking pace
         this.moveInput = vec2(0, 0);
         
-        if (distToPlayer > desiredDist + staggerOffset + 0.5)
+        if (distToPlayer > desiredDist + staggerOffset)
         {
-            // Need to catch up - move towards player (cap speed to stay grounded)
-            const urgency = clamp((distToPlayer - desiredDist) / 3, 0.8, 0.4);
-            this.moveInput.x = playerDirection * urgency;
+            // Walk towards player - gradual speed based on distance
+            let walkSpeed;
+            if (distToPlayer > maxFollowDist)
+            {
+                // Getting far - walk faster but don't rush
+                walkSpeed = 0.6;
+            }
+            else
+            {
+                // Close enough - gentle walking pace
+                walkSpeed = 0.35;
+            }
+            this.moveInput.x = playerDirection * walkSpeed;
         }
-        else if (distToPlayer < desiredDist * 0.4)
+        else if (distToPlayer < 1.0)
         {
-            // Too close - back off slightly
-            this.moveInput.x = -playerDirection * 0.2;
+            // Too close - gently back off
+            this.moveInput.x = -playerDirection * 0.15;
         }
+        // else: She's at a good distance, just stay put
         
-        // Vertical movement for ladders - only when player is on ladder or far above/below
-        if (abs(toPlayer.y) > 2.5)
-            this.moveInput.y = sign(toPlayer.y) * 0.4;
+        // Vertical movement for ladders only
+        if (abs(toPlayer.y) > 3 && this.climbingLadder)
+            this.moveInput.y = sign(toPlayer.y) * 0.5;
 
         // ========== OBSTACLE DETECTION & JUMPING ==========
+        // Walk on foot when possible, but jump when needed to navigate
         const onGround = this.groundObject || this.groundTimer.active();
         const lookAhead = this.getMirrorSign(1.0);
         const feetPos = this.pos.subtract(vec2(0, this.size.y * 0.4));
         
-        // Check for wall/obstacle ahead
+        // Check for wall/obstacle ahead at feet level
         const wallCheckPos = feetPos.add(vec2(lookAhead * 0.8, 0));
         const wallTile = getTileCollisionData(wallCheckPos);
         const isBlockedByWall = wallTile > 0 && wallTile != tileType_ladder;
         
-        // Check for step/stair ahead (1 tile high obstacle)
-        const stepCheckLow = feetPos.add(vec2(lookAhead * 0.8, 0));
-        const stepCheckHigh = feetPos.add(vec2(lookAhead * 0.8, 1.2));
-        const hasStepAhead = getTileCollisionData(stepCheckLow) > 0 && 
+        // Check for step/stair ahead (1-2 tile high obstacle with clear space above)
+        const stepCheckLow = feetPos.add(vec2(lookAhead * 0.8, 0.5));
+        const stepCheckHigh = feetPos.add(vec2(lookAhead * 0.8, 2.0));
+        const hasStepAhead = isBlockedByWall && 
                              getTileCollisionData(stepCheckHigh) <= 0;
         
         // Check for gap ahead
-        const gapCheckPos = feetPos.add(vec2(lookAhead * 1.5, -1));
+        const gapCheckPos = feetPos.add(vec2(lookAhead * 1.2, -1));
+        const gapCheckDeep = feetPos.add(vec2(lookAhead * 1.2, -2));
         const hasGapAhead = getTileCollisionData(gapCheckPos) <= 0 && 
+                            getTileCollisionData(gapCheckDeep) <= 0 &&
                             this.moveInput.x != 0 && onGround;
-        
-        // Check if player is significantly above us
-        const playerAbove = toPlayer.y > 2;
         
         // Stuck detection
         if (this.pathfindTimer.elapsed())
         {
             this.pathfindTimer.set(0.5);
             if (this.lastStuckPos && this.pos.distance(this.lastStuckPos) < 0.3 && 
-                abs(this.moveInput.x) > 0.1)
+                abs(this.moveInput.x) > 0.2 && onGround)
             {
-                // We're stuck! Try jumping or wall climbing
-                this.stuckTimer.set(0.5);
+                // We're stuck - try a jump
+                this.stuckTimer.set(0.4);
             }
             this.lastStuckPos = this.pos.copy();
         }
         
-        // Determine if we should jump - be conservative to stay close
+        // Determine if we should jump
         let shouldJump = false;
-        let highJump = false;
         
-        if (onGround || this.climbingWall || this.climbingLadder)
+        // Only consider jumping when on ground and trying to move
+        if (onGround && abs(this.moveInput.x) > 0.1)
         {
-            // Small hop for steps
-            if (hasStepAhead)
+            // Jump over gaps
+            if (hasGapAhead)
             {
                 shouldJump = true;
             }
-            // Jump over gaps only if moving
-            else if (hasGapAhead && abs(this.velocity.x) > 0.05)
+            // Hop over steps/stairs
+            else if (hasStepAhead)
             {
                 shouldJump = true;
             }
-            // Only high jump if player is far above AND we're stuck
-            else if (playerAbove && distToPlayer > 3 && this.stuckTimer.active())
-            {
-                shouldJump = true;
-                highJump = true;
-            }
-            // Stuck recovery - just a normal jump first
+            // Stuck against wall - try jumping
             else if (this.stuckTimer.active() && isBlockedByWall)
             {
                 shouldJump = true;
             }
         }
         
-        // Wall climbing when blocked - less aggressive
-        if (isBlockedByWall && !onGround && this.velocity.y < 0 && 
-            this.moveInput.x != 0 && !this.wallJumpTimer.active() && distToPlayer > 2)
-        {
-            this.climbingWall = 1;
-            this.velocity.y *= 0.8;
-            shouldJump = true;
-            this.wallJumpTimer.set(0.4);
-        }
-        
         // Store jump request for silent jump handling after super.update()
         this.wantsToJump = shouldJump && !this.preventJumpTimer.active();
-        this.wantsHighJump = highJump;
         if (this.wantsToJump)
-            this.holdJumpTimer.set(highJump ? 0.4 : 0.15);
+            this.holdJumpTimer.set(0.25); // Decent jump height
         
         // ========== COMBAT - SHOOTING ==========
         this.holdingShoot = false;
@@ -369,24 +383,17 @@ class Girl extends Character
         // Handle jump manually to avoid jump sound
         if (this.wantsToJump && wasOnGround && !this.jumpTimer.active())
         {
-            // Apply jump velocity silently - same as player
-            if (this.climbingWall)
-            {
-                this.velocity.y = 0.25; // Wall jump (same as player)
-            }
-            else
-            {
-                this.velocity.y = 0.15; // Normal jump (same as player)
-            }
+            // Good jump height to clear obstacles
+            this.velocity.y = 0.15;
             this.jumpTimer.set(0.2);
-            this.preventJumpTimer.set(0.4);
+            this.preventJumpTimer.set(0.4); // Reasonable cooldown
             this.groundTimer.unset();
         }
         
-        // Jump continuation (same as player)
+        // Jump continuation for holding jump
         if (this.jumpTimer.active() && this.holdingJump && this.velocity.y > 0)
         {
-            this.velocity.y += 0.017;
+            this.velocity.y += 0.015;
         }
         
         // Ensure weapon protection
@@ -529,11 +536,25 @@ function spawnGirls(spawnPos)
     survivingGirls.push(girl);
 }
 
+// Clean up the survivingGirls array - call this every frame to keep count accurate
+function cleanupSurvivingGirls()
+{
+    // Remove any dead, destroyed, or fallen girls from the array
+    for (let i = survivingGirls.length - 1; i >= 0; i--)
+    {
+        const g = survivingGirls[i];
+        if (!g || g.destroyed || g.isDead() || g.health <= 0 || g.pos.y < -5)
+        {
+            survivingGirls.splice(i, 1);
+        }
+    }
+}
+
 // Function to respawn surviving girls from previous level
 function respawnSurvivingGirls(spawnPos)
 {
-    // Filter out dead/destroyed girls
-    survivingGirls = survivingGirls.filter(g => g && !g.destroyed && !g.isDead());
+    // Clean up first
+    cleanupSurvivingGirls();
     
     // Respawn surviving girls beside checkpoint (to avoid collision with player)
     // Spread them out horizontally so they don't overlap
@@ -555,4 +576,5 @@ function respawnSurvivingGirls(spawnPos)
         index++;
     }
 }
+
 
