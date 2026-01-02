@@ -179,7 +179,7 @@ function explosion(pos, radius=2)
         if (o.isGameObject)
         {
             // do damage
-            d < radius && o.damage && o.damage(damage);
+            d < radius && typeof o.damage === 'function' && o.damage(damage);
 
             // catch fire
             d < radius*1.5 && o.burn && o.burn();
@@ -256,7 +256,7 @@ function nukeExplosion(pos, radius=15)
         if (o.isGameObject)
         {
             // do damage
-            d < radius && o.damage && o.damage(damage);
+            d < radius && typeof o.damage === 'function' && o.damage(damage);
 
             // catch fire
             d < radius*1.5 && o.burn && o.burn();
