@@ -30,6 +30,10 @@ let updateWindowSize, renderWindowSize, gameplayWindowSize;
 // let selectedLevel = 1; // Level selector for testing (1-5) - COMMENTED OUT
 let selectedLevel = 1; // Keep default to 1 for normal gameplay
 
+// Title screen music
+let titleMusic = null;
+let titleMusicPlaying = false;
+
 engineInit(
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -37,6 +41,14 @@ engineInit(
 {
     gameState = 'title';
     cameraScale = startCameraScale;
+    
+    // Initialize title screen music
+    titleMusic = new Audio('https://mp3.tom7.org/t7es/2016/superior-olive.mp3');
+    titleMusic.loop = true;
+    titleMusic.volume = 0.5;
+    titleMusic.onerror = function() {
+        console.warn('Failed to load title music');
+    };
 },
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -53,6 +65,21 @@ engineInit(
     // handle title screen input
     if (gameState === 'title')
     {
+        // Try to start playing title music if not already playing
+        // This will work once user has interacted with the page (browser autoplay policy)
+        if (titleMusic && !titleMusicPlaying && hadInput)
+        {
+            const playPromise = titleMusic.play();
+            if (playPromise !== undefined)
+            {
+                playPromise.then(function() {
+                    titleMusicPlaying = true;
+                }).catch(function(error) {
+                    // Music will start on next interaction attempt
+                });
+            }
+        }
+        
         // Level selector (number keys 1-6) - COMMENTED OUT
         // for(let i = 1; i <= 6; i++)
         // {
@@ -66,6 +93,13 @@ engineInit(
         // Start game
         if (keyWasPressed(32) || gamepadWasPressed(0))
         {
+            // Stop title music when game starts
+            if (titleMusic && titleMusicPlaying)
+            {
+                titleMusic.pause();
+                titleMusic.currentTime = 0;
+                titleMusicPlaying = false;
+            }
             gameState = 'playing';
             resetGame();
         }
@@ -168,11 +202,15 @@ engineInit(
     {
         // return to title screen after game over
         gameState = 'title';
+        // Reset music flag so it will restart when title screen is shown
+        titleMusicPlaying = false;
     }
     else if (gameState === 'win' && gameCompleteTimer.get() > 4)
     {
         // return to title screen after win
         gameState = 'title';
+        // Reset music flag so it will restart when title screen is shown
+        titleMusicPlaying = false;
     }
 },
 
