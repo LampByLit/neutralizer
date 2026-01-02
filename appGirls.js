@@ -123,6 +123,7 @@ class Girl extends Character
         // Girl sprite - use tile 30 from tiles2.png (bottom area, unused tile)
         this.bodyTile = 30;
         this.tileSize = vec2(8); // tiles2.png tile size
+        this.bodyHeight = 0.1 * this.sizeScale; // Body offset from ground (required for rendering)
         
         // Girl color - pink/purple theme
         this.color = new Color(1, 0.5, 0.8); // Pink
@@ -360,11 +361,9 @@ class Girl extends Character
         if (!isOverlapping(this.pos, this.size, cameraPos, renderWindowSize))
             return;
 
-        // Set tile to use (walk cycle)
-        this.tileIndex = this.isDead() ? this.bodyTile : 
-            this.climbingLadder || this.groundTimer.active() ? 
-            this.bodyTile + 2 * (this.walkCyclePercent|0) : 
-            this.bodyTile + 1;
+        // Set tile to use - use bodyTile directly (tile 30 from tiles2.png)
+        // Note: If tile 30 doesn't exist, try tile 22 (same as Spider) or another unused tile
+        this.tileIndex = this.isDead() ? this.bodyTile : this.bodyTile;
 
         let additive = this.additiveColor.add(this.extraAdditiveColor);
         const sizeScale = this.sizeScale;
@@ -373,14 +372,17 @@ class Girl extends Character
         const bodyPos = this.pos.add(vec2(0, -this.bodyHeight + 0.06*Math.sin(this.walkCyclePercent*PI)).scale(sizeScale));
         
         // Draw body using drawTile2 for tiles2.png (complete sprite, no separate head/eyes)
+        // Make sure color is visible (full opacity)
+        const visibleColor = new Color(color.r, color.g, color.b, 1.0);
+        
         if (typeof drawTile2 === 'function')
         {
-            drawTile2(bodyPos, vec2(sizeScale), this.tileIndex, this.tileSize, color, this.angle, this.mirror, additive);
+            drawTile2(bodyPos, vec2(sizeScale), this.tileIndex, this.tileSize, visibleColor, this.angle, this.mirror, additive);
         }
         else
         {
-            // Fallback to regular drawTile (shouldn't happen, but just in case)
-            drawTile(bodyPos, vec2(sizeScale), this.tileIndex, this.tileSize, color, this.angle, this.mirror, additive);
+            // Fallback to regular drawTile with a visible tile from tiles.png if drawTile2 doesn't work
+            drawTile(bodyPos, vec2(sizeScale), 3, vec2(8), visibleColor, this.angle, this.mirror, additive);
         }
     }
     
