@@ -1747,46 +1747,35 @@ class SmokerWeapon extends Weapon
             // Get base aim angle from parent
             const baseAimAngle = this.parent.aimAngle || 0;
             
-            // Calculate forward direction based on mirror state and aim angle
-            const forwardDirection = vec2(this.parent.getMirrorSign(1), 0).rotate(baseAimAngle);
+            // Calculate direction based on mirror state and aim angle
+            // Gas spray works in all directions based on aim
+            const sprayDirection = vec2(this.parent.getMirrorSign(1), 0).rotate(baseAimAngle);
             
-            // Only fire forward (check if direction matches facing direction)
-            const isFiringForward = (this.parent.mirror == 0 && forwardDirection.x >= 0) || 
-                                     (this.parent.mirror == 1 && forwardDirection.x <= 0);
-            
-            if (isFiringForward)
+            // Spawn gas clouds continuously while F is held
+            while (this.fireTimeBuffer >= this.gasSpawnRate)
             {
-                // Spawn gas clouds continuously while F is held
-                while (this.fireTimeBuffer >= this.gasSpawnRate)
-                {
-                    this.fireTimeBuffer -= this.gasSpawnRate;
-                    
-                    // Calculate weapon position (where gas comes from)
-                    const sizeScale = this.parent.sizeScale || 1;
-                    const weaponPos = this.parent.pos.add(
-                        vec2(this.parent.getMirrorSign(.55), 0).scale(sizeScale)
-                    );
-                    
-                    // Spawn gas cloud slightly forward
-                    const gasPos = weaponPos.add(forwardDirection.scale(0.5));
-                    
-                    // Create toxic gas cloud
-                    const gas = new ToxicGasCloud(gasPos, this.parent);
-                    
-                    // Add slight forward velocity
-                    gas.velocity = this.parent.velocity.add(forwardDirection.scale(0.3));
-                    
-                    // Play gas spray sound (low volume since it fires continuously)
-                    playSound(sound_walk, gasPos, 10, 0.2);
-                    
-                    // Alert enemies
-                    alertEnemies(gasPos, gasPos);
-                }
-            }
-            else
-            {
-                // Not firing forward, reset buffer
-                this.fireTimeBuffer = min(this.fireTimeBuffer, 0);
+                this.fireTimeBuffer -= this.gasSpawnRate;
+                
+                // Calculate weapon position (where gas comes from)
+                const sizeScale = this.parent.sizeScale || 1;
+                const weaponPos = this.parent.pos.add(
+                    vec2(this.parent.getMirrorSign(.55), 0).scale(sizeScale)
+                );
+                
+                // Spawn gas cloud in the direction of aim
+                const gasPos = weaponPos.add(sprayDirection.scale(0.5));
+                
+                // Create toxic gas cloud
+                const gas = new ToxicGasCloud(gasPos, this.parent);
+                
+                // Add velocity in spray direction
+                gas.velocity = this.parent.velocity.add(sprayDirection.scale(0.3));
+                
+                // Play gas spray sound (low volume since it fires continuously)
+                playSound(sound_walk, gasPos, 10, 0.2);
+                
+                // Alert enemies
+                alertEnemies(gasPos, gasPos);
             }
         }
         else
