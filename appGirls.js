@@ -381,24 +381,24 @@ class Girl extends Character
         const sizeScale = this.sizeScale;
         const color = this.color.scale(this.burnColorPercent(), 1);
 
+        // Draw BIG OBVIOUS rectangle at exact position first to verify rendering
+        const debugColor = new Color(1.0, 0.0, 1.0, 1.0); // Bright magenta
+        drawRect(this.pos, vec2(1, 1), debugColor, 0); // Big 1x1 rectangle
+        
         const bodyPos = this.pos.add(vec2(0, -this.bodyHeight + 0.06*Math.sin(this.walkCyclePercent*PI)).scale(sizeScale));
         
         // Draw body using drawTile2 for tiles2.png (complete sprite, no separate head/eyes)
         // Make sure color is visible (full opacity) - use bright pink so it's obvious
         const visibleColor = new Color(1.0, 0.5, 0.8, 1.0); // Bright pink, full opacity
         
-        // DEBUG: Draw a simple colored rect first to verify render is working
-        drawRect(bodyPos, vec2(sizeScale), visibleColor, 0);
-        
+        // Try drawTile2 first
         if (typeof drawTile2 === 'function')
         {
             drawTile2(bodyPos, vec2(sizeScale), this.tileIndex, this.tileSize, visibleColor, this.angle, this.mirror, additive);
         }
-        else
-        {
-            // Emergency fallback - use regular drawTile with a visible tile from tiles.png if drawTile2 doesn't work
-            drawTile(bodyPos, vec2(sizeScale), 3, vec2(8), visibleColor, this.angle, this.mirror, additive);
-        }
+        
+        // ALWAYS also draw with regular drawTile as backup (tile 3 = body tile from tiles.png)
+        drawTile(bodyPos, vec2(sizeScale), 3, vec2(8), visibleColor, this.angle, this.mirror, additive);
     }
     
     kill(damagingObject)
