@@ -120,8 +120,9 @@ class Girl extends Character
         this.noFallDamage = 1; // No fall damage
         this.jumpPower = 0.3; // High jump power
         
-        // Girl sprite - use tile 30 from tiles2.png (bottom area, unused tile)
-        this.bodyTile = 30;
+        // Girl sprite - use tile 22 from tiles2.png (same as Spider, for testing - change to 30 later)
+        // TODO: Change to tile 30 once confirmed it exists in tiles2.png
+        this.bodyTile = 22; // Temporarily using tile 22 (Spider tile) to test rendering
         this.tileSize = vec2(8); // tiles2.png tile size
         this.bodyHeight = 0.1 * this.sizeScale; // Body offset from ground (required for rendering)
         
@@ -358,11 +359,11 @@ class Girl extends Character
     
     render()
     {
-        if (!isOverlapping(this.pos, this.size, cameraPos, renderWindowSize))
+        // Always render if persistent (like players)
+        if (!this.persistent && !isOverlapping(this.pos, this.size, cameraPos, renderWindowSize))
             return;
 
-        // Set tile to use - use bodyTile directly (tile 30 from tiles2.png)
-        // Note: If tile 30 doesn't exist, try tile 22 (same as Spider) or another unused tile
+        // Set tile to use - use bodyTile directly
         this.tileIndex = this.isDead() ? this.bodyTile : this.bodyTile;
 
         let additive = this.additiveColor.add(this.extraAdditiveColor);
@@ -372,8 +373,8 @@ class Girl extends Character
         const bodyPos = this.pos.add(vec2(0, -this.bodyHeight + 0.06*Math.sin(this.walkCyclePercent*PI)).scale(sizeScale));
         
         // Draw body using drawTile2 for tiles2.png (complete sprite, no separate head/eyes)
-        // Make sure color is visible (full opacity)
-        const visibleColor = new Color(color.r, color.g, color.b, 1.0);
+        // Make sure color is visible (full opacity) - use bright pink so it's obvious
+        const visibleColor = new Color(1.0, 0.5, 0.8, 1.0); // Bright pink, full opacity
         
         if (typeof drawTile2 === 'function')
         {
