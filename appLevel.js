@@ -1323,16 +1323,10 @@ function nextLevel()
     new Player(checkpointPos);
     
     // Helper function to find ground position near checkpoint
+    // Just use checkpoint Y position since checkpoint is already on valid ground
     const findGroundPosNearCheckpoint = (offsetX) =>
     {
-        const testX = checkpointPos.x + offsetX;
-        const testPos = vec2(testX, levelSize.y);
-        const raycastHit = tileCollisionRaycast(testPos, vec2(testX, 0));
-        if (raycastHit)
-        {
-            return raycastHit.add(vec2(0, 1)); // 1 unit above ground
-        }
-        // Fallback to checkpoint if raycast fails
+        // Use checkpoint Y directly (it's already on ground) with horizontal offset
         return checkpointPos.add(vec2(offsetX, 0));
     };
     
