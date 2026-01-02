@@ -515,7 +515,7 @@ class KeyItem extends GameObject
 
         this.health = this.healthMax = 1e3; // Indestructible
         this.canBurn = 0; // Can't be burned
-        this.setCollision(1, 1);
+        this.setCollision(1, 0); // Non-solid so player can pass through from any direction
         this.renderOrder = 1e9; // Draw on top
         this.color = new Color(1, 1, 0); // Yellow/gold color
         this.additiveColor = new Color(0.5, 0.5, 0); // Golden glow
@@ -534,10 +534,10 @@ class KeyItem extends GameObject
         this.floatTimer += timeDelta;
         this.pos.y = this.originalY + Math.sin(this.floatTimer * 2) * 0.1;
 
-        // Check for player collision
+        // Check for player collision from any direction
         for(const player of players)
         {
-            if (player && !player.isDead() && this.pos.distanceSquared(player.pos) < 1)
+            if (player && !player.isDead() && isOverlapping(this.pos, this.size, player.pos, player.size))
             {
                 this.collect(player);
                 break;
@@ -681,7 +681,7 @@ class Item extends GameObject
         this.isItem = 1;
         this.health = this.healthMax = 1e3; // Indestructible
         this.canBurn = 0;
-        this.setCollision(1, 1);
+        this.setCollision(1, 0); // Non-solid so player can pass through from any direction
         this.renderOrder = 1e8;
         this.color = new Color(1, 1, 1);
         
@@ -698,10 +698,10 @@ class Item extends GameObject
     {
         super.update();
         
-        // Check for player collision
+        // Check for player collision from any direction
         for(const player of players)
         {
-            if (player && !player.isDead() && this.pos.distanceSquared(player.pos) < .5)
+            if (player && !player.isDead() && isOverlapping(this.pos, this.size, player.pos, player.size))
             {
                 this.collect(player);
                 break;
