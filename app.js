@@ -49,6 +49,13 @@ engineInit(
     titleMusic.onerror = function() {
         console.warn('Failed to load title music');
     };
+    
+    // Try to start playing music immediately
+    titleMusic.play().then(function() {
+        titleMusicPlaying = true;
+    }).catch(function(error) {
+        // Browser may block autoplay, will retry in update loop
+    });
 },
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -66,18 +73,13 @@ engineInit(
     if (gameState === 'title')
     {
         // Try to start playing title music if not already playing
-        // This will work once user has interacted with the page (browser autoplay policy)
-        if (titleMusic && !titleMusicPlaying && hadInput)
+        if (titleMusic && !titleMusicPlaying)
         {
-            const playPromise = titleMusic.play();
-            if (playPromise !== undefined)
-            {
-                playPromise.then(function() {
-                    titleMusicPlaying = true;
-                }).catch(function(error) {
-                    // Music will start on next interaction attempt
-                });
-            }
+            titleMusic.play().then(function() {
+                titleMusicPlaying = true;
+            }).catch(function(error) {
+                // Browser may block autoplay, will retry on next frame
+            });
         }
         
         // Level selector (number keys 1-6) - COMMENTED OUT
