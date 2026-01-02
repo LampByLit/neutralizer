@@ -60,6 +60,7 @@ const resetGame=()=>
     gameTimer.set(totalKills = 0);
     level = selectedLevel - 1; // Start at selected level (nextLevel increments it)
     gameState = 'playing';
+    survivingGirls = []; // Clear girls on game reset
     nextLevel();
 }
 
@@ -1196,6 +1197,12 @@ function nextLevel()
     // warm up level
     levelWarmup = 1;
 
+    // Create a wider platform for the first checkpoint (so player and girls can spawn safely)
+    // Platform needs to be wide enough for player + multiple girls (up to 6-8 girls possible)
+    // With 20 tiles wide (10 on each side), girls spawning at 1.5+ spacing can fit comfortably
+    const checkpointGroundY = (checkpointPos.y - 1) | 0;
+    createMalefactorSpawnPlatform(checkpointPos.x, checkpointGroundY, 20, 4); // 20 tiles wide, 4 tiles tall platform
+    
     // objects that effect the level must be added here
     const firstCheckpoint = new Checkpoint(checkpointPos).setActive();
 

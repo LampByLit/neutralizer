@@ -519,6 +519,10 @@ engineInit(
         mainContext.fillText('LEVEL ' + level, hudX, hudY);
         mainContext.fillText('LIVES ' + playerLives, hudX, hudY + lineHeight);
         mainContext.fillText('ENEMIES ' + enemiesCount, hudX, hudY + lineHeight * 2);
+        
+        // Count living girls (always show counter)
+        const girlCount = survivingGirls.filter(g => g && !g.destroyed && !g.isDead()).length;
+        mainContext.fillText('GIRLS ' + girlCount, hudX, hudY + lineHeight * 3);
 
         // fade in level transition
         const fade = levelEndTimer.isSet() ? percent(levelEndTimer.get(), 3, 1) : percent(levelTimer.get(), .5, 2);
