@@ -1322,16 +1322,32 @@ function nextLevel()
     players = [];
     new Player(checkpointPos);
     
+    // Helper function to find ground position near checkpoint
+    const findGroundPosNearCheckpoint = (offsetX) =>
+    {
+        const testX = checkpointPos.x + offsetX;
+        const testPos = vec2(testX, levelSize.y);
+        const raycastHit = tileCollisionRaycast(testPos, vec2(testX, 0));
+        if (raycastHit)
+        {
+            return raycastHit.add(vec2(0, 1)); // 1 unit above ground
+        }
+        // Fallback to checkpoint if raycast fails
+        return checkpointPos.add(vec2(offsetX, 0));
+    };
+    
     // Spawn girls: 2 new girls + restore surviving girls
     if (typeof girls !== 'undefined')
     {
-        // Restore surviving girls to checkpoint (they're already in engineObjects from generateLevel)
+        // Restore surviving girls to ground near checkpoint (they're already in engineObjects from generateLevel)
         for(const girl of survivingGirls)
         {
             if (girl && !girl.isDead() && !girl.destroyed)
             {
-                // Move to checkpoint with slight offset
-                girl.pos = checkpointPos.add(vec2(rand(1, -1), rand(0.5, -0.5)));
+                // Find ground position near checkpoint with slight offset
+                const offsetX = rand(3, -3); // Random offset within 3 units
+                const groundPos = findGroundPosNearCheckpoint(offsetX);
+                girl.pos = groundPos;
                 girl.velocity = vec2();
                 
                 // Recreate weapon if it was destroyed during level transition
@@ -1354,13 +1370,13 @@ function nextLevel()
             }
         }
         
-        // Spawn 2 new girls at checkpoint (with offsets to avoid clustering)
+        // Spawn 2 new girls on ground near checkpoint (with offsets to avoid clustering)
         const girlsToSpawn = 2;
         for(let i = 0; i < girlsToSpawn; i++)
         {
-            const offsetX = (i - 0.5) * 2; // Spread them out: -1, +1
-            const offsetY = rand(0.5, -0.5);
-            new Girl(checkpointPos.add(vec2(offsetX, offsetY)));
+            const offsetX = (i - 0.5) * 4; // Spread them out: -2, +2
+            const groundPos = findGroundPosNearCheckpoint(offsetX);
+            new Girl(groundPos);
         }
     }
     //new Enemy(checkpointPos.add(vec2(3))); // test enemy

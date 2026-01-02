@@ -120,9 +120,8 @@ class Girl extends Character
         this.noFallDamage = 1; // No fall damage
         this.jumpPower = 0.3; // High jump power
         
-        // Girl sprite - use tile 30 from tiles2.png (bottom area)
+        // Girl sprite - use tile 30 from tiles2.png (bottom area, unused tile)
         this.bodyTile = 30;
-        this.headTile = 2; // Use same head tile
         this.tileSize = vec2(8); // tiles2.png tile size
         
         // Girl color - pink/purple theme
@@ -370,36 +369,19 @@ class Girl extends Character
         let additive = this.additiveColor.add(this.extraAdditiveColor);
         const sizeScale = this.sizeScale;
         const color = this.color.scale(this.burnColorPercent(), 1);
-        const eyeColor = this.eyeColor.scale(this.burnColorPercent(), 1);
-        const headColor = color;
-
-        // Melee animation - head moves back
-        const meleeHeadOffset = this.meleeTimer.active() ? -.12 * Math.sin(this.meleeTimer.getPercent() * PI) : 0;
 
         const bodyPos = this.pos.add(vec2(0, -this.bodyHeight + 0.06*Math.sin(this.walkCyclePercent*PI)).scale(sizeScale));
         
-        // Draw body using drawTile2 for tiles2.png
+        // Draw body using drawTile2 for tiles2.png (complete sprite, no separate head/eyes)
         if (typeof drawTile2 === 'function')
         {
             drawTile2(bodyPos, vec2(sizeScale), this.tileIndex, this.tileSize, color, this.angle, this.mirror, additive);
         }
         else
         {
-            // Fallback to regular drawTile
+            // Fallback to regular drawTile (shouldn't happen, but just in case)
             drawTile(bodyPos, vec2(sizeScale), this.tileIndex, this.tileSize, color, this.angle, this.mirror, additive);
         }
-
-        // Draw head
-        const headBasePos = vec2(this.getMirrorSign(.05) + meleeHeadOffset * this.getMirrorSign(), .46);
-        const headPos = this.pos.add(headBasePos.scale(sizeScale).rotate(-this.angle));
-        drawTile(headPos, vec2(sizeScale/2), this.headTile, vec2(8), headColor, this.angle, this.mirror, additive);
-        
-        // Draw eyes
-        const eyeOffset = vec2(this.getMirrorSign(.15), .46).scale(sizeScale);
-        const leftEyePos = this.pos.add(eyeOffset.rotate(-this.angle));
-        const rightEyePos = this.pos.add(eyeOffset.scale(vec2(-1,1)).rotate(-this.angle));
-        drawTile(leftEyePos, vec2(sizeScale/3), 1, vec2(8), eyeColor, 0, 0, additive);
-        drawTile(rightEyePos, vec2(sizeScale/3), 1, vec2(8), eyeColor, 0, 0, additive);
     }
     
     kill(damagingObject)
