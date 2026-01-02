@@ -420,7 +420,7 @@ engineInit(
         mainContext.font = 'bold 32px JetBrains Mono';
         if (!titleScreenReady)
         {
-            mainContext.fillText('Press Any Key', mainCanvas.width/2, mainCanvas.height/2 + 70);
+            mainContext.fillText('Press Space', mainCanvas.width/2, mainCanvas.height/2 + 70);
         }
         else
         {
