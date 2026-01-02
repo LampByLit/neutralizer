@@ -307,6 +307,54 @@ engineInit(
 
         drawStars();
     }
+    else if (gameState === 'title' && titleScreenReady)
+    {
+        // Glitchy pink pixelated flashing background effect
+        const pixelSize = 8; // Pixelation size
+        const cols = Math.ceil(mainCanvas.width / pixelSize);
+        const rows = Math.ceil(mainCanvas.height / pixelSize);
+        
+        // Use frame for flashing effect
+        const flashIntensity = (Math.sin(frame * 0.5) + 1) * 0.5; // 0 to 1
+        const basePink = 0.8 + flashIntensity * 0.2; // Flash between 0.8 and 1.0
+        
+        // Seed random for glitchy effect
+        randSeeded(frame * 12345);
+        
+        for (let y = 0; y < rows; y++)
+        {
+            for (let x = 0; x < cols; x++)
+            {
+                // Random glitch offset
+                const glitchX = (rand() - 0.5) * 3;
+                const glitchY = (rand() - 0.5) * 3;
+                
+                // Random pink color variation
+                const r = basePink + (rand() - 0.5) * 0.3;
+                const g = 0.2 + (rand() - 0.5) * 0.2;
+                const b = 0.5 + (rand() - 0.5) * 0.3;
+                
+                // Random pixel size for extra glitchiness
+                const sizeVariation = 0.7 + rand() * 0.6;
+                const px = (x + glitchX) * pixelSize;
+                const py = (y + glitchY) * pixelSize;
+                const pw = pixelSize * sizeVariation;
+                const ph = pixelSize * sizeVariation;
+                
+                mainContext.fillStyle = `rgb(${Math.floor(r * 255)}, ${Math.floor(g * 255)}, ${Math.floor(b * 255)})`;
+                mainContext.fillRect(px, py, pw, ph);
+            }
+        }
+        
+        // Add some random scanlines for extra glitch
+        randSeeded(frame * 54321);
+        mainContext.fillStyle = 'rgba(255, 0, 255, 0.1)';
+        for (let i = 0; i < 5; i++)
+        {
+            const scanY = rand() * mainCanvas.height;
+            mainContext.fillRect(0, scanY, mainCanvas.width, 2);
+        }
+    }
     else
     {
         // simple black background for title/game over/win screens
