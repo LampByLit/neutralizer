@@ -1724,7 +1724,7 @@ class SmokerWeapon extends Weapon
     constructor(pos, parent)
     {
         super(pos, parent);
-        this.fireTimeBuffer = 0;
+        this.gasTimeBuffer = 0; // Separate buffer for gas spawning (not shared with Weapon's fireTimeBuffer)
         this.gasSpawnRate = 0.1; // Spawn gas cloud every 0.1 seconds
         this.hidden = 1; // Don't render the weapon sprite (helmet is rendered separately)
     }
@@ -1737,7 +1737,7 @@ class SmokerWeapon extends Weapon
         if (!this.parent.isPlayer)
             return;
         
-        this.fireTimeBuffer += timeDelta;
+        this.gasTimeBuffer += timeDelta;
         
         // Check if F key is pressed (key code 70)
         const pressingF = !this.parent.playerIndex && keyIsDown(70);
@@ -1752,9 +1752,9 @@ class SmokerWeapon extends Weapon
             const sprayDirection = vec2(this.parent.getMirrorSign(1), 0).rotate(baseAimAngle);
             
             // Spawn gas clouds continuously while F is held
-            while (this.fireTimeBuffer >= this.gasSpawnRate)
+            while (this.gasTimeBuffer >= this.gasSpawnRate)
             {
-                this.fireTimeBuffer -= this.gasSpawnRate;
+                this.gasTimeBuffer -= this.gasSpawnRate;
                 
                 // Calculate weapon position (where gas comes from)
                 const sizeScale = this.parent.sizeScale || 1;
@@ -1781,7 +1781,7 @@ class SmokerWeapon extends Weapon
         else
         {
             // Not pressing F, reset buffer
-            this.fireTimeBuffer = min(this.fireTimeBuffer, 0);
+            this.gasTimeBuffer = min(this.gasTimeBuffer, 0);
         }
     }
 }
