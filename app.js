@@ -346,6 +346,10 @@ engineInit(
                     headwearTileIndex = 5; // itemType_hammer tileIndex
                 else if (player.equippedWeaponType == 'RadarWeapon')
                     headwearTileIndex = 6; // itemType_radar tileIndex
+                else if (player.equippedWeaponType == 'SmokerWeapon')
+                    headwearTileIndex = 7; // itemType_smoker tileIndex
+                else if (player.equippedWeaponType == 'FangWeapon')
+                    headwearTileIndex = 8; // itemType_fang tileIndex
                 
                 if (headwearTileIndex >= 0 && typeof drawTile2 === 'function')
                 {

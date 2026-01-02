@@ -3035,6 +3035,10 @@ class Player extends Character
             newWeapon = new HammerWeapon(this.pos, this);
         else if (weaponType == 'RadarWeapon')
             newWeapon = new RadarWeapon(this.pos, this);
+        else if (weaponType == 'SmokerWeapon')
+            newWeapon = new SmokerWeapon(this.pos, this);
+        else if (weaponType == 'FangWeapon')
+            newWeapon = new FangWeapon(this.pos, this);
         else
             newWeapon = new Weapon(this.pos, this);
         
@@ -3065,6 +3069,10 @@ class Player extends Character
                 itemType = typeof itemType_hammer !== 'undefined' ? itemType_hammer : 5;
             else if (currentWeaponType == 'RadarWeapon')
                 itemType = typeof itemType_radar !== 'undefined' ? itemType_radar : 6;
+            else if (currentWeaponType == 'SmokerWeapon')
+                itemType = typeof itemType_smoker !== 'undefined' ? itemType_smoker : 7;
+            else if (currentWeaponType == 'FangWeapon')
+                itemType = typeof itemType_fang !== 'undefined' ? itemType_fang : 8;
             
             // Create item slightly away from player so it doesn't immediately get collected
             if (itemType >= 0)

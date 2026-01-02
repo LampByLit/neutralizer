@@ -371,7 +371,7 @@ class Checkpoint extends GameObject
     {
         // draw flag
         const height = 4;
-        const color = activeCheckpoint == this ? new Color(1,0,0) : new Color;
+        const color = activeCheckpoint == this ? new Color : new Color(1,0,0);
         const a = Math.sin(time*4+this.pos.x);
         drawTile(this.pos.add(vec2(.5,height-.3-.5-.03*a)), vec2(1,.6), 14, undefined, color, a*.06);  
         drawRect(this.pos.add(vec2(0,height/2-.5)), vec2(.1,height), new Color(.9,.9,.9));
@@ -538,6 +538,79 @@ class HammerProjectile extends GameObject
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class ToxicGasCloud extends GameObject
+{
+    constructor(pos, attacker) 
+    {
+        super(pos, vec2(2), 0, vec2(8)); // Large cloud size
+
+        this.health = this.healthMax = 1e3;
+        this.attacker = attacker;
+        this.team = attacker ? attacker.team : 0;
+        this.lifetime = 3; // Gas cloud lasts 3 seconds
+        this.damagePerSecond = 20; // Extreme damage - 20 per second
+        this.damageTimer = new Timer(0.1); // Damage every 0.1 seconds
+        this.radius = 2; // Damage radius
+        this.setCollision();
+        this.color = new Color(1, 0.4, 0.8, 0.6); // Pink gas color
+    }
+
+    update()
+    {
+        super.update();
+
+        // Check lifetime
+        if (this.getAliveTime() > this.lifetime)
+        {
+            this.destroy();
+            return;
+        }
+
+        // Damage enemies in range
+        if (this.damageTimer.elapsed())
+        {
+            forEachObject(this.pos, this.radius, (o)=>
+            {
+                if (o.isGameObject && !o.parent && o.team != this.team)
+                {
+                    if (o.isCharacter)
+                    {
+                        const d = o.pos.distance(this.pos);
+                        if (d < this.radius)
+                        {
+                            // Deal damage proportional to time (damagePerSecond * 0.1)
+                            o.damage(this.damagePerSecond * 0.1, this);
+                        }
+                    }
+                }
+            });
+            this.damageTimer.set(0.1);
+        }
+
+        // Create pink gas particles
+        new ParticleEmitter(
+            this.pos, this.radius, 0, 50, PI * 2, // pos, emitSize, emitTime, emitRate, emiteCone
+            0, undefined,        // tileIndex, tileSize
+            new Color(1, 0.4, 0.8, 0.8), new Color(1, 0.2, 0.6, 0.4), // Pink colorStartA, colorStartB
+            new Color(1, 0.4, 0.8, 0), new Color(1, 0.2, 0.6, 0), // colorEndA, colorEndB
+            1.5, .3, 1, .05, .02, // particleTime, sizeStart, sizeEnd, particleSpeed, particleAngleSpeed
+            .95, 1, -.1, PI * 2, .1,  // damping, angleDamping, gravityScale, particleCone, fadeRate, 
+            .5, 0, 0, 0, 1e8              // randomness, collide, additive, randomColorLinear, renderOrder
+        );
+    }
+    
+    render()
+    {
+        // Draw semi-transparent pink cloud
+        setBlendMode(1);
+        const alpha = 0.3 * (1 - this.getAliveTime() / this.lifetime); // Fade out over time
+        drawTile(this.pos, vec2(this.radius), 0, vec2(16), new Color(1, 0.4, 0.8, alpha), 0);
+        setBlendMode(0);
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 class KeyItem extends GameObject
 {
     constructor(pos)
@@ -637,7 +710,7 @@ class KeyItem extends GameObject
 ///////////////////////////////////////////////////////////////////////////////
 
 // Item type definitions
-// Order: Life (0), Health (1), Laser (2), Cannon (3), Jumper (4), Hammer (5), Radar (6)
+// Order: Life (0), Health (1), Laser (2), Cannon (3), Jumper (4), Hammer (5), Radar (6), Smoker (7), Fang (8)
 const itemType_life = 0;
 const itemType_health = 1;
 const itemType_laser = 2;
@@ -645,6 +718,8 @@ const itemType_cannon = 3;
 const itemType_jumper = 4;
 const itemType_hammer = 5;
 const itemType_radar = 6;
+const itemType_smoker = 7;
+const itemType_fang = 8;
 
 const itemType_consumable = 0;
 const itemType_equipable = 1;
@@ -686,11 +761,21 @@ const itemRegistry = {
         category: itemType_equipable, 
         tileIndex: 6, 
         weaponType: 'RadarWeapon' 
+    },
+    [itemType_smoker]: { 
+        category: itemType_equipable, 
+        tileIndex: 7, 
+        weaponType: 'SmokerWeapon' 
+    },
+    [itemType_fang]: { 
+        category: itemType_equipable, 
+        tileIndex: 8, 
+        weaponType: 'FangWeapon' 
     }
 };
 
 // Get all available item types for random selection
-const getAllItemTypes = ()=> [itemType_life, itemType_health, itemType_laser, itemType_cannon, itemType_jumper, itemType_hammer, itemType_radar];
+const getAllItemTypes = ()=> [itemType_life, itemType_health, itemType_laser, itemType_cannon, itemType_jumper, itemType_hammer, itemType_radar, itemType_smoker, itemType_fang];
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -1606,6 +1691,129 @@ class RadarWeapon extends Weapon
         }
         
         super.destroy();
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class SmokerWeapon extends Weapon
+{
+    constructor(pos, parent)
+    {
+        super(pos, parent);
+        this.fireTimeBuffer = 0;
+        this.gasSpawnRate = 0.1; // Spawn gas cloud every 0.1 seconds
+        this.hidden = 1; // Don't render the weapon sprite (helmet is rendered separately)
+    }
+    
+    update()
+    {
+        super.update();
+        
+        // Only handle gas spraying for player
+        if (!this.parent.isPlayer)
+            return;
+        
+        this.fireTimeBuffer += timeDelta;
+        
+        // Check if F key is pressed (key code 70)
+        const pressingF = !this.parent.playerIndex && keyIsDown(70);
+        
+        if (pressingF)
+        {
+            // Spawn gas clouds continuously while F is held
+            while (this.fireTimeBuffer >= this.gasSpawnRate)
+            {
+                this.fireTimeBuffer -= this.gasSpawnRate;
+                
+                // Calculate weapon position (where gas comes from)
+                const sizeScale = this.parent.sizeScale || 1;
+                const weaponPos = this.parent.pos.add(
+                    vec2(this.parent.getMirrorSign(.55), 0).scale(sizeScale)
+                );
+                
+                // Get forward direction based on aim
+                const baseAimAngle = this.parent.aimAngle || 0;
+                const forwardDirection = vec2(this.parent.getMirrorSign(1), 0).rotate(baseAimAngle);
+                
+                // Spawn gas cloud slightly forward
+                const gasPos = weaponPos.add(forwardDirection.scale(0.5));
+                
+                // Create toxic gas cloud
+                const gas = new ToxicGasCloud(gasPos, this.parent);
+                
+                // Add slight forward velocity
+                gas.velocity = this.parent.velocity.add(forwardDirection.scale(0.3));
+                
+                // Alert enemies
+                alertEnemies(gasPos, gasPos);
+            }
+        }
+        else
+        {
+            // Not pressing F, reset buffer
+            this.fireTimeBuffer = min(this.fireTimeBuffer, 0);
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class FangWeapon extends Weapon
+{
+    constructor(pos, parent)
+    {
+        super(pos, parent);
+        this.fireTimeBuffer = 0;
+        this.hidden = 1; // Don't render the weapon sprite (helmet is rendered separately)
+    }
+    
+    update()
+    {
+        super.update();
+        
+        // Only handle venom spraying for player
+        if (!this.parent.isPlayer)
+            return;
+        
+        // Check if F key is pressed (key code 70)
+        const pressingF = !this.parent.playerIndex && keyIsDown(70);
+        
+        if (pressingF)
+        {
+            // Same parameters as spider venom spray
+            const particleSpeed = .3;
+            const particleRate = 8; // Fast firing rate
+            const spread = 0.03; // Very tight spread for good aim
+            
+            this.fireTimeBuffer += timeDelta;
+            const rate = 1/particleRate;
+            
+            // Get forward direction based on aim
+            const baseAimAngle = this.parent.aimAngle || 0;
+            const forwardDirection = vec2(this.parent.getMirrorSign(1), 0).rotate(baseAimAngle);
+            
+            // Calculate weapon position (where venom comes from)
+            const sizeScale = this.parent.sizeScale || 1;
+            const weaponPos = this.parent.pos.add(
+                vec2(this.parent.getMirrorSign(.55), 0).scale(sizeScale)
+            );
+            
+            for(; this.fireTimeBuffer > 0; this.fireTimeBuffer -= rate)
+            {
+                // Create red venom particle exactly like spider
+                const particle = new VenomParticle(weaponPos, this.parent, new Color(1, 0, 0));
+                
+                // Fire particle in forward direction with small spread
+                const spreadAngle = rand(spread, -spread);
+                particle.velocity = forwardDirection.rotate(spreadAngle).scale(particleSpeed);
+            }
+        }
+        else
+        {
+            // Not pressing F, reset buffer
+            this.fireTimeBuffer = min(this.fireTimeBuffer, 0);
+        }
     }
 }
 
