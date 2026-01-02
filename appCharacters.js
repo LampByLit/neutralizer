@@ -338,7 +338,8 @@ class Character extends GameObject
         if (this.isDead())
             return 0;
 
-        if (levelWarmup)
+        // Malefactors are immune to warmup destruction (they're too important!)
+        if (levelWarmup && !this.immuneToWarmupDamage)
         {
             this.destroy();
             return 1;
@@ -1119,6 +1120,7 @@ class Malefactor extends Enemy
         this.maxSpeed = maxCharacterSpeed * 4.0; // 4x faster than normal - very fast!
         this.jumpPower = 0.3; // Higher jump than normal (.15) but not too high
         this.noFallDamage = 1; // Flag to prevent fall damage
+        this.immuneToWarmupDamage = 1; // Prevent destruction during warmup
         
         // Unique sprite - use tile 21 for body (different from bastard's 20)
         this.bodyTile = 21;

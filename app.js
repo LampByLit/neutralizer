@@ -27,6 +27,8 @@ const team_player = 1;
 const team_enemy = 2;
 
 let updateWindowSize, renderWindowSize, gameplayWindowSize;
+// let selectedLevel = 1; // Level selector for testing (1-5) - COMMENTED OUT
+let selectedLevel = 1; // Keep default to 1 for normal gameplay
 
 engineInit(
 
@@ -49,10 +51,24 @@ engineInit(
     //debugRect(cameraPos, updateWindowSize);
 
     // handle title screen input
-    if (gameState === 'title' && (keyWasPressed(32) || gamepadWasPressed(0)))
+    if (gameState === 'title')
     {
-        gameState = 'playing';
-        resetGame();
+        // Level selector (number keys 1-5) - COMMENTED OUT FOR RELEASE
+        // for(let i = 1; i <= 5; i++)
+        // {
+        //     const keyCode = 48 + i; // 49 = '1', 50 = '2', etc.
+        //     if (keyWasPressed(keyCode))
+        //     {
+        //         selectedLevel = i;
+        //     }
+        // }
+        
+        // Start game
+        if (keyWasPressed(32) || gamepadWasPressed(0))
+        {
+            gameState = 'playing';
+            resetGame();
+        }
     }
 
     if (debug)
@@ -271,15 +287,33 @@ engineInit(
             mainContext.fillText('MALEFACTOR', mainCanvas.width/2, mainCanvas.height/2 - 100);
         }
         
+        // Level selector - COMMENTED OUT FOR RELEASE
+        // mainContext.textAlign = 'center';
+        // mainContext.fillStyle = new Color(1,1,1).rgba();
+        // mainContext.font = 'bold 24px JetBrains Mono';
+        // mainContext.fillText('Select Level (Press 1-5):', mainCanvas.width/2, mainCanvas.height/2 + 20);
+        // 
+        // // Highlight selected level
+        // const levelY = mainCanvas.height/2 + 55;
+        // for(let i = 1; i <= 5; i++)
+        // {
+        //     const x = mainCanvas.width/2 - 80 + (i - 1) * 40;
+        //     const color = i === selectedLevel ? new Color(1,1,0) : new Color(0.7,0.7,0.7);
+        //     mainContext.fillStyle = color.rgba();
+        //     mainContext.font = 'bold 36px JetBrains Mono';
+        //     mainContext.textAlign = 'center';
+        //     mainContext.fillText(i.toString(), x, levelY);
+        // }
+        
         // Press to start text
         mainContext.textAlign = 'center';
         mainContext.fillStyle = new Color(1,1,1).rgba();
         mainContext.font = 'bold 32px JetBrains Mono';
-        mainContext.fillText('Press SPACE to Start', mainCanvas.width/2, mainCanvas.height/2 + 50);
+        mainContext.fillText('Press SPACE to Start', mainCanvas.width/2, mainCanvas.height/2 + 70);
 
         // Controls subtitle
         mainContext.font = 'bold 20px JetBrains Mono';
-        const controlsY = mainCanvas.height/2 + 120;
+        const controlsY = mainCanvas.height/2 + 140;
         const lineHeight = 24;
         mainContext.fillText('WASD = Move', mainCanvas.width/2, controlsY);
         mainContext.fillText('Arrows = Aim', mainCanvas.width/2, controlsY + lineHeight);

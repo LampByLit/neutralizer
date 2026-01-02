@@ -55,7 +55,8 @@ const resetGame=()=>
     levelEndTimer.unset();
     gameOverTimer.unset();
     gameCompleteTimer.unset();
-    gameTimer.set(totalKills = level = 0);
+    gameTimer.set(totalKills = 0);
+    level = selectedLevel - 1; // Start at selected level (nextLevel increments it)
     gameState = 'playing';
     nextLevel();
 }
@@ -145,6 +146,36 @@ function clearEdgeTiles(size, edgeBuffer = 20)
         setTileCollisionData(vec2(x, y), tileType_empty);
         setTileBackgroundData(vec2(x, y), tileType_empty);
     }
+}
+
+function createMalefactorSpawnPlatform(centerX, groundY, platformWidth = 12, platformHeight = 8)
+{
+    // Create a flat platform for the malefactor to spawn on
+    // Clear a large area and create a solid platform
+    const halfWidth = platformWidth / 2;
+    const platformTop = groundY - platformHeight;
+    
+    // Clear the area above the platform (air space)
+    for(let x = centerX - halfWidth; x <= centerX + halfWidth; ++x)
+    {
+        for(let y = platformTop; y < groundY; ++y)
+        {
+            const pos = vec2(x, y);
+            setTileCollisionData(pos, tileType_empty);
+            setTileBackgroundData(pos, tileType_empty);
+        }
+    }
+    
+    // Create the platform floor (solid ground)
+    for(let x = centerX - halfWidth; x <= centerX + halfWidth; ++x)
+    {
+        const pos = vec2(x, groundY);
+        setTileCollisionData(pos, tileType_dirt);
+        setTileBackgroundData(pos, tileType_dirt);
+    }
+    
+    // Return the spawn position (center of platform, slightly above ground)
+    return vec2(centerX, groundY - 1);
 }
 
 function spawnProps(pos)
@@ -467,68 +498,87 @@ function generateLevel()
         const malefactorCount = level == 4 ? 1 : 3;
         for(let i = 0; i < malefactorCount; i++)
         {
-            let malefactorSpawned = 0;
-            // Try with distance requirement first
-            for(let attempts = 100; !malefactorSpawned && attempts--;)
+            let spawnPos = null;
+            
+            if (level == 4)
             {
-                const pos = vec2(randSeeded(levelSize.x-40, 40), levelSize.y);
-                raycastHit = tileCollisionRaycast(pos, vec2(pos.x, 0));
-                if (raycastHit && abs(checkpointPos.x-pos.x) > 20)
-                {
-                    const spawnPos = raycastHit.add(vec2(randSeeded(10, -10), 2));
-                    new Malefactor(spawnPos);
-                    ++totalMalefactorsSpawnedRef.value;
-                    ++totalEnemiesSpawnedRef.value;
-                    malefactorSpawned = 1;
-                }
-            }
-            // If still not spawned, try without distance requirement (spawn anywhere)
-            if (!malefactorSpawned)
-            {
-                for(let attempts = 200; !malefactorSpawned && attempts--;)
-                {
-                    const pos = vec2(randSeeded(levelSize.x-40, 40), levelSize.y);
-                    raycastHit = tileCollisionRaycast(pos, vec2(pos.x, 0));
-                    if (raycastHit)
-                    {
-                        const spawnPos = raycastHit.add(vec2(randSeeded(10, -10), 2));
-                        new Malefactor(spawnPos);
-                        ++totalMalefactorsSpawnedRef.value;
-                        ++totalEnemiesSpawnedRef.value;
-                        malefactorSpawned = 1;
-                    }
-                }
-            }
-            // Final fallback: spawn near checkpoint if all else fails
-            if (!malefactorSpawned)
-            {
-                const fallbackPos = checkpointPos.add(vec2(randSeeded(50, -50), 0));
-                raycastHit = tileCollisionRaycast(fallbackPos, vec2(fallbackPos.x, 0));
+                // Level 4: Create a guaranteed spawn platform
+                // Find a good location away from checkpoint (at least 40 tiles)
+                let platformX = checkpointPos.x + (randSeeded() < 0.5 ? 50 : -50);
+                platformX = clamp(platformX, levelSize.x - 60, 60); // Keep away from edges
+                
+                // Find ground level at this X position
+                const testPos = vec2(platformX, levelSize.y);
+                raycastHit = tileCollisionRaycast(testPos, vec2(platformX, 0));
+                
                 if (raycastHit)
                 {
-                    const spawnPos = raycastHit.add(vec2(0, 2));
-                    new Malefactor(spawnPos);
-                    ++totalMalefactorsSpawnedRef.value;
-                    ++totalEnemiesSpawnedRef.value;
-                    malefactorSpawned = 1;
+                    // raycastHit returns center of tile (y + 0.5), so floor it to get tile Y
+                    // The tile Y is the TOP of the solid tile, which is where we want the platform floor
+                    const groundY = (raycastHit.y - 0.5) | 0;
+                    spawnPos = createMalefactorSpawnPlatform(platformX, groundY, 12, 8);
                 }
                 else
                 {
-                    // Ultimate fallback: spawn directly on checkpoint position (guaranteed to have ground)
-                    // checkpointPos is already on ground, so we can spawn directly there with offset
-                    const ultimateSpawnPos = checkpointPos.add(vec2(randSeeded(30, -30), 0));
-                    new Malefactor(ultimateSpawnPos);
-                    ++totalMalefactorsSpawnedRef.value;
-                    ++totalEnemiesSpawnedRef.value;
-                    malefactorSpawned = 1;
+                    // Fallback: create platform near checkpoint
+                    const fallbackX = checkpointPos.x + 40;
+                    const fallbackTest = vec2(fallbackX, levelSize.y);
+                    raycastHit = tileCollisionRaycast(fallbackTest, vec2(fallbackX, 0));
+                    if (raycastHit)
+                    {
+                        const groundY = (raycastHit.y - 0.5) | 0;
+                        spawnPos = createMalefactorSpawnPlatform(fallbackX, groundY, 12, 8);
+                    }
+                    else
+                    {
+                        // Ultimate fallback: use checkpoint ground level (checkpointPos is 1 tile above ground)
+                        const checkpointGroundY = (checkpointPos.y - 1) | 0;
+                        spawnPos = createMalefactorSpawnPlatform(checkpointPos.x + 40, checkpointGroundY, 12, 8);
+                    }
                 }
             }
-            
-            // CRITICAL: Verify malefactor actually spawned (for level 4, this is mandatory)
-            if (level == 4 && !malefactorSpawned)
+            else
             {
-                // Emergency spawn: use checkpoint position directly (guaranteed to exist)
-                new Malefactor(checkpointPos.add(vec2(20, 0)));
+                // Level 5: Use existing logic but with platform creation
+                let foundPos = null;
+                for(let attempts = 50; !foundPos && attempts--;)
+                {
+                    const pos = vec2(randSeeded(levelSize.x-40, 40), levelSize.y);
+                    raycastHit = tileCollisionRaycast(pos, vec2(pos.x, 0));
+                    if (raycastHit && abs(checkpointPos.x-pos.x) > 30)
+                    {
+                        const groundY = (raycastHit.y - 0.5) | 0;
+                        foundPos = createMalefactorSpawnPlatform(pos.x, groundY, 10, 6);
+                    }
+                }
+                if (!foundPos)
+                {
+                    // Fallback for level 5
+                    const fallbackX = checkpointPos.x + (i * 40 - 40);
+                    const fallbackTest = vec2(fallbackX, levelSize.y);
+                    raycastHit = tileCollisionRaycast(fallbackTest, vec2(fallbackX, 0));
+                    if (raycastHit)
+                    {
+                        const groundY = (raycastHit.y - 0.5) | 0;
+                        foundPos = createMalefactorSpawnPlatform(fallbackX, groundY, 10, 6);
+                    }
+                }
+                spawnPos = foundPos;
+            }
+            
+            // Spawn the malefactor on the platform
+            if (spawnPos)
+            {
+                new Malefactor(spawnPos);
+                ++totalMalefactorsSpawnedRef.value;
+                ++totalEnemiesSpawnedRef.value;
+            }
+            else
+            {
+                // Emergency fallback: spawn at checkpoint with platform
+                const emergencyGroundY = (checkpointPos.y - 1) | 0;
+                spawnPos = createMalefactorSpawnPlatform(checkpointPos.x + 40, emergencyGroundY, 12, 8);
+                new Malefactor(spawnPos);
                 ++totalMalefactorsSpawnedRef.value;
                 ++totalEnemiesSpawnedRef.value;
             }
@@ -801,12 +851,28 @@ function nextLevel()
             }
         }, 0); // Check all objects, not just collide objects
         
-        // If no malefactor found, force spawn one at checkpoint (guaranteed location)
+        // If no malefactor found, force spawn one with platform (guaranteed location)
         if (malefactorCount == 0)
         {
-            // Spawn malefactor offset from checkpoint to avoid immediate collision with player
-            const emergencySpawnPos = checkpointPos.add(vec2(30, 0));
-            new Malefactor(emergencySpawnPos);
+            // Create a spawn platform away from checkpoint
+            const platformX = checkpointPos.x + 50;
+            const platformTest = vec2(platformX, levelSize.y);
+            let raycastHit = tileCollisionRaycast(platformTest, vec2(platformX, 0));
+            
+            let spawnPos;
+            if (raycastHit)
+            {
+                const groundY = (raycastHit.y - 0.5) | 0;
+                spawnPos = createMalefactorSpawnPlatform(platformX, groundY, 12, 8);
+            }
+            else
+            {
+                // Use checkpoint ground level (checkpointPos is 1 tile above ground)
+                const checkpointGroundY = (checkpointPos.y - 1) | 0;
+                spawnPos = createMalefactorSpawnPlatform(checkpointPos.x + 50, checkpointGroundY, 12, 8);
+            }
+            
+            new Malefactor(spawnPos);
         }
     }
 
