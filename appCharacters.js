@@ -2038,7 +2038,8 @@ class Spider extends Enemy
     
     render()
     {
-        if (!isOverlapping(this.pos, this.size, cameraPos, renderWindowSize))
+        // Allow persistent dead spiders to render even when far away
+        if (!isOverlapping(this.pos, this.size, cameraPos, renderWindowSize) && !(this.persistent && this.isDead()))
             return;
 
         // set tile to use
@@ -2147,15 +2148,18 @@ class Spider extends Enemy
             const controlY = lerp(bodyY, pawY - this.pawHeight, 0.5);
             
             // Draw leg as fuzzy quadratic curve - multiple overlapping lines for fuzzy effect
-            const segmentCount = 12; // More segments for smoother fuzzy curve
+            const segmentCount = 16; // More segments for smoother fuzzy curve
             let prevX = bodyX;
             let prevY = bodyY;
             
+            // Store curve points for hair rendering
+            const curvePoints = [];
+            
             // Draw multiple layers for fuzzy effect
-            for(let fuzzyLayer = 0; fuzzyLayer < 5; fuzzyLayer++)
+            for(let fuzzyLayer = 0; fuzzyLayer < 7; fuzzyLayer++)
             {
-                const fuzzyOffset = (fuzzyLayer - 2) * legThickness * 0.15;
-                const fuzzyAlpha = 0.3 + (fuzzyLayer === 2 ? 0.4 : 0.1); // Center layer is brightest
+                const fuzzyOffset = (fuzzyLayer - 3) * legThickness * 0.12;
+                const fuzzyAlpha = 0.25 + (fuzzyLayer === 3 ? 0.5 : 0.08); // Center layer is brightest
                 const fuzzyColor = new Color(1, 0, 0, fuzzyAlpha);
                 
                 prevX = bodyX;
@@ -2178,11 +2182,51 @@ class Spider extends Enemy
                         y += Math.sin(angle) * fuzzyOffset;
                     }
                     
+                    // Store point for hair rendering (only on center layer)
+                    if (fuzzyLayer === 3)
+                    {
+                        curvePoints.push({x: x, y: y, angle: Math.atan2(y - prevY, x - prevX)});
+                    }
+                    
                     // Draw line segment with fuzzy color
-                    drawLine(vec2(prevX, prevY), vec2(x, y), legThickness * (0.7 + fuzzyLayer * 0.1), fuzzyColor);
+                    drawLine(vec2(prevX, prevY), vec2(x, y), legThickness * (0.6 + fuzzyLayer * 0.08), fuzzyColor);
                     
                     prevX = x;
                     prevY = y;
+                }
+            }
+            
+            // Draw hairy texture - small lines perpendicular to leg
+            for(let hairIndex = 0; hairIndex < curvePoints.length; hairIndex += 2) // Every other point
+            {
+                const point = curvePoints[hairIndex];
+                const hairAngle = point.angle + PI/2; // Perpendicular to leg
+                const hairLength = legThickness * 0.4; // Hair length
+                const hairCount = 3; // Multiple hairs per point
+                
+                // Deterministic pseudo-random based on leg and hair indices
+                const seed = (i * 17 + hairIndex * 7 + time * 0.1) % 1000;
+                const rand1 = (Math.sin(seed) * 0.5 + 0.5);
+                const rand2 = (Math.cos(seed * 1.3) * 0.5 + 0.5);
+                const rand3 = (Math.sin(seed * 2.1) * 0.5 + 0.5);
+                
+                for(let h = 0; h < hairCount; h++)
+                {
+                    const hairOffset = (h - (hairCount-1)/2) * legThickness * 0.15;
+                    const hairStartX = point.x + Math.cos(hairAngle) * hairOffset;
+                    const hairStartY = point.y + Math.sin(hairAngle) * hairOffset;
+                    
+                    // Use deterministic pseudo-random for hair length variation
+                    const lengthVariation = 0.7 + (h === 0 ? rand1 : h === 1 ? rand2 : rand3) * 0.3;
+                    const hairEndX = hairStartX + Math.cos(hairAngle) * hairLength * lengthVariation;
+                    const hairEndY = hairStartY + Math.sin(hairAngle) * hairLength * lengthVariation;
+                    
+                    // Deterministic hair color variation (slightly darker/lighter)
+                    const hairBrightness = 0.7 + (h === 0 ? rand1 : h === 1 ? rand2 : rand3) * 0.3;
+                    const hairColor = new Color(hairBrightness, 0, 0, 0.6);
+                    
+                    // Draw hair as thin line
+                    drawLine(vec2(hairStartX, hairStartY), vec2(hairEndX, hairEndY), legThickness * 0.15, hairColor);
                 }
             }
             
