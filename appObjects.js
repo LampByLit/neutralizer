@@ -652,7 +652,7 @@ class Item extends GameObject
             return;
         }
         
-        super(pos, vec2(.4, .4), itemData.tileIndex, vec2(8));
+        super(pos, vec2(.7, .7), itemData.tileIndex, vec2(8));
         
         this.itemType = itemType;
         this.itemData = itemData;
