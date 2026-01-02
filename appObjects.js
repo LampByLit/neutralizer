@@ -448,7 +448,7 @@ class HammerProjectile extends GameObject
         this.angleDamping = .96;
         this.renderOrder = 1e8;
         this.gravityScale = 1; // Affected by gravity for ballistic trajectory
-        this.damage = 5; // 5x bullet damage
+        this.hammerDamage = 5; // 5x bullet damage
         this.hasLanded = 0; // Track if projectile has landed
         this.isNuking = 0; // Flag to prevent infinite recursion
         this.setCollision();
@@ -473,7 +473,7 @@ class HammerProjectile extends GameObject
                 if (o.isCharacter)
                 {
                     // Enemy touched the hammer - deal damage and disappear
-                    o.damage(this.damage, this);
+                    o.damage(this.hammerDamage, this);
                     this.destroy();
                     return;
                 }
@@ -506,8 +506,8 @@ class HammerProjectile extends GameObject
         this.destroyed = 1;
         this.health = 0;
         
-        // Explode with massive nuke explosion (radius 15 - very powerful blast)
-        nukeExplosion(this.pos, 15);
+        // Explode with massive nuke explosion - same size as jackrock (radius 10)
+        nukeExplosion(this.pos, 10);
         this.destroy();
     }
     
@@ -519,7 +519,7 @@ class HammerProjectile extends GameObject
             if (o.isCharacter)
             {
                 // Enemy touched the hammer - deal damage and disappear
-                o.damage(this.damage, this);
+                o.damage(this.hammerDamage, this);
                 this.destroy();
                 return 1;
             }
