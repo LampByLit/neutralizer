@@ -26,6 +26,10 @@ function playSound(zzfxSound, pos, range=defaultSoundRange, volumeScale=1)
     if (lengthSquared > maxRange**2)
         return;
 
+    // if sound is an array of sounds, pick one randomly
+    if (Array.isArray(zzfxSound[0]))
+        zzfxSound = zzfxSound[rand(zzfxSound.length)|0];
+
     // copy sound (so volume scale isnt permanant)
     zzfxSound = [...zzfxSound];
 

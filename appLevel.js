@@ -510,7 +510,27 @@ function generateLevel()
                     new Malefactor(spawnPos);
                     ++totalMalefactorsSpawnedRef.value;
                     ++totalEnemiesSpawnedRef.value;
+                    malefactorSpawned = 1;
                 }
+                else
+                {
+                    // Ultimate fallback: spawn directly on checkpoint position (guaranteed to have ground)
+                    // checkpointPos is already on ground, so we can spawn directly there with offset
+                    const ultimateSpawnPos = checkpointPos.add(vec2(randSeeded(30, -30), 0));
+                    new Malefactor(ultimateSpawnPos);
+                    ++totalMalefactorsSpawnedRef.value;
+                    ++totalEnemiesSpawnedRef.value;
+                    malefactorSpawned = 1;
+                }
+            }
+            
+            // CRITICAL: Verify malefactor actually spawned (for level 4, this is mandatory)
+            if (level == 4 && !malefactorSpawned)
+            {
+                // Emergency spawn: use checkpoint position directly (guaranteed to exist)
+                new Malefactor(checkpointPos.add(vec2(20, 0)));
+                ++totalMalefactorsSpawnedRef.value;
+                ++totalEnemiesSpawnedRef.value;
             }
         }
     }
@@ -756,14 +776,39 @@ function nextLevel()
     levelWarmup = 0;
 
     // destroy any objects that are stuck in collision
+    // Skip characters - they handle their own collision and are supposed to be on the ground
     forEachObject(0, 0, (o)=>
     {
-        if (o.isGameObject && o != firstCheckpoint)
+        if (o.isGameObject && o != firstCheckpoint && !o.isCharacter)
         {
             const checkBackground = o.isCheckpoint;
             (checkBackground ? getTileBackgroundData(o.pos) > 0 : tileCollisionTest(o.pos,o.size))  && o.destroy();
         }
     });
+
+    // CRITICAL VERIFICATION: Ensure level 4 has exactly 1 malefactor (guaranteed spawn)
+    if (level == 4)
+    {
+        let malefactorCount = 0;
+        forEachObject(0, 0, (o)=>
+        {
+            // Check if it's a malefactor: enemy character with type 7 (type_malefactor) or sizeScale ~5.0
+            if (o.isCharacter && o.team == team_enemy && !o.destroyed)
+            {
+                // Malefactors have type 7 and sizeScale of 5.0
+                if ((o.type === 7) || (o.sizeScale && abs(o.sizeScale - 5.0) < 0.1))
+                    ++malefactorCount;
+            }
+        }, 0); // Check all objects, not just collide objects
+        
+        // If no malefactor found, force spawn one at checkpoint (guaranteed location)
+        if (malefactorCount == 0)
+        {
+            // Spawn malefactor offset from checkpoint to avoid immediate collision with player
+            const emergencySpawnPos = checkpointPos.add(vec2(30, 0));
+            new Malefactor(emergencySpawnPos);
+        }
+    }
 
     // hack, subtract off warm up time from main game timer
     //gameTimer.time += warmUpTime;
