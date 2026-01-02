@@ -401,6 +401,10 @@ class Character extends GameObject
         if (this.isDead())
             return super.collideWithObject(o);
 
+        // KeyItems are harmless - don't cause damage
+        if (o.isKeyItem)
+            return super.collideWithObject(o);
+
         if (o.velocity.lengthSquared() > .04)
         {
             const v = o.velocity.subtract(this.velocity);
