@@ -31,17 +31,17 @@ let skyParticles, skyRain, skySoundTimer = new Timer;
 let gameTimer = new Timer, levelTimer = new Timer, levelEndTimer = new Timer, gameOverTimer = new Timer, gameCompleteTimer = new Timer;
 let gameState = 'title'; // game states: 'title', 'playing', 'gameOver', 'win'
 
-// level enemy limits: [maxEnemies, maxSlimes, maxBastards, maxMalefactors, maxFoes]
+// level enemy limits: [maxEnemies, maxSlimes, maxBastards, maxMalefactors, maxFoes, maxSpiders, maxSpiderlings]
 const levelLimits = {
-    1: [20, 1, 0, 0, 0],
-    2: [40, 3, 0, 0, 0],
-    3: [50, 10, 15, 0, 0],
-    4: [1, 0, 0, 1, 0],  // ONLY malefactors: 1 malefactor
-    5: [60, 20, 15, 10, 1],  // 60 enemies total, including 10 malefactors and 1 foe
+    1: [20, 1, 0, 0, 0, 1, 0],  // Level 1: 1 spider boss
+    2: [40, 3, 0, 0, 0, 0, 3],  // Level 2: max 3 spiderlings
+    3: [50, 10, 15, 0, 0, 0, 5],  // Level 3: max 5 spiderlings
+    4: [1, 0, 0, 1, 0, 1, 0],  // Level 4: 1 malefactor and 1 spider
+    5: [60, 20, 15, 10, 1, 0, 8],  // Level 5: 60 enemies total, including 10 malefactors, 1 foe, and 8 spiderlings
     // 6: [1, 0, 0, 0, 0]  // Level 6: Flat level with 1 weak enemy and many crates - REMOVED
 };
-let levelMaxEnemies, levelMaxSlimes, levelMaxBastards, levelMaxMalefactors, levelMaxFoes;
-let totalEnemiesSpawned, totalSlimesSpawned, totalBastardsSpawned, totalMalefactorsSpawned, totalFoesSpawned;
+let levelMaxEnemies, levelMaxSlimes, levelMaxBastards, levelMaxMalefactors, levelMaxFoes, levelMaxSpiders, levelMaxSpiderlings;
+let totalEnemiesSpawned, totalSlimesSpawned, totalBastardsSpawned, totalMalefactorsSpawned, totalFoesSpawned, totalSpidersSpawned, totalSpiderlingsSpawned;
 
 let tileBackground, keyItemSpawned;
 const setTileBackgroundData = (pos, data=0)=>
@@ -229,7 +229,7 @@ function spawnProps(pos)
     }
 }
 
-function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefactorsSpawnedRef, totalEnemiesSpawnedRef)
+function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefactorsSpawnedRef, totalEnemiesSpawnedRef, totalSpiderlingsSpawnedRef)
 {
     // check if we've hit limits
     if (totalEnemiesSpawnedRef.value >= levelMaxEnemies)
@@ -363,12 +363,22 @@ function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefact
                 
                 const pos = floorBottomCenterPos.add(vec2(randSeeded( floorWidth-1,-floorWidth+1),.7));
                 
-                // decide what to spawn: slime, bastard, or regular enemy
+                // decide what to spawn: slime, bastard, spiderling, or regular enemy
                 let spawnSlime = 0;
                 let spawnBastard = 0;
+                let spawnSpiderling = 0;
                 
-                // If not spawning malefactor, check for bastard
-                if (level >= 3 && totalBastardsSpawnedRef.value < levelMaxBastards)
+                // Check for spiderling first (levels 2, 3, and 5)
+                if ((level == 2 || level == 3 || level == 5) && totalSpiderlingsSpawnedRef.value < levelMaxSpiderlings)
+                {
+                    // Chance to spawn spiderling based on level
+                    let spiderlingChance = level == 2 ? 0.4 : (level == 3 ? 0.25 : 0.2); // 40% level 2, 25% level 3, 20% level 5
+                    if (randSeeded() < spiderlingChance)
+                        spawnSpiderling = 1;
+                }
+                
+                // If not spawning spiderling, check for bastard
+                if (!spawnSpiderling && level >= 3 && totalBastardsSpawnedRef.value < levelMaxBastards)
                 {
                     // Chance to spawn bastard based on level
                     let bastardChance = level == 3 ? 0.4 : (level == 4 ? 0.25 : 0.2); // 40% level 3, 25% level 4, 20% level 5
@@ -376,8 +386,8 @@ function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefact
                         spawnBastard = 1;
                 }
                 
-                // If not spawning bastard, check for slime
-                if (!spawnBastard && totalSlimesSpawnedRef.value < levelMaxSlimes)
+                // If not spawning spiderling or bastard, check for slime
+                if (!spawnSpiderling && !spawnBastard && totalSlimesSpawnedRef.value < levelMaxSlimes)
                 {
                     // we can still spawn slimes, use chance-based logic
                     if (level == 1)
@@ -391,7 +401,13 @@ function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefact
                     }
                 }
                 
-                if (spawnBastard)
+                if (spawnSpiderling)
+                {
+                    new Spiderling(pos);
+                    ++totalSpiderlingsSpawnedRef.value;
+                    ++totalEnemiesSpawnedRef.value;
+                }
+                else if (spawnBastard)
                 {
                     new Bastard(pos);
                     ++totalBastardsSpawnedRef.value;
@@ -510,16 +526,20 @@ function generateLevel()
     }
     checkpointPos = raycastHit.add(vec2(0,1));
 
-    // track total enemies, slimes, bastards, malefactors, and foes spawned for this level
+    // track total enemies, slimes, bastards, malefactors, foes, spiders, and spiderlings spawned for this level
     totalEnemiesSpawned = 0;
     totalSlimesSpawned = 0;
     totalBastardsSpawned = 0;
     totalMalefactorsSpawned = 0;
     totalFoesSpawned = 0;
+    totalSpidersSpawned = 0;
+    totalSpiderlingsSpawned = 0;
     const totalSlimesSpawnedRef = { value: 0 };
     const totalBastardsSpawnedRef = { value: 0 };
     const totalMalefactorsSpawnedRef = { value: 0 };
     const totalFoesSpawnedRef = { value: 0 };
+    const totalSpidersSpawnedRef = { value: 0 };
+    const totalSpiderlingsSpawnedRef = { value: 0 };
     const totalEnemiesSpawnedRef = { value: 0 };
     
     // Level 6: Special generation - flat level with many crates and 1 weak enemy - REMOVED
@@ -748,6 +768,153 @@ function generateLevel()
         }
     }
 
+    // Spawn spider on level 1 and 4 (before base generation) - with platform like malefactor
+    if ((level == 1 || level == 4) && levelMaxSpiders > 0)
+    {
+        const spiderCount = levelMaxSpiders;
+        for(let i = 0; i < spiderCount; i++)
+        {
+            let spawnPos = null;
+            
+            // Find a good location away from checkpoint (at least 40 tiles)
+            let platformX = checkpointPos.x + (randSeeded() < 0.5 ? 60 : -60);
+            platformX = clamp(platformX, levelSize.x - 60, 60); // Keep away from edges
+            
+            // Find ground level at this X position
+            const testPos = vec2(platformX, levelSize.y);
+            raycastHit = tileCollisionRaycast(testPos, vec2(platformX, 0));
+            
+            if (raycastHit)
+            {
+                // raycastHit returns center of tile (y + 0.5), so floor it to get tile Y
+                const groundY = (raycastHit.y - 0.5) | 0;
+                spawnPos = createMalefactorSpawnPlatform(platformX, groundY, 10, 6); // Platform for spider
+            }
+            else
+            {
+                // Fallback: create platform near checkpoint but away from it
+                const fallbackX = checkpointPos.x + (randSeeded() < 0.5 ? 50 : -50);
+                const fallbackTest = vec2(fallbackX, levelSize.y);
+                raycastHit = tileCollisionRaycast(fallbackTest, vec2(fallbackX, 0));
+                if (raycastHit)
+                {
+                    const groundY = (raycastHit.y - 0.5) | 0;
+                    spawnPos = createMalefactorSpawnPlatform(fallbackX, groundY, 10, 6);
+                }
+                else
+                {
+                    // Ultimate fallback: use checkpoint ground level (checkpointPos is 1 tile above ground)
+                    const checkpointGroundY = (checkpointPos.y - 1) | 0;
+                    spawnPos = createMalefactorSpawnPlatform(checkpointPos.x + 50, checkpointGroundY, 10, 6);
+                }
+            }
+            
+            // Spawn the spider on the platform
+            if (spawnPos)
+            {
+                new Spider(spawnPos);
+                ++totalSpidersSpawnedRef.value;
+                ++totalEnemiesSpawnedRef.value;
+            }
+            else
+            {
+                // Emergency fallback: spawn at checkpoint with platform
+                const emergencyGroundY = (checkpointPos.y - 1) | 0;
+                spawnPos = createMalefactorSpawnPlatform(checkpointPos.x + 40, emergencyGroundY, 10, 6);
+                new Spider(spawnPos);
+                ++totalSpidersSpawnedRef.value;
+                ++totalEnemiesSpawnedRef.value;
+            }
+        }
+    }
+
+    // Spawn TON of crates on level 4
+    if (level == 4)
+    {
+        // Scan across the level and place crates densely on solid ground
+        const crateSpacing = 2; // Spawn crates every 2 tiles (very dense!)
+        const minDistanceFromCheckpoint = 10; // Don't spawn too close to start
+        
+        for(let x = minDistanceFromCheckpoint; x < levelSize.x - minDistanceFromCheckpoint; x += crateSpacing)
+        {
+            // Try multiple Y positions to find ground
+            for(let yOffset = 0; yOffset < 50; yOffset++)
+            {
+                const testPos = vec2(x, levelSize.y - yOffset);
+                raycastHit = tileCollisionRaycast(testPos, vec2(x, 0));
+                
+                if (raycastHit)
+                {
+                    const groundY = (raycastHit.y - 0.5) | 0;
+                    const cratePos = vec2(x + randSeeded(0.8, -0.8), groundY - 0.5);
+                    
+                    // Make sure there's solid ground below and empty space above
+                    if (getTileCollisionData(vec2(cratePos.x, groundY)) > 0 &&
+                        getTileCollisionData(cratePos) <= 0 &&
+                        abs(checkpointPos.x - cratePos.x) > minDistanceFromCheckpoint)
+                    {
+                        // Spawn multiple crates at this location (stack them!)
+                        const crateCount = randSeeded(3) + 1; // 1-3 crates per spot
+                        for(let i = 0; i < crateCount; i++)
+                        {
+                            const offsetY = i * 0.6; // Stack them vertically
+                            const finalPos = vec2(cratePos.x, cratePos.y - offsetY);
+                            
+                            // Random crate type - mostly wood crates, some metal, few explosive
+                            let crateType = propType_crate_wood;
+                            const randType = randSeeded();
+                            if (randType < 0.1) // 10% explosive crates
+                                crateType = propType_crate_explosive;
+                            else if (randType < 0.3) // 20% metal crates
+                                crateType = propType_crate_metal;
+                            
+                            new Prop(finalPos, crateType);
+                        }
+                        break; // Found ground, move to next X position
+                    }
+                }
+            }
+        }
+        
+        // Also spawn crates in clusters for extra density
+        for(let cluster = 0; cluster < 30; cluster++)
+        {
+            const clusterX = randSeeded(levelSize.x - 40, 40);
+            const testPos = vec2(clusterX, levelSize.y);
+            raycastHit = tileCollisionRaycast(testPos, vec2(clusterX, 0));
+            
+            if (raycastHit && abs(checkpointPos.x - clusterX) > minDistanceFromCheckpoint)
+            {
+                const groundY = (raycastHit.y - 0.5) | 0;
+                const clusterCenter = vec2(clusterX, groundY - 0.5);
+                
+                // Create a cluster of 5-10 crates
+                const clusterSize = randSeeded(6) + 5;
+                for(let i = 0; i < clusterSize; i++)
+                {
+                    const angle = randSeeded(PI * 2);
+                    const radius = randSeeded(2, 0.5);
+                    const crateX = clusterCenter.x + Math.cos(angle) * radius;
+                    const crateY = clusterCenter.y + Math.sin(angle) * radius;
+                    const cratePos = vec2(crateX, crateY);
+                    
+                    if (getTileCollisionData(vec2(crateX, groundY)) > 0 &&
+                        getTileCollisionData(cratePos) <= 0)
+                    {
+                        let crateType = propType_crate_wood;
+                        const randType = randSeeded();
+                        if (randType < 0.15)
+                            crateType = propType_crate_explosive;
+                        else if (randType < 0.35)
+                            crateType = propType_crate_metal;
+                        
+                        new Prop(cratePos, crateType);
+                    }
+                }
+            }
+        }
+    }
+
     // random bases until we hit enemy limits (level 4 skips bases)
     if (level != 4)
     {
@@ -756,7 +923,7 @@ function generateLevel()
             if (!tries--)
                 break; // stop if we can't spawn more bases
 
-            if (buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefactorsSpawnedRef, totalEnemiesSpawnedRef))
+            if (buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefactorsSpawnedRef, totalEnemiesSpawnedRef, totalSpiderlingsSpawnedRef))
                 break; // stop if buildBase returns error or limit reached
         }
     }
@@ -767,6 +934,28 @@ function generateLevel()
     totalBastardsSpawned = totalBastardsSpawnedRef.value;
     totalMalefactorsSpawned = totalMalefactorsSpawnedRef.value;
     totalFoesSpawned = totalFoesSpawnedRef.value;
+    totalSpidersSpawned = totalSpidersSpawnedRef.value;
+    totalSpiderlingsSpawned = totalSpiderlingsSpawnedRef.value;
+
+    // spawn jackrock - one per level
+    for(let tries=99; tries--;)
+    {
+        const jackrockX = randSeeded(levelSize.x - 50, 50);
+        const pos = vec2(jackrockX, levelSize.y);
+        raycastHit = tileCollisionRaycast(pos, vec2(pos.x, 0));
+        // must not be near player start
+        if (raycastHit && abs(checkpointPos.x - jackrockX) > 40)
+        {
+            const jackrockPos = raycastHit.add(vec2(0, 1));
+            // Make sure there's enough space for the large rock
+            if (getTileCollisionData(jackrockPos) <= 0 &&
+                getTileCollisionData(jackrockPos.add(vec2(0, -2))) <= 0)
+            {
+                new Prop(jackrockPos, propType_rock_jackrock);
+                break;
+            }
+        }
+    }
 
     // build checkpoints
     for(let x=0; x<levelSize.x-9; )
@@ -963,6 +1152,8 @@ function nextLevel()
     levelMaxBastards = limits[2];
     levelMaxMalefactors = limits[3];
     levelMaxFoes = limits[4] || 0;
+    levelMaxSpiders = limits[5] || 0;
+    levelMaxSpiderlings = limits[6] || 0;
     levelEnemyCount = levelMaxEnemies; // keep for compatibility with existing code
     levelSeed = randSeed = rand(1e9)|0;
     levelSize = level == 1 ? vec2(300,200) : vec2(min(level*99,400),200);

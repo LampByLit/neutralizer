@@ -159,7 +159,7 @@ function explosion(pos, radius=2)
     {
         const h = (radius**2 - x**2)**.5;
         for(let y = -h; y <= h; ++y)
-            destroyTile(pos.add(vec2(x,y)), 0, 0);
+            destroyTile(pos.add(vec2(x,y)), 0, 0, 0.4, 0); // Reduced cascade chance (0.4) and start at depth 0
     }
 
     // cleanup neighbors
@@ -224,10 +224,11 @@ function explosion(pos, radius=2)
 
 class TileCascadeDestroy extends EngineObject 
 {
-    constructor(pos, cascadeChance=1, glass=0)
+    constructor(pos, cascadeChance=1, glass=0, cascadeDepth=0)
     {
         super(pos, vec2());
         this.cascadeChance = cascadeChance;
+        this.cascadeDepth = cascadeDepth;
         this.destroyTimer = new Timer(glass ? .05 : rand(.3, .1));
     }
 
@@ -235,7 +236,7 @@ class TileCascadeDestroy extends EngineObject
     {
         if (this.destroyTimer.elapsed())
         {
-            destroyTile(this.pos, 1, 1, this.cascadeChance);
+            destroyTile(this.pos, 1, 1, this.cascadeChance, this.cascadeDepth);
             this.destroy();
         }
     }
@@ -314,7 +315,7 @@ function decorateTile(pos)
     }
 }
 
-function destroyTile(pos, makeSound = 1, cleanNeighbors = 1, maxCascadeChance = 1)
+function destroyTile(pos, makeSound = 1, cleanNeighbors = 1, maxCascadeChance = 1, cascadeDepth = 0)
 {
     // pos must be an int
     pos = pos.int();
@@ -343,18 +344,23 @@ function destroyTile(pos, makeSound = 1, cleanNeighbors = 1, maxCascadeChance = 
                 decorateTile(pos.add(vec2(i,j)));
         }
 
-        // if weak earth, random chance of delayed destruction of tile directly above
-        if (tileType == tileType_glass)
+        // Limit cascade depth to prevent infinite cascades (max 12 tiles deep)
+        const maxCascadeDepth = 12;
+        if (cascadeDepth < maxCascadeDepth)
         {
-            maxCascadeChance = 1;
-            if (getTileCollisionData(pos.add(vec2(0,-1))) == tileType)
-                new TileCascadeDestroy(pos.add(vec2(0,-1)), 1, 1);
-        }
-        else if (tileType != tileType_dirt)
-            maxCascadeChance = 0;
+            // if weak earth, random chance of delayed destruction of tile directly above
+            if (tileType == tileType_glass)
+            {
+                maxCascadeChance = 1;
+                if (getTileCollisionData(pos.add(vec2(0,-1))) == tileType)
+                    new TileCascadeDestroy(pos.add(vec2(0,-1)), 1, 1, cascadeDepth + 1);
+            }
+            else if (tileType != tileType_dirt)
+                maxCascadeChance = 0;
 
-        if (rand() < maxCascadeChance && getTileCollisionData(pos.add(vec2(0,1))) == tileType)
-            new TileCascadeDestroy(pos.add(vec2(0,1)), maxCascadeChance * .4, tileType == tileType_glass);
+            if (rand() < maxCascadeChance && getTileCollisionData(pos.add(vec2(0,1))) == tileType)
+                new TileCascadeDestroy(pos.add(vec2(0,1)), maxCascadeChance * .4, tileType == tileType_glass, cascadeDepth + 1);
+        }
     }
 
     return 1;

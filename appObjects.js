@@ -177,7 +177,8 @@ const propType_barrel_metal         = 5;
 const propType_barrel_highExplosive = 6;
 const propType_rock                 = 7;
 const propType_rock_lava            = 8;
-const propType_count                = 9;
+const propType_rock_jackrock        = 9;
+const propType_count                = 10;
 
 class Prop extends GameObject 
 {
@@ -258,6 +259,18 @@ class Prop extends GameObject
                 this.isLavaRock = 1;    
             }
         }
+        else if (this.type == propType_rock_jackrock)
+        {
+            this.tileIndex = 18;
+            this.baseColor = new Color(.2, 1, .2); // Bright green
+            this.color = this.baseColor.copy();
+            health = 10;
+            this.mass *= 8;
+            this.size = this.size.scale(4); // Very large
+            this.pos.y += 1; // Adjust position for larger size
+            this.isCrushing = 1;
+            this.explosionSize = 10; // Enormous explosion - biggest in the game
+        }
 
         // randomly angle and flip axis (90 degree rotation)
         this.angle = (rand(4)|0)*PI/2;
@@ -277,6 +290,15 @@ class Prop extends GameObject
         // apply collision damage
         const deltaSpeedSquared = this.velocity.subtract(oldVelocity).lengthSquared();
         deltaSpeedSquared > .05 && this.damage(2*deltaSpeedSquared);
+
+        // Darken jackrock color based on health percentage
+        if (this.type == propType_rock_jackrock && this.baseColor)
+        {
+            const healthPercent = this.health / this.healthMax;
+            // Scale from 1.0 (full health) down to 0.2 (near death) - gets darker as health decreases
+            const darkness = lerp(healthPercent, 0.2, 1.0);
+            this.color = this.baseColor.scale(darkness, 1);
+        }
     }
 
     damage(damage, damagingObject)
@@ -292,8 +314,8 @@ class Prop extends GameObject
         if (this.type == propType_barrel_water)
             makeWater(this.pos);
 
-        // Drop item from wooden and metal crates (20% chance)
-        if ((this.type == propType_crate_wood || this.type == propType_crate_metal) && rand() < .2)
+        // Drop item from all crates and barrels (20% chance)
+        if (this.type < propType_rock && rand() < .2)
         {
             const itemTypes = getAllItemTypes();
             const randomItemType = itemTypes[rand(itemTypes.length)|0];
@@ -1657,6 +1679,190 @@ class SlimeWeapon extends EngineObject
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class SpiderWeapon extends EngineObject 
+{
+    constructor(pos, parent) 
+    { 
+        super(pos, vec2(.6), 4, vec2(8));
+
+        this.isWeapon = 1;
+        this.fireTimeBuffer = this.localAngle = 0;
+        this.burstTimer = new Timer;
+        this.burstActive = 0;
+        this.burstDuration = 2.0; // Shorter bursts but more frequent
+        this.burstCooldown = 0.6; // Very short cooldown for aggression
+        
+        this.renderOrder = parent.renderOrder+1;
+        this.hidden = 1; // Don't render the weapon (spider shoots from head, not gun)
+
+        parent.weapon = this;
+        parent.addChild(this, this.localOffset = vec2(.55,0));
+    }
+    
+    render()
+    {
+        // Don't render - spider shoots from head, not a visible weapon
+    }
+
+    update()
+    {
+        super.update();
+
+        const particleSpeed = .3;
+        const particleRate = 8; // Fast firing rate
+        const spread = 0.03; // Very tight spread for good aim
+
+        // Burst fire pattern - more aggressive than slime
+        if (!this.burstTimer.isSet())
+        {
+            // Start new burst
+            this.burstActive = 1;
+            this.burstTimer.set(this.burstDuration);
+        }
+        else if (this.burstTimer.get() > this.burstDuration - 0.1)
+        {
+            // Burst just started
+            this.burstActive = 1;
+        }
+        else if (this.burstTimer.get() < 0.1)
+        {
+            // Burst ending, start cooldown
+            this.burstActive = 0;
+            this.burstTimer.set(-this.burstCooldown);
+        }
+
+        // Only shoot when parent sees player and burst is active
+        if (this.parent.sawPlayerTimer && this.parent.sawPlayerTimer.isSet() && 
+            this.parent.sawPlayerTimer.get() < 10 && this.burstActive)
+        {
+            this.fireTimeBuffer += timeDelta;
+            const rate = 1/particleRate;
+            
+            // Get direction to player from head position
+            const headPos = this.parent.pos.add(vec2(this.parent.getMirrorSign(.05), .46).scale(this.parent.sizeScale || 1));
+            const playerPos = this.parent.sawPlayerPos;
+            const direction = playerPos.subtract(headPos).normalize();
+            
+            for(; this.fireTimeBuffer > 0; this.fireTimeBuffer -= rate)
+            {
+                // Create venom particle from head position (red venom for spider)
+                const particle = new VenomParticle(headPos, this.parent, new Color(1, 0, 0));
+                
+                // Fire particle directly towards player with small spread
+                // Apply small random rotation to direction vector for spread
+                const spreadAngle = rand(spread, -spread);
+                particle.velocity = direction.rotate(spreadAngle).scale(particleSpeed);
+            }
+        }
+        else
+        {
+            this.fireTimeBuffer = min(this.fireTimeBuffer, 0);
+            // Face player even when not shooting
+            if (this.parent.sawPlayerTimer && this.parent.sawPlayerTimer.isSet())
+            {
+                const playerPos = this.parent.sawPlayerPos;
+                const direction = playerPos.subtract(this.pos).normalize();
+                const aimAngle = direction.angle();
+                this.localAngle = -aimAngle * this.getMirrorSign();
+            }
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class SpiderlingWeapon extends EngineObject 
+{
+    constructor(pos, parent) 
+    { 
+        super(pos, vec2(.6), 4, vec2(8));
+
+        this.isWeapon = 1;
+        this.fireTimeBuffer = this.localAngle = 0;
+        this.burstTimer = new Timer;
+        this.burstActive = 0;
+        this.burstDuration = 2.0; // Shorter bursts but more frequent
+        this.burstCooldown = 0.6; // Very short cooldown for aggression
+        
+        this.renderOrder = parent.renderOrder+1;
+        this.hidden = 1; // Don't render the weapon (spiderling shoots from head, not gun)
+
+        parent.weapon = this;
+        parent.addChild(this, this.localOffset = vec2(.55,0));
+    }
+    
+    render()
+    {
+        // Don't render - spiderling shoots from head, not a visible weapon
+    }
+
+    update()
+    {
+        super.update();
+
+        const particleSpeed = .3;
+        const particleRate = 8; // Fast firing rate
+        const spread = 0.03; // Very tight spread for good aim
+
+        // Burst fire pattern - more aggressive than slime
+        if (!this.burstTimer.isSet())
+        {
+            // Start new burst
+            this.burstActive = 1;
+            this.burstTimer.set(this.burstDuration);
+        }
+        else if (this.burstTimer.get() > this.burstDuration - 0.1)
+        {
+            // Burst just started
+            this.burstActive = 1;
+        }
+        else if (this.burstTimer.get() < 0.1)
+        {
+            // Burst ending, start cooldown
+            this.burstActive = 0;
+            this.burstTimer.set(-this.burstCooldown);
+        }
+
+        // Only shoot when parent sees player and burst is active
+        if (this.parent.sawPlayerTimer && this.parent.sawPlayerTimer.isSet() && 
+            this.parent.sawPlayerTimer.get() < 10 && this.burstActive)
+        {
+            this.fireTimeBuffer += timeDelta;
+            const rate = 1/particleRate;
+            
+            // Get direction to player from head position
+            const headPos = this.parent.pos.add(vec2(this.parent.getMirrorSign(.05), .46).scale(this.parent.sizeScale || 1));
+            const playerPos = this.parent.sawPlayerPos;
+            const direction = playerPos.subtract(headPos).normalize();
+            
+            for(; this.fireTimeBuffer > 0; this.fireTimeBuffer -= rate)
+            {
+                // Create venom particle from head position (black venom for spiderling)
+                const particle = new VenomParticle(headPos, this.parent, new Color(0.1, 0.1, 0.1));
+                
+                // Fire particle directly towards player with small spread
+                // Apply small random rotation to direction vector for spread
+                const spreadAngle = rand(spread, -spread);
+                particle.velocity = direction.rotate(spreadAngle).scale(particleSpeed);
+            }
+        }
+        else
+        {
+            this.fireTimeBuffer = min(this.fireTimeBuffer, 0);
+            // Face player even when not shooting
+            if (this.parent.sawPlayerTimer && this.parent.sawPlayerTimer.isSet())
+            {
+                const playerPos = this.parent.sawPlayerPos;
+                const direction = playerPos.subtract(this.pos).normalize();
+                const aimAngle = direction.angle();
+                this.localAngle = -aimAngle * this.getMirrorSign();
+            }
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 class FoeWeapon extends EngineObject 
 {
     constructor(pos, parent) 
@@ -1853,6 +2059,107 @@ class SlimeParticle extends EngineObject
         const alpha = 0.8 * (1 - (time - this.spawnTime) / this.lifetime);
         const particleColor = new Color(0, 1, 0, alpha);
         drawTile(this.pos, this.size, -1, undefined, particleColor);
+        setBlendMode(0);
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class VenomParticle extends EngineObject 
+{
+    constructor(pos, attacker, venomColor) 
+    { 
+        super(pos, vec2(.4)); // Much larger venom particles
+        // Use provided color or default to red
+        this.venomColor = venomColor || new Color(1, 0, 0); // Default: bright red venom
+        this.color = new Color(this.venomColor.r, this.venomColor.g, this.venomColor.b, 0.9);
+        this.setCollision();
+
+        this.damage = 0.5; // Lower damage per particle but many particles
+        this.damping = 0.98;
+        this.gravityScale = 0.1; // Slight gravity
+        this.attacker = attacker;
+        this.team = attacker.team;
+        this.renderOrder = 1e9;
+        this.lifetime = 2.0; // How long particle lives
+        this.spawnTime = time;
+        this.hasHit = []; // Track what we've hit to avoid multiple hits
+    }
+
+    update()
+    {
+        super.update();
+
+        // Check lifetime
+        if (time - this.spawnTime > this.lifetime)
+        {
+            this.destroy();
+            return;
+        }
+
+        // check if hit someone
+        forEachObject(this.pos, this.size, (o)=>
+        {
+            if (o.isGameObject && !o.parent && o.team != this.team)
+            {
+                // Check if we've already hit this object
+                if (this.hasHit.indexOf(o) >= 0)
+                    return;
+                    
+                if (!o.dodgeTimer || !o.dodgeTimer.active())
+                {
+                    this.collideWithObject(o);
+                    this.hasHit.push(o);
+                }
+            }
+        });
+    }
+    
+    collideWithObject(o)
+    {
+        if (o.isGameObject)
+        {
+            o.damage(this.damage, this);
+            o.applyForce(this.velocity.scale(.05));
+            // Don't destroy on hit - particles can hit multiple times
+        }
+    
+        return 1; 
+    }
+
+    collideWithTile(data, pos)
+    {
+        if (data <= 0)
+            return 0;
+            
+        // Red venom particles stick to walls briefly
+        this.velocity = this.velocity.scale(0.3);
+        this.damping = 0.9;
+        
+        // Small chance to destroy weak tiles
+        const destroyTileChance = data == tileType_glass ? 0.1 : data == tileType_dirt ? 0.05 : 0;
+        rand() < destroyTileChance && destroyTile(pos);
+
+        return 0; // Don't stop particle, just slow it
+    }
+
+    render()
+    {
+        // Draw as noticeable blob - much larger and more visible
+        setBlendMode(0);
+        const age = (time - this.spawnTime) / this.lifetime;
+        const alpha = Math.max(0, Math.min(1, 0.95 * (1 - age))); // Clamp alpha to 0-1
+        const particleColor = new Color(this.venomColor.r, this.venomColor.g, this.venomColor.b, alpha);
+        // Draw main particle
+        drawTile(this.pos, this.size, -1, undefined, particleColor);
+        // Draw glowing outer ring for more visibility
+        const glowColor = new Color(
+            this.venomColor.r * 0.7 + 0.3, 
+            this.venomColor.g * 0.7 + 0.3, 
+            this.venomColor.b * 0.7 + 0.3, 
+            Math.max(0, Math.min(1, alpha * 0.5))
+        );
+        drawTile(this.pos, this.size.scale(1.4), -1, undefined, glowColor);
         setBlendMode(0);
     }
 }

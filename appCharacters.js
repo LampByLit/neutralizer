@@ -440,7 +440,9 @@ const type_slime  = 5;
 const type_bastard= 6;
 const type_malefactor = 7;
 const type_foe    = 8;
-const type_count  = 9;
+const type_spider = 9;
+const type_spiderling = 10;
+const type_count  = 11;
 
 function alertEnemies(pos, playerPos)
 {
@@ -917,6 +919,9 @@ class Foe extends Enemy
         
         // Foe doesn't burn
         this.canBurn = 0;
+        
+        // Foe is persistent - corpse won't disappear when shot
+        this.persistent = 1;
         
         // Initialize trail timer
         this.trailTimer.set(0.1);
@@ -1600,6 +1605,1204 @@ class Malefactor extends Enemy
             
             drawTile(this.pos.add(vec2(this.getMirrorSign(.05),.46).scale(sizeScale).rotate(-this.angle)),vec2(sizeScale/2, blinkScale*sizeScale/2),this.headTile+1,vec2(8), glowingEyeColor, this.angle, this.mirror, eyeGlow);
         }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class Spider extends Enemy
+{
+    constructor(pos) 
+    { 
+        super(pos);
+        
+        // Override type to be spider
+        this.type = type_spider;
+        
+        // Spider is 3x size
+        this.size = this.size.scale(this.sizeScale = 3.0);
+        this.health = this.healthMax = 50; // Same health as malefactor
+        this.maxSpeed = maxCharacterSpeed * 3.5; // Very fast - 3.5x faster than normal
+        this.jumpPower = 0.25; // Good jump power
+        this.noFallDamage = 1; // Flag to prevent fall damage
+        this.immuneToWarmupDamage = 1; // Prevent destruction during warmup
+        
+        // Spider sprite - use tile 22 from tiles2.png (user can adjust if needed)
+        this.bodyTile = 22;
+        this.headTile = 2; // Use same head tile as normal enemies
+        
+        // Spider color - red
+        this.color = new Color(0.8, 0.1, 0.1); // Red body
+        this.eyeColor = new Color(1, 0, 0); // Red eyes
+        
+        // Liquid trail particles
+        this.liquidTrailParticles = [];
+        this.maxTrailParticles = 40; // Maximum number of liquid particles
+        this.lastTrailPos = this.pos.copy();
+        this.trailTimer = new Timer;
+        this.trailTimer.set(0.05); // Spawn particles more frequently for smoother liquid
+        
+        // Replace weapon with spider weapon (shoots red venom)
+        this.weapon && this.weapon.destroy();
+        new SpiderWeapon(this.pos, this);
+        
+        // Enhanced vision range for aggressive chasing
+        this.maxVisionRange = 18;
+        
+        // Spider is persistent - corpse won't disappear when shot
+        this.persistent = 1;
+        
+        // Leg system - 16 legs with grid-based tile tracking (discrete stepping)
+        this.pawRadius = 0.5 * this.sizeScale; // Distance from body center to paw placement
+        this.pawHeight = 0.3 * this.sizeScale; // Height of leg curve
+        this.bodyHeight = 0.1 * this.sizeScale; // Body offset from ground
+        
+        // 16 paws - each stores its current tile position (grid coordinates)
+        this.paws = [];
+        const bodyTileX = (this.pos.x) | 0;
+        const bodyTileY = (this.pos.y) | 0;
+        
+        for(let i = 0; i < 16; i++)
+        {
+            const angle = (i / 16) * PI * 2;
+            const offsetX = Math.sin(angle) * this.pawRadius;
+            const offsetY = Math.cos(angle) * this.pawRadius;
+            
+            // Find ground tile at this position
+            let pawTileX = bodyTileX + (offsetX) | 0;
+            let pawTileY = bodyTileY;
+            
+            // Check tiles below to find ground
+            let foundGround = false;
+            for(let checkY = bodyTileY; checkY < bodyTileY + 5; checkY++)
+            {
+                if (getTileCollisionData(vec2(pawTileX, checkY)) > 0)
+                {
+                    pawTileY = checkY;
+                    foundGround = true;
+                    break;
+                }
+            }
+            
+            // Always create paw, even if no ground found (will use fallback position)
+            if (!foundGround)
+            {
+                pawTileY = bodyTileY + 2; // Fallback: place below body
+            }
+            
+            this.paws.push({
+                tileX: pawTileX, // Grid X position
+                tileY: pawTileY, // Grid Y position (top of tile)
+                worldPos: vec2(pawTileX + 0.5, pawTileY), // World position (center of tile top)
+                needsUpdate: false
+            });
+        }
+        
+        // Update tracking
+        this.lastBodyTileX = bodyTileX;
+        this.lastBodyTileY = bodyTileY;
+        this.pawUpdateCounter = 0; // Update paws every N frames
+    }
+    
+    update()
+    {
+        if (!aiEnable || levelWarmup || this.isDead() || !this.inUpdateWindow())
+        {
+            if (this.weapon)
+                this.weapon.triggerIsDown = 0;
+            super.update();
+            return;
+        }
+
+        if (this.weapon)
+            this.weapon.localPos = this.weapon.localOffset.scale(this.sizeScale);
+
+        // Update leg system - grid-based discrete stepping (much simpler and faster)
+        const bodyTileX = (this.pos.x) | 0;
+        const bodyTileY = (this.pos.y) | 0;
+        
+        // Only update paws occasionally or when spider moves to new tile
+        const bodyMoved = (bodyTileX != this.lastBodyTileX || bodyTileY != this.lastBodyTileY);
+        this.pawUpdateCounter++;
+        const shouldUpdatePaws = bodyMoved || (this.pawUpdateCounter % 5 == 0); // Update every 5 frames or when body moves
+        
+        if (shouldUpdatePaws)
+        {
+            // Calculate body position
+            const bodyPos = this.pos.add(vec2(0, -this.bodyHeight + 0.06*Math.sin(this.walkCyclePercent*PI)).scale(this.sizeScale));
+            
+            // Update each paw - discrete tile stepping
+            for(let i = 0; i < this.paws.length; i++)
+            {
+                const paw = this.paws[i];
+                
+            // Calculate angle for this paw (evenly spaced around body)
+            const angle = (i / 16) * PI * 2;
+                
+                // Calculate target tile position around spider body
+                const targetOffsetX = Math.sin(angle) * this.pawRadius;
+                const targetOffsetY = Math.cos(angle) * this.pawRadius;
+                const targetTileX = bodyTileX + (targetOffsetX) | 0;
+                
+                // Find ground tile at target X position (check tiles below)
+                let targetTileY = bodyTileY;
+                let foundGround = false;
+                
+                for(let checkY = bodyTileY; checkY < bodyTileY + 4 && !foundGround; checkY++)
+                {
+                    if (getTileCollisionData(vec2(targetTileX, checkY)) > 0)
+                    {
+                        targetTileY = checkY;
+                        foundGround = true;
+                    }
+                }
+                
+                // Only update paw if target tile is different and ground was found
+                if (foundGround && (paw.tileX != targetTileX || paw.tileY != targetTileY))
+                {
+                    // Check distance - only step if far enough (prevents jitter)
+                    const distX = Math.abs(paw.tileX - targetTileX);
+                    const distY = Math.abs(paw.tileY - targetTileY);
+                    
+                    if (distX > 0 || distY > 1) // Step if moved horizontally or more than 1 tile vertically
+                    {
+                        paw.tileX = targetTileX;
+                        paw.tileY = targetTileY;
+                        paw.worldPos = vec2(targetTileX + 0.5, targetTileY); // Snap to tile top surface
+                    }
+                }
+                // If no ground found, keep paw on current tile (don't move it)
+            }
+            
+            this.lastBodyTileX = bodyTileX;
+            this.lastBodyTileY = bodyTileY;
+        }
+        
+        // Update liquid trail particles
+        if (this.trailTimer.elapsed())
+        {
+            this.trailTimer.set(0.05); // Reset timer
+            
+            // Ensure lastTrailPos is valid Vector2
+            if (!this.lastTrailPos || this.lastTrailPos.x == undefined || this.lastTrailPos.y == undefined)
+            {
+                this.lastTrailPos = this.pos.copy();
+            }
+            
+            // Ensure pos is valid before subtracting
+            if (this.pos && this.pos.x != undefined && this.pos.y != undefined)
+            {
+                const distMoved = this.pos.subtract(this.lastTrailPos).length();
+                if (distMoved > 0.05) // Spawn particles more frequently
+                {
+                    // Spawn new liquid particle at spider position
+                    const particle = {
+                        x: this.pos.x,
+                        y: this.pos.y,
+                        px: this.pos.x, // Previous position
+                        py: this.pos.y,
+                        vx: 0,
+                        vy: 0,
+                        radius: this.sizeScale * 0.15,
+                        lifetime: 3.0, // How long particle lives
+                        spawnTime: time,
+                        alpha: 0.8
+                    };
+                    
+                    this.liquidTrailParticles.push(particle);
+                    
+                    // Remove oldest particles if over limit
+                    if (this.liquidTrailParticles.length > this.maxTrailParticles)
+                    {
+                        this.liquidTrailParticles.shift();
+                    }
+                    
+                    this.lastTrailPos = this.pos.copy();
+                }
+            }
+        }
+        
+        // Update liquid trail particle physics
+        const spacing = this.sizeScale * 0.3; // Interaction distance
+        const limit = spacing * 0.66; // Boundary limit
+        
+        for(let i = 0; i < this.liquidTrailParticles.length; i++)
+        {
+            const p = this.liquidTrailParticles[i];
+            
+            // Check lifetime
+            const age = time - p.spawnTime;
+            if (age > p.lifetime)
+            {
+                this.liquidTrailParticles.splice(i, 1);
+                i--;
+                continue;
+            }
+            
+            // Calculate velocity from position delta
+            p.vx = p.x - p.px;
+            p.vy = p.y - p.py;
+            
+            // Apply gravity
+            p.vx += 0;
+            p.vy += 0.01; // Small downward gravity
+            
+            // Apply damping
+            p.vx *= 0.95;
+            p.vy *= 0.95;
+            
+            // Store previous position
+            p.px = p.x;
+            p.py = p.y;
+            
+            // Update position
+            p.x += p.vx;
+            p.y += p.vy;
+            
+            // Particle interactions - find nearby particles
+            let force = 0;
+            let force_b = 0;
+            const close = [];
+            
+            for(let j = 0; j < this.liquidTrailParticles.length; j++)
+            {
+                if (i === j) continue;
+                
+                const neighbor = this.liquidTrailParticles[j];
+                const dx = neighbor.x - p.x;
+                const dy = neighbor.y - p.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < spacing && distance > 0.01)
+                {
+                    const m = 1 - (distance / spacing);
+                    force += m * m;
+                    force_b += (m * m * m) / 2;
+                    
+                    neighbor.m = m;
+                    neighbor.dfx = (dx / distance) * m;
+                    neighbor.dfy = (dy / distance) * m;
+                    close.push(neighbor);
+                }
+            }
+            
+            // Apply interaction forces
+            force = (force - 3) * 0.3; // Adjust force strength
+            
+            for(let k = 0; k < close.length; k++)
+            {
+                const neighbor = close[k];
+                const press = force + force_b * neighbor.m;
+                
+                const dx = neighbor.dfx * press * 0.3;
+                const dy = neighbor.dfy * press * 0.3;
+                
+                neighbor.x += dx;
+                neighbor.y += dy;
+                p.x -= dx;
+                p.y -= dy;
+            }
+            
+            // Boundary constraints (keep particles near spider)
+            const distFromSpider = Math.sqrt((p.x - this.pos.x) ** 2 + (p.y - this.pos.y) ** 2);
+            if (distFromSpider > this.sizeScale * 2)
+            {
+                // Pull back towards spider
+                const pullX = (this.pos.x - p.x) * 0.1;
+                const pullY = (this.pos.y - p.y) * 0.1;
+                p.x += pullX;
+                p.y += pullY;
+            }
+            
+            // Fade alpha over lifetime
+            p.alpha = 0.8 * (1 - age / p.lifetime);
+        }
+
+        // Spider always chases player from start - highly aggressive
+        // Check for players every frame (no sight check delay)
+        for(const player of players)
+        {
+            if (player && !player.isDead())
+            {
+                // Always alert on player - no range or line of sight check needed
+                // Spider is highly aggressive and always knows where player is
+                this.alert(player.pos);
+                break;
+            }
+        }
+
+        this.pressedDodge = this.climbingWall = this.pressingThrow = 0;
+        
+        if (this.burnTimer.isSet())
+        {
+            // burning, run around
+            this.facePlayerTimer.unset();
+            if (rand()< .005)
+            {
+                this.pressedJumpTimer.set(.05);
+                this.holdJumpTimer.set(rand(.05));
+            }
+            if (rand()<.05)
+                this.moveInput.x = randSign()*rand(.6, .3);
+            this.moveInput.y = 0;
+        }
+        else if (this.sawPlayerTimer.isSet() && this.sawPlayerTimer.get() < 10)
+        {
+            debugAI && debugPoint(this.sawPlayerPos, '#f00');
+
+            // Aggressive wall climbing - spider climbs walls very well
+            if (this.moveInput.x && !this.velocity.x && this.velocity.y < 0)
+            {
+                this.velocity.y *=.8;
+                this.climbingWall = 1;
+                this.pressedJumpTimer.set(.1);
+                this.holdJumpTimer.set(rand(.2));
+            }
+            
+            const timeSinceSawPlayer = this.sawPlayerTimer.get();
+            // Spider is highly aggressive - no reaction delay, always chase immediately
+            if (timeSinceSawPlayer < 5)
+            {
+                debugAI && debugRect(this.pos, this.size, '#f00');
+                    
+                if (!this.dodgeTimer.active())
+                {
+                    // Very aggressive - always chase player
+                    const delta = this.sawPlayerPos.subtract(this.pos);
+                    const dist = delta.length();
+                    
+                    // Move towards player very aggressively
+                    this.moveInput.x = sign(delta.x);
+                    
+                    // Jump frequently to close distance
+                    if (this.groundTimer.active() && dist > 2 && rand() < 0.15)
+                    {
+                        this.pressedJumpTimer.set(.1);
+                        this.holdJumpTimer.set(rand(.15));
+                    }
+                    
+                    // Face player
+                    this.facePlayerTimer.set(rand(2,1));
+                }
+            }
+        }
+        else
+        {
+            // Spider always chases - no patrol behavior needed since it always sees player
+            // But keep some movement in case player is temporarily out of range
+            if (rand() < .01)
+                this.moveInput.x = randSign();
+            if (rand() < .005 && this.groundTimer.active())
+                this.pressedJumpTimer.set(.1);
+        }
+
+        // Call Character.update() but prevent fall damage
+        const healthBefore = this.health;
+        const wasOnGroundBeforeUpdate = this.groundObject || this.climbingWall ? 1 : 0;
+        
+        this.maxFallVelocity = 0; // Reset before update
+        Character.prototype.update.call(this);
+        
+        // If fall damage was applied, restore it
+        if (this.noFallDamage && healthBefore > this.health && wasOnGroundBeforeUpdate == 0 && (this.groundObject || this.climbingWall))
+        {
+            this.health = healthBefore;
+        }
+        
+        this.maxFallVelocity = 0;
+
+        // Clamp velocity to max speed
+        if (abs(this.velocity.x) > this.maxSpeed)
+            this.velocity.x = sign(this.velocity.x) * this.maxSpeed;
+
+        // override default mirror to face player
+        if (this.facePlayerTimer.active() && !this.dodgeTimer.active() && !this.reactionTimer.active())
+            this.mirror = this.sawPlayerPos.x < this.pos.x;
+    }
+
+    alert(playerPos, resetSawPlayer)
+    {
+        if (resetSawPlayer || !this.sawPlayerTimer.isSet())
+        {
+            if (!this.reactionTimer.isSet())
+            {
+                this.reactionTimer.set(rand(.2,.1)); // Very fast reaction
+                this.facePlayerTimer.set(rand(2,1));
+                if (this.groundObject && rand() < .5) // Very likely to jump when alerted
+                    this.pressedJumpTimer.set(.1);
+            }
+            this.sawPlayerPos = playerPos.copy();
+            this.sawPlayerTimer.set();
+        }
+    }
+    
+    render()
+    {
+        if (!isOverlapping(this.pos, this.size, cameraPos, renderWindowSize))
+            return;
+
+        // set tile to use
+        this.tileIndex = this.isDead() ? this.bodyTile : this.climbingLadder || this.groundTimer.active() ? this.bodyTile + 2*this.walkCyclePercent|0 : this.bodyTile+1;
+
+        let additive = this.additiveColor.add(this.extraAdditiveColor);
+        const sizeScale = this.sizeScale;
+        const color = this.color.scale(this.burnColorPercent(),1);
+        const eyeColor = this.eyeColor.scale(this.burnColorPercent(),1);
+        const headColor = this.team == team_enemy ? new Color() : color;
+
+        // melee animation - head moves back
+        const meleeHeadOffset = this.meleeTimer.active() ? -.12 * Math.sin(this.meleeTimer.getPercent() * PI) : 0;
+
+        const bodyPos = this.pos.add(vec2(0, -this.bodyHeight + 0.06*Math.sin(this.walkCyclePercent*PI)).scale(sizeScale));
+        
+        // Draw liquid trail particles - actual liquid physics
+        if (this.liquidTrailParticles.length > 0)
+        {
+            setBlendMode(0); // Regular blend for translucent effect
+            for(let i = 0; i < this.liquidTrailParticles.length; i++)
+            {
+                const p = this.liquidTrailParticles[i];
+                
+                // Clamp alpha to valid range (0-1)
+                const clampedAlpha = Math.max(0, Math.min(1, p.alpha));
+                
+                // Draw particle as red liquid blob with radial gradient effect
+                const particleColor = new Color(1, 0, 0, clampedAlpha);
+                const particleSize = p.radius;
+                
+                // Draw main particle blob
+                drawTile(vec2(p.x, p.y), vec2(particleSize), -1, undefined, particleColor, 0, false, additive);
+                
+                // Draw outer glow for liquid effect
+                const glowAlpha = Math.max(0, Math.min(1, clampedAlpha * 0.4));
+                const glowColor = new Color(1, 0.2, 0.2, glowAlpha);
+                drawTile(vec2(p.x, p.y), vec2(particleSize * 1.3), -1, undefined, glowColor, 0, false, additive);
+            }
+            setBlendMode(0);
+        }
+        
+        // Draw red translucent slime blobs around spider - much more liquidy
+        setBlendMode(0);
+        const translucentColor = new Color(1, 0, 0, 0.55); // More opaque red translucent
+        const blobSize = sizeScale * 1.6; // Larger blobs
+        // Draw many overlapping blobs for lots of liquidy slime
+        drawTile(this.pos.add(vec2(-0.2, 0.15).scale(sizeScale)), vec2(blobSize), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(0.2, 0.15).scale(sizeScale)), vec2(blobSize), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(0, -0.15).scale(sizeScale)), vec2(blobSize), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(0, 0.2).scale(sizeScale)), vec2(blobSize * 0.95), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(-0.15, 0).scale(sizeScale)), vec2(blobSize * 0.9), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(0.15, 0).scale(sizeScale)), vec2(blobSize * 0.9), -1, undefined, translucentColor);
+        // Add more liquidy blobs
+        drawTile(this.pos.add(vec2(-0.25, 0.05).scale(sizeScale)), vec2(blobSize * 0.85), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(0.25, 0.05).scale(sizeScale)), vec2(blobSize * 0.85), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(0, 0.25).scale(sizeScale)), vec2(blobSize * 0.8), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(-0.1, -0.2).scale(sizeScale)), vec2(blobSize * 0.75), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(0.1, -0.2).scale(sizeScale)), vec2(blobSize * 0.75), -1, undefined, translucentColor);
+        setBlendMode(0);
+        
+        // Draw spider legs - thick fuzzy quadratic curves
+        const legColor = new Color(1, 0, 0); // Red legs
+        const legThickness = sizeScale * 0.12; // Much thicker legs
+        
+        // Helper function to lerp
+        const lerp = (a, b, t) => a + (b - a) * t;
+        
+        // Ensure paws array exists
+        if (!this.paws || this.paws.length != 16)
+        {
+            this.paws = [];
+            const bodyTileX = (this.pos.x) | 0;
+            const bodyTileY = (this.pos.y) | 0;
+            for(let i = 0; i < 16; i++)
+            {
+                const angle = (i / 16) * PI * 2;
+                const offsetX = Math.sin(angle) * this.pawRadius;
+                const offsetY = Math.cos(angle) * this.pawRadius;
+                let pawTileX = bodyTileX + (offsetX) | 0;
+                let pawTileY = bodyTileY + 2;
+                this.paws.push({
+                    tileX: pawTileX,
+                    tileY: pawTileY,
+                    worldPos: vec2(pawTileX + 0.5, pawTileY)
+                });
+            }
+        }
+        
+        // Draw each leg as a thick fuzzy quadratic curve
+        for(let i = 0; i < 16; i++)
+        {
+            const paw = this.paws[i];
+            if (!paw || !paw.worldPos) continue;
+            
+            // Body attachment point
+            const bodyX = bodyPos.x;
+            const bodyY = bodyPos.y;
+            
+            // Paw position (snapped to tile surface)
+            const pawX = paw.worldPos.x;
+            const pawY = paw.worldPos.y;
+            
+            // Control point for quadratic curve (midpoint, raised up)
+            const controlX = lerp(bodyX, pawX, 0.5);
+            const controlY = lerp(bodyY, pawY - this.pawHeight, 0.5);
+            
+            // Draw leg as fuzzy quadratic curve - multiple overlapping lines for fuzzy effect
+            const segmentCount = 12; // More segments for smoother fuzzy curve
+            let prevX = bodyX;
+            let prevY = bodyY;
+            
+            // Draw multiple layers for fuzzy effect
+            for(let fuzzyLayer = 0; fuzzyLayer < 5; fuzzyLayer++)
+            {
+                const fuzzyOffset = (fuzzyLayer - 2) * legThickness * 0.15;
+                const fuzzyAlpha = 0.3 + (fuzzyLayer === 2 ? 0.4 : 0.1); // Center layer is brightest
+                const fuzzyColor = new Color(1, 0, 0, fuzzyAlpha);
+                
+                prevX = bodyX;
+                prevY = bodyY;
+                
+                for(let seg = 1; seg <= segmentCount; seg++)
+                {
+                    const t = seg / segmentCount;
+                    
+                    // Quadratic bezier curve: (1-t)^2*P0 + 2*(1-t)*t*P1 + t^2*P2
+                    const mt = 1 - t;
+                    let x = mt * mt * bodyX + 2 * mt * t * controlX + t * t * pawX;
+                    let y = mt * mt * bodyY + 2 * mt * t * controlY + t * t * pawY;
+                    
+                    // Add fuzzy offset perpendicular to leg direction
+                    if (seg > 1)
+                    {
+                        const angle = Math.atan2(y - prevY, x - prevX) + PI/2;
+                        x += Math.cos(angle) * fuzzyOffset;
+                        y += Math.sin(angle) * fuzzyOffset;
+                    }
+                    
+                    // Draw line segment with fuzzy color
+                    drawLine(vec2(prevX, prevY), vec2(x, y), legThickness * (0.7 + fuzzyLayer * 0.1), fuzzyColor);
+                    
+                    prevX = x;
+                    prevY = y;
+                }
+            }
+            
+            // Draw fuzzy foot at ground contact (on tile surface)
+            const pawRadius = sizeScale * 0.12; // Larger foot
+            for(let fuzzyFoot = 0; fuzzyFoot < 3; fuzzyFoot++)
+            {
+                const footOffset = (fuzzyFoot - 1) * pawRadius * 0.2;
+                const footAlpha = 0.4 + (fuzzyFoot === 1 ? 0.4 : 0.1);
+                const footColor = new Color(1, 0, 0, footAlpha);
+                drawTile(paw.worldPos.add(vec2(footOffset, 0)), vec2(pawRadius * (0.8 + fuzzyFoot * 0.1)), -1, undefined, footColor, 0, false, additive);
+            }
+        }
+        
+        // Draw spider body using drawTile2 for tiles2.png
+        if (typeof drawTile2 === 'function')
+            drawTile2(bodyPos, vec2(sizeScale), this.tileIndex, this.tileSize, color, this.angle, this.mirror, additive);
+        else
+            drawTile(bodyPos, vec2(sizeScale), this.tileIndex, this.tileSize, color, this.angle, this.mirror, additive);
+        
+        // No head - spider is just a body with legs
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class Spiderling extends Enemy
+{
+    constructor(pos) 
+    { 
+        super(pos);
+        
+        // Override type to be spiderling
+        this.type = type_spiderling;
+        
+        // Spiderling is small (0.9x size - smaller than normal)
+        this.size = this.size.scale(this.sizeScale = 0.9);
+        this.health = this.healthMax = 6; // Same health as slimer
+        this.maxSpeed = maxCharacterSpeed * 3.5; // Very fast - 3.5x faster than normal (same as spider)
+        this.jumpPower = 0.25; // Good jump power
+        this.noFallDamage = 1; // Flag to prevent fall damage
+        this.immuneToWarmupDamage = 1; // Prevent destruction during warmup
+        
+        // Spiderling sprite - use tile 22 from tiles2.png (same as spider)
+        this.bodyTile = 22;
+        this.headTile = 2; // Use same head tile as normal enemies
+        
+        // Spiderling color - black
+        this.color = new Color(0.1, 0.1, 0.1); // Black body
+        this.eyeColor = new Color(0.2, 0.2, 0.2); // Dark eyes
+        
+        // Liquid trail particles
+        this.liquidTrailParticles = [];
+        this.maxTrailParticles = 40; // Maximum number of liquid particles
+        this.lastTrailPos = this.pos.copy();
+        this.trailTimer = new Timer;
+        this.trailTimer.set(0.05); // Spawn particles more frequently for smoother liquid
+        
+        // Replace weapon with spiderling weapon (shoots black venom)
+        this.weapon && this.weapon.destroy();
+        new SpiderlingWeapon(this.pos, this);
+        
+        // Enhanced vision range for aggressive chasing
+        this.maxVisionRange = 18;
+        
+        // Spiderling is persistent - corpse won't disappear when shot
+        this.persistent = 1;
+        
+        // Leg system - 16 legs with grid-based tile tracking (discrete stepping)
+        this.pawRadius = 0.5 * this.sizeScale; // Distance from body center to paw placement
+        this.pawHeight = 0.3 * this.sizeScale; // Height of leg curve
+        this.bodyHeight = 0.1 * this.sizeScale; // Body offset from ground
+        
+        // 16 paws - each stores its current tile position (grid coordinates)
+        this.paws = [];
+        const bodyTileX = (this.pos.x) | 0;
+        const bodyTileY = (this.pos.y) | 0;
+        
+        for(let i = 0; i < 16; i++)
+        {
+            const angle = (i / 16) * PI * 2;
+            const offsetX = Math.sin(angle) * this.pawRadius;
+            const offsetY = Math.cos(angle) * this.pawRadius;
+            
+            // Find ground tile at this position
+            let pawTileX = bodyTileX + (offsetX) | 0;
+            let pawTileY = bodyTileY;
+            
+            // Check tiles below to find ground
+            let foundGround = false;
+            for(let checkY = bodyTileY; checkY < bodyTileY + 5; checkY++)
+            {
+                if (getTileCollisionData(vec2(pawTileX, checkY)) > 0)
+                {
+                    pawTileY = checkY;
+                    foundGround = true;
+                    break;
+                }
+            }
+            
+            // Always create paw, even if no ground found (will use fallback position)
+            if (!foundGround)
+            {
+                pawTileY = bodyTileY + 2; // Fallback: place below body
+            }
+            
+            this.paws.push({
+                tileX: pawTileX, // Grid X position
+                tileY: pawTileY, // Grid Y position (top of tile)
+                worldPos: vec2(pawTileX + 0.5, pawTileY), // World position (center of tile top)
+                needsUpdate: false
+            });
+        }
+        
+        // Update tracking
+        this.lastBodyTileX = bodyTileX;
+        this.lastBodyTileY = bodyTileY;
+        this.pawUpdateCounter = 0; // Update paws every N frames
+    }
+    
+    update()
+    {
+        if (!aiEnable || levelWarmup || this.isDead() || !this.inUpdateWindow())
+        {
+            if (this.weapon)
+                this.weapon.triggerIsDown = 0;
+            super.update();
+            return;
+        }
+
+        if (this.weapon)
+            this.weapon.localPos = this.weapon.localOffset.scale(this.sizeScale);
+
+        // Update leg system - grid-based discrete stepping (much simpler and faster)
+        const bodyTileX = (this.pos.x) | 0;
+        const bodyTileY = (this.pos.y) | 0;
+        
+        // Only update paws occasionally or when spiderling moves to new tile
+        const bodyMoved = (bodyTileX != this.lastBodyTileX || bodyTileY != this.lastBodyTileY);
+        this.pawUpdateCounter++;
+        const shouldUpdatePaws = bodyMoved || (this.pawUpdateCounter % 5 == 0); // Update every 5 frames or when body moves
+        
+        if (shouldUpdatePaws)
+        {
+            // Calculate body position
+            const bodyPos = this.pos.add(vec2(0, -this.bodyHeight + 0.06*Math.sin(this.walkCyclePercent*PI)).scale(this.sizeScale));
+            
+            // Update each paw - discrete tile stepping
+            for(let i = 0; i < this.paws.length; i++)
+            {
+                const paw = this.paws[i];
+                
+            // Calculate angle for this paw (evenly spaced around body)
+            const angle = (i / 16) * PI * 2;
+                
+                // Calculate target tile position around spiderling body
+                const targetOffsetX = Math.sin(angle) * this.pawRadius;
+                const targetOffsetY = Math.cos(angle) * this.pawRadius;
+                const targetTileX = bodyTileX + (targetOffsetX) | 0;
+                
+                // Find ground tile at target X position (check tiles below)
+                let targetTileY = bodyTileY;
+                let foundGround = false;
+                
+                for(let checkY = bodyTileY; checkY < bodyTileY + 4 && !foundGround; checkY++)
+                {
+                    if (getTileCollisionData(vec2(targetTileX, checkY)) > 0)
+                    {
+                        targetTileY = checkY;
+                        foundGround = true;
+                    }
+                }
+                
+                // Only update paw if target tile is different and ground was found
+                if (foundGround && (paw.tileX != targetTileX || paw.tileY != targetTileY))
+                {
+                    // Check distance - only step if far enough (prevents jitter)
+                    const distX = Math.abs(paw.tileX - targetTileX);
+                    const distY = Math.abs(paw.tileY - targetTileY);
+                    
+                    if (distX > 0 || distY > 1) // Step if moved horizontally or more than 1 tile vertically
+                    {
+                        paw.tileX = targetTileX;
+                        paw.tileY = targetTileY;
+                        paw.worldPos = vec2(targetTileX + 0.5, targetTileY); // Snap to tile top surface
+                    }
+                }
+                // If no ground found, keep paw on current tile (don't move it)
+            }
+            
+            this.lastBodyTileX = bodyTileX;
+            this.lastBodyTileY = bodyTileY;
+        }
+        
+        // Update liquid trail particles
+        if (this.trailTimer.elapsed())
+        {
+            this.trailTimer.set(0.05); // Reset timer
+            
+            // Ensure lastTrailPos is valid Vector2
+            if (!this.lastTrailPos || this.lastTrailPos.x == undefined || this.lastTrailPos.y == undefined)
+            {
+                this.lastTrailPos = this.pos.copy();
+            }
+            
+            // Ensure pos is valid before subtracting
+            if (this.pos && this.pos.x != undefined && this.pos.y != undefined)
+            {
+                const distMoved = this.pos.subtract(this.lastTrailPos).length();
+                if (distMoved > 0.05) // Spawn particles more frequently
+                {
+                    // Spawn new liquid particle at spiderling position
+                    const particle = {
+                        x: this.pos.x,
+                        y: this.pos.y,
+                        px: this.pos.x, // Previous position
+                        py: this.pos.y,
+                        vx: 0,
+                        vy: 0,
+                        radius: this.sizeScale * 0.15,
+                        lifetime: 3.0, // How long particle lives
+                        spawnTime: time,
+                        alpha: 0.8
+                    };
+                    
+                    this.liquidTrailParticles.push(particle);
+                    
+                    // Remove oldest particles if over limit
+                    if (this.liquidTrailParticles.length > this.maxTrailParticles)
+                    {
+                        this.liquidTrailParticles.shift();
+                    }
+                    
+                    this.lastTrailPos = this.pos.copy();
+                }
+            }
+        }
+        
+        // Update liquid trail particle physics
+        const spacing = this.sizeScale * 0.3; // Interaction distance
+        const limit = spacing * 0.66; // Boundary limit
+        
+        for(let i = 0; i < this.liquidTrailParticles.length; i++)
+        {
+            const p = this.liquidTrailParticles[i];
+            
+            // Check lifetime
+            const age = time - p.spawnTime;
+            if (age > p.lifetime)
+            {
+                this.liquidTrailParticles.splice(i, 1);
+                i--;
+                continue;
+            }
+            
+            // Calculate velocity from position delta
+            p.vx = p.x - p.px;
+            p.vy = p.y - p.py;
+            
+            // Apply gravity
+            p.vx += 0;
+            p.vy += 0.01; // Small downward gravity
+            
+            // Apply damping
+            p.vx *= 0.95;
+            p.vy *= 0.95;
+            
+            // Store previous position
+            p.px = p.x;
+            p.py = p.y;
+            
+            // Update position
+            p.x += p.vx;
+            p.y += p.vy;
+            
+            // Particle interactions - find nearby particles
+            let force = 0;
+            let force_b = 0;
+            const close = [];
+            
+            for(let j = 0; j < this.liquidTrailParticles.length; j++)
+            {
+                if (i === j) continue;
+                
+                const neighbor = this.liquidTrailParticles[j];
+                const dx = neighbor.x - p.x;
+                const dy = neighbor.y - p.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < spacing && distance > 0.01)
+                {
+                    const m = 1 - (distance / spacing);
+                    force += m * m;
+                    force_b += (m * m * m) / 2;
+                    
+                    neighbor.m = m;
+                    neighbor.dfx = (dx / distance) * m;
+                    neighbor.dfy = (dy / distance) * m;
+                    close.push(neighbor);
+                }
+            }
+            
+            // Apply interaction forces
+            force = (force - 3) * 0.3; // Adjust force strength
+            
+            for(let k = 0; k < close.length; k++)
+            {
+                const neighbor = close[k];
+                const press = force + force_b * neighbor.m;
+                
+                const dx = neighbor.dfx * press * 0.3;
+                const dy = neighbor.dfy * press * 0.3;
+                
+                neighbor.x += dx;
+                neighbor.y += dy;
+                p.x -= dx;
+                p.y -= dy;
+            }
+            
+            // Boundary constraints (keep particles near spiderling)
+            const distFromSpiderling = Math.sqrt((p.x - this.pos.x) ** 2 + (p.y - this.pos.y) ** 2);
+            if (distFromSpiderling > this.sizeScale * 2)
+            {
+                // Pull back towards spiderling
+                const pullX = (this.pos.x - p.x) * 0.1;
+                const pullY = (this.pos.y - p.y) * 0.1;
+                p.x += pullX;
+                p.y += pullY;
+            }
+            
+            // Fade alpha over lifetime
+            p.alpha = 0.8 * (1 - age / p.lifetime);
+        }
+
+        // Spiderling always chases player from start - highly aggressive
+        // Check for players every frame (no sight check delay)
+        for(const player of players)
+        {
+            if (player && !player.isDead())
+            {
+                // Always alert on player - no range or line of sight check needed
+                // Spiderling is highly aggressive and always knows where player is
+                this.alert(player.pos);
+                break;
+            }
+        }
+
+        this.pressedDodge = this.climbingWall = this.pressingThrow = 0;
+        
+        if (this.burnTimer.isSet())
+        {
+            // burning, run around
+            this.facePlayerTimer.unset();
+            if (rand()< .005)
+            {
+                this.pressedJumpTimer.set(.05);
+                this.holdJumpTimer.set(rand(.05));
+            }
+            if (rand()<.05)
+                this.moveInput.x = randSign()*rand(.6, .3);
+            this.moveInput.y = 0;
+        }
+        else if (this.sawPlayerTimer.isSet() && this.sawPlayerTimer.get() < 10)
+        {
+            debugAI && debugPoint(this.sawPlayerPos, '#f00');
+
+            // Aggressive wall climbing - spiderling climbs walls very well
+            if (this.moveInput.x && !this.velocity.x && this.velocity.y < 0)
+            {
+                this.velocity.y *=.8;
+                this.climbingWall = 1;
+                this.pressedJumpTimer.set(.1);
+                this.holdJumpTimer.set(rand(.2));
+            }
+            
+            const timeSinceSawPlayer = this.sawPlayerTimer.get();
+            // Spiderling is highly aggressive - no reaction delay, always chase immediately
+            if (timeSinceSawPlayer < 5)
+            {
+                debugAI && debugRect(this.pos, this.size, '#f00');
+                    
+                if (!this.dodgeTimer.active())
+                {
+                    // Very aggressive - always chase player
+                    const delta = this.sawPlayerPos.subtract(this.pos);
+                    const dist = delta.length();
+                    
+                    // Move towards player very aggressively
+                    this.moveInput.x = sign(delta.x);
+                    
+                    // Jump frequently to close distance
+                    if (this.groundTimer.active() && dist > 2 && rand() < 0.15)
+                    {
+                        this.pressedJumpTimer.set(.1);
+                        this.holdJumpTimer.set(rand(.15));
+                    }
+                    
+                    // Face player
+                    this.facePlayerTimer.set(rand(2,1));
+                }
+            }
+        }
+        else
+        {
+            // Spiderling always chases - no patrol behavior needed since it always sees player
+            // But keep some movement in case player is temporarily out of range
+            if (rand() < .01)
+                this.moveInput.x = randSign();
+            if (rand() < .005 && this.groundTimer.active())
+                this.pressedJumpTimer.set(.1);
+        }
+
+        // Call Character.update() but prevent fall damage
+        const healthBefore = this.health;
+        const wasOnGroundBeforeUpdate = this.groundObject || this.climbingWall ? 1 : 0;
+        
+        this.maxFallVelocity = 0; // Reset before update
+        Character.prototype.update.call(this);
+        
+        // If fall damage was applied, restore it
+        if (this.noFallDamage && healthBefore > this.health && wasOnGroundBeforeUpdate == 0 && (this.groundObject || this.climbingWall))
+        {
+            this.health = healthBefore;
+        }
+        
+        this.maxFallVelocity = 0;
+
+        // Clamp velocity to max speed
+        if (abs(this.velocity.x) > this.maxSpeed)
+            this.velocity.x = sign(this.velocity.x) * this.maxSpeed;
+
+        // override default mirror to face player
+        if (this.facePlayerTimer.active() && !this.dodgeTimer.active() && !this.reactionTimer.active())
+            this.mirror = this.sawPlayerPos.x < this.pos.x;
+    }
+
+    alert(playerPos, resetSawPlayer)
+    {
+        if (resetSawPlayer || !this.sawPlayerTimer.isSet())
+        {
+            if (!this.reactionTimer.isSet())
+            {
+                this.reactionTimer.set(rand(.2,.1)); // Very fast reaction
+                this.facePlayerTimer.set(rand(2,1));
+                if (this.groundObject && rand() < .5) // Very likely to jump when alerted
+                    this.pressedJumpTimer.set(.1);
+            }
+            this.sawPlayerPos = playerPos.copy();
+            this.sawPlayerTimer.set();
+        }
+    }
+    
+    render()
+    {
+        if (!isOverlapping(this.pos, this.size, cameraPos, renderWindowSize))
+            return;
+
+        // set tile to use
+        this.tileIndex = this.isDead() ? this.bodyTile : this.climbingLadder || this.groundTimer.active() ? this.bodyTile + 2*this.walkCyclePercent|0 : this.bodyTile+1;
+
+        let additive = this.additiveColor.add(this.extraAdditiveColor);
+        const sizeScale = this.sizeScale;
+        const color = this.color.scale(this.burnColorPercent(),1);
+        const eyeColor = this.eyeColor.scale(this.burnColorPercent(),1);
+        const headColor = this.team == team_enemy ? new Color() : color;
+
+        // melee animation - head moves back
+        const meleeHeadOffset = this.meleeTimer.active() ? -.12 * Math.sin(this.meleeTimer.getPercent() * PI) : 0;
+
+        const bodyPos = this.pos.add(vec2(0, -this.bodyHeight + 0.06*Math.sin(this.walkCyclePercent*PI)).scale(sizeScale));
+        
+        // Draw liquid trail particles - actual liquid physics
+        if (this.liquidTrailParticles.length > 0)
+        {
+            setBlendMode(0); // Regular blend for translucent effect
+            for(let i = 0; i < this.liquidTrailParticles.length; i++)
+            {
+                const p = this.liquidTrailParticles[i];
+                
+                // Clamp alpha to valid range (0-1)
+                const clampedAlpha = Math.max(0, Math.min(1, p.alpha));
+                
+                // Draw particle as black liquid blob with radial gradient effect
+                const particleColor = new Color(0.1, 0.1, 0.1, clampedAlpha);
+                const particleSize = p.radius;
+                
+                // Draw main particle blob
+                drawTile(vec2(p.x, p.y), vec2(particleSize), -1, undefined, particleColor, 0, false, additive);
+                
+                // Draw outer glow for liquid effect
+                const glowAlpha = Math.max(0, Math.min(1, clampedAlpha * 0.4));
+                const glowColor = new Color(0.2, 0.2, 0.2, glowAlpha);
+                drawTile(vec2(p.x, p.y), vec2(particleSize * 1.3), -1, undefined, glowColor, 0, false, additive);
+            }
+            setBlendMode(0);
+        }
+        
+        // Draw black translucent slime blobs around spiderling - much more liquidy
+        setBlendMode(0);
+        const translucentColor = new Color(0.1, 0.1, 0.1, 0.55); // More opaque black translucent
+        const blobSize = sizeScale * 1.6; // Larger blobs
+        // Draw many overlapping blobs for lots of liquidy slime
+        drawTile(this.pos.add(vec2(-0.2, 0.15).scale(sizeScale)), vec2(blobSize), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(0.2, 0.15).scale(sizeScale)), vec2(blobSize), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(0, -0.15).scale(sizeScale)), vec2(blobSize), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(0, 0.2).scale(sizeScale)), vec2(blobSize * 0.95), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(-0.15, 0).scale(sizeScale)), vec2(blobSize * 0.9), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(0.15, 0).scale(sizeScale)), vec2(blobSize * 0.9), -1, undefined, translucentColor);
+        // Add more liquidy blobs
+        drawTile(this.pos.add(vec2(-0.25, 0.05).scale(sizeScale)), vec2(blobSize * 0.85), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(0.25, 0.05).scale(sizeScale)), vec2(blobSize * 0.85), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(0, 0.25).scale(sizeScale)), vec2(blobSize * 0.8), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(-0.1, -0.2).scale(sizeScale)), vec2(blobSize * 0.75), -1, undefined, translucentColor);
+        drawTile(this.pos.add(vec2(0.1, -0.2).scale(sizeScale)), vec2(blobSize * 0.75), -1, undefined, translucentColor);
+        setBlendMode(0);
+        
+        // Draw spiderling legs - thick fuzzy quadratic curves
+        const legColor = new Color(0.1, 0.1, 0.1); // Black legs
+        const legThickness = sizeScale * 0.12; // Much thicker legs
+        
+        // Helper function to lerp
+        const lerp = (a, b, t) => a + (b - a) * t;
+        
+        // Ensure paws array exists
+        if (!this.paws || this.paws.length != 16)
+        {
+            this.paws = [];
+            const bodyTileX = (this.pos.x) | 0;
+            const bodyTileY = (this.pos.y) | 0;
+            for(let i = 0; i < 16; i++)
+            {
+                const angle = (i / 16) * PI * 2;
+                const offsetX = Math.sin(angle) * this.pawRadius;
+                const offsetY = Math.cos(angle) * this.pawRadius;
+                let pawTileX = bodyTileX + (offsetX) | 0;
+                let pawTileY = bodyTileY + 2;
+                this.paws.push({
+                    tileX: pawTileX,
+                    tileY: pawTileY,
+                    worldPos: vec2(pawTileX + 0.5, pawTileY)
+                });
+            }
+        }
+        
+        // Draw each leg as a thick fuzzy quadratic curve
+        for(let i = 0; i < 16; i++)
+        {
+            const paw = this.paws[i];
+            if (!paw || !paw.worldPos) continue;
+            
+            // Body attachment point
+            const bodyX = bodyPos.x;
+            const bodyY = bodyPos.y;
+            
+            // Paw position (snapped to tile surface)
+            const pawX = paw.worldPos.x;
+            const pawY = paw.worldPos.y;
+            
+            // Control point for quadratic curve (midpoint, raised up)
+            const controlX = lerp(bodyX, pawX, 0.5);
+            const controlY = lerp(bodyY, pawY - this.pawHeight, 0.5);
+            
+            // Draw leg as fuzzy quadratic curve - multiple overlapping lines for fuzzy effect
+            const segmentCount = 12; // More segments for smoother fuzzy curve
+            let prevX = bodyX;
+            let prevY = bodyY;
+            
+            // Draw multiple layers for fuzzy effect
+            for(let fuzzyLayer = 0; fuzzyLayer < 5; fuzzyLayer++)
+            {
+                const fuzzyOffset = (fuzzyLayer - 2) * legThickness * 0.15;
+                const fuzzyAlpha = 0.3 + (fuzzyLayer === 2 ? 0.4 : 0.1); // Center layer is brightest
+                const fuzzyColor = new Color(0.1, 0.1, 0.1, fuzzyAlpha);
+                
+                prevX = bodyX;
+                prevY = bodyY;
+                
+                for(let seg = 1; seg <= segmentCount; seg++)
+                {
+                    const t = seg / segmentCount;
+                    
+                    // Quadratic bezier curve: (1-t)^2*P0 + 2*(1-t)*t*P1 + t^2*P2
+                    const mt = 1 - t;
+                    let x = mt * mt * bodyX + 2 * mt * t * controlX + t * t * pawX;
+                    let y = mt * mt * bodyY + 2 * mt * t * controlY + t * t * pawY;
+                    
+                    // Add fuzzy offset perpendicular to leg direction
+                    if (seg > 1)
+                    {
+                        const angle = Math.atan2(y - prevY, x - prevX) + PI/2;
+                        x += Math.cos(angle) * fuzzyOffset;
+                        y += Math.sin(angle) * fuzzyOffset;
+                    }
+                    
+                    // Draw line segment with fuzzy color
+                    drawLine(vec2(prevX, prevY), vec2(x, y), legThickness * (0.7 + fuzzyLayer * 0.1), fuzzyColor);
+                    
+                    prevX = x;
+                    prevY = y;
+                }
+            }
+            
+            // Draw fuzzy foot at ground contact (on tile surface)
+            const pawRadius = sizeScale * 0.12; // Larger foot
+            for(let fuzzyFoot = 0; fuzzyFoot < 3; fuzzyFoot++)
+            {
+                const footOffset = (fuzzyFoot - 1) * pawRadius * 0.2;
+                const footAlpha = 0.4 + (fuzzyFoot === 1 ? 0.4 : 0.1);
+                const footColor = new Color(0.1, 0.1, 0.1, footAlpha);
+                drawTile(paw.worldPos.add(vec2(footOffset, 0)), vec2(pawRadius * (0.8 + fuzzyFoot * 0.1)), -1, undefined, footColor, 0, false, additive);
+            }
+        }
+        
+        // Draw spiderling body using drawTile2 for tiles2.png
+        if (typeof drawTile2 === 'function')
+            drawTile2(bodyPos, vec2(sizeScale), this.tileIndex, this.tileSize, color, this.angle, this.mirror, additive);
+        else
+            drawTile(bodyPos, vec2(sizeScale), this.tileIndex, this.tileSize, color, this.angle, this.mirror, additive);
+        
+        // No head - spiderling is just a body with legs
     }
 }
 
