@@ -36,7 +36,7 @@ const levelLimits = {
     1: [20, 1, 0, 0, 0, 1, 0],  // Level 1: 1 spider boss
     2: [40, 3, 0, 0, 0, 0, 3],  // Level 2: max 3 spiderlings
     3: [50, 10, 15, 0, 0, 0, 5],  // Level 3: max 5 spiderlings
-    4: [1, 0, 0, 1, 0, 1, 0],  // Level 4: 1 malefactor and 1 spider
+    4: [2, 0, 0, 1, 0, 1, 0],  // Level 4: 1 malefactor and 1 spider
     5: [60, 20, 15, 10, 1, 0, 8],  // Level 5: 60 enemies total, including 10 malefactors, 1 foe, and 8 spiderlings
     // 6: [1, 0, 0, 0, 0]  // Level 6: Flat level with 1 weak enemy and many crates - REMOVED
 };
@@ -668,8 +668,8 @@ function generateLevel()
             if (level == 4)
             {
                 // Level 4: Create a guaranteed spawn platform
-                // Find a good location away from checkpoint (at least 40 tiles)
-                let platformX = checkpointPos.x + (randSeeded() < 0.5 ? 50 : -50);
+                // Spawn malefactor on the right side (+70), spider will be on left side (-70)
+                let platformX = checkpointPos.x + 70;
                 platformX = clamp(platformX, levelSize.x - 60, 60); // Keep away from edges
                 
                 // Find ground level at this X position
@@ -806,7 +806,14 @@ function generateLevel()
             let spawnPos = null;
             
             // Find a good location away from checkpoint (at least 40 tiles)
-            let platformX = checkpointPos.x + (randSeeded() < 0.5 ? 60 : -60);
+            // For level 4, spawn spider on opposite side from malefactor to avoid collision
+            let platformX;
+            if (level == 4) {
+                // Malefactor spawns at +70, so spawn spider at -70 (opposite side)
+                platformX = checkpointPos.x - 70;
+            } else {
+                platformX = checkpointPos.x + (randSeeded() < 0.5 ? 60 : -60);
+            }
             platformX = clamp(platformX, levelSize.x - 60, 60); // Keep away from edges
             
             // Find ground level at this X position
@@ -1242,7 +1249,7 @@ function nextLevel()
                     ++malefactorCount;
             }
         }, 0); // Check all objects, not just collide objects
-        
+
         // If no malefactor found, force spawn one with platform (guaranteed location)
         if (malefactorCount == 0)
         {
@@ -1266,7 +1273,7 @@ function nextLevel()
             
             new Malefactor(spawnPos);
         }
-        
+
         // Verify spider exists
         let spiderCount = 0;
         forEachObject(0, 0, (o)=>
@@ -1279,7 +1286,7 @@ function nextLevel()
                     ++spiderCount;
             }
         }, 0); // Check all objects, not just collide objects
-        
+
         // If no spider found, force spawn one with platform (guaranteed location)
         if (spiderCount == 0)
         {

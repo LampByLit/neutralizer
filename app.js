@@ -100,7 +100,7 @@ engineInit(
                 }
             }
         }
-        
+
         // Level selector (number keys 1-6) - COMMENTED OUT
         // for(let i = 1; i <= 6; i++)
         // {
@@ -110,7 +110,7 @@ engineInit(
         //         selectedLevel = i;
         //     }
         // }
-        
+
         // Start game with Enter key (key code 13) or gamepad button
         if (titleScreenReady && (keyWasPressed(13) || gamepadWasPressed(0)))
         {
@@ -395,13 +395,13 @@ engineInit(
             mainContext.font = 'bold 64px JetBrains Mono';
             mainContext.fillText('MALEFACTOR', mainCanvas.width/2, mainCanvas.height/2 - 100);
         }
-        
+
         // Level selector - COMMENTED OUT
         // mainContext.textAlign = 'center';
         // mainContext.fillStyle = new Color(1,1,1).rgba();
         // mainContext.font = 'bold 24px JetBrains Mono';
         // mainContext.fillText('Select Level (Press 1-6):', mainCanvas.width/2, mainCanvas.height/2 + 20);
-        // 
+        //
         // // Highlight selected level
         // const levelY = mainCanvas.height/2 + 55;
         // for(let i = 1; i <= 6; i++)
@@ -413,7 +413,7 @@ engineInit(
         //     mainContext.textAlign = 'center';
         //     mainContext.fillText(i.toString(), x, levelY);
         // }
-        
+
         // Press to start text - show different message based on state
         mainContext.textAlign = 'center';
         mainContext.fillStyle = new Color(1,1,1).rgba();

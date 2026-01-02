@@ -210,11 +210,11 @@ class EngineObject
         drawTile(this.pos, this.size, this.tileIndex, this.tileSize, this.color, this.angle, this.mirror, this.additiveColor);
     }
     
-    destroy()             
-    { 
+    destroy()
+    {
         if (this.destroyed)
             return;
-        
+
         // disconnect from parent and destroy chidren
         this.destroyed = 1;
         this.parent && this.parent.removeChild(this);
