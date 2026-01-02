@@ -292,8 +292,8 @@ class Prop extends GameObject
         if (this.type == propType_barrel_water)
             makeWater(this.pos);
 
-        // Drop item from wooden crates (20% chance)
-        if (this.type == propType_crate_wood && rand() < .2)
+        // Drop item from wooden and metal crates (20% chance)
+        if ((this.type == propType_crate_wood || this.type == propType_crate_metal) && rand() < .2)
         {
             const itemTypes = getAllItemTypes();
             const randomItemType = itemTypes[rand(itemTypes.length)|0];
