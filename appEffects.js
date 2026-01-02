@@ -179,16 +179,16 @@ function explosion(pos, radius=2)
         if (o.isGameObject)
         {
             // do damage
-            d < radius && o.damage(damage);
+            d < radius && o.damage && o.damage(damage);
 
             // catch fire
-            d < radius*1.5 && o.burn();
+            d < radius*1.5 && o.burn && o.burn();
         }
 
         // push
         const p = percent(d, radius, 2*radius);
         const force = o.pos.subtract(pos).normalize(p*radius*.2);
-        o.applyForce(force);
+        o.applyForce && o.applyForce(force);
         if (o.isDead && o.isDead())
             o.angleVelocity += randSign()*rand(p*radius/4,.3);
     });
@@ -215,6 +215,86 @@ function explosion(pos, radius=2)
         new Color(1,.5,.1), new Color(1,.1,.1), // colorStartA, colorStartB
         new Color(1,.5,.1,0), new Color(1,.1,.1,0), // colorEndA, colorEndB
         .5, .5, 2, .1, .05, // particleTime, sizeStart, sizeEnd, particleSpeed, particleAngleSpeed
+        .9, 1, 0, PI, .05,  // damping, angleDamping, gravityScale, particleCone, fadeRate, 
+        .5, 0, 1, 0, 1e9              // randomness, collide, additive, randomColorLinear, renderOrder
+    );
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+function nukeExplosion(pos, radius=10)
+{
+    ASSERT(radius > 0);
+    if (levelWarmup)
+        return;
+
+    const damage = radius*2;
+
+    // destroy level
+    for(let x = -radius; x < radius; ++x)
+    {
+        const h = (radius**2 - x**2)**.5;
+        for(let y = -h; y <= h; ++y)
+            destroyTile(pos.add(vec2(x,y)), 0, 0, 0.4, 0);
+    }
+
+    // cleanup neighbors (reduced for performance)
+    const cleanupRadius = radius + 1;
+    for(let x = -cleanupRadius; x < cleanupRadius; ++x)
+    {
+        const h = (cleanupRadius**2 - x**2)**.5;
+        for(let y = -h; y < h; ++y)
+            decorateTile(pos.add(vec2(x,y)).int());
+    }
+
+    // kill/push objects
+    const maxRangeSquared = (radius*1.5)**2;
+    forEachObject(pos, radius*3, (o)=> 
+    {
+        const d = o.pos.distance(pos);
+        if (o.isGameObject)
+        {
+            // do damage
+            d < radius && o.damage && o.damage(damage);
+
+            // catch fire
+            d < radius*1.5 && o.burn && o.burn();
+        }
+
+        // push
+        const p = percent(d, radius, 2*radius);
+        const force = o.pos.subtract(pos).normalize(p*radius*.2);
+        o.applyForce && o.applyForce(force);
+        if (o.isDead && o.isDead())
+            o.angleVelocity += randSign()*rand(p*radius/4,.3);
+    });
+
+    playSound(sound_explosion, pos);
+    debugFire && debugCircle(pos, maxRangeSquared**.5, '#f00', 2);
+    debugFire && debugCircle(pos, radius**.5, '#ff0', 2);
+
+    // Optimized particles for nuke - capped emission rates
+    const maxParticleRate = 200; // Cap at 200 particles/sec instead of 500
+    const maxFireRate = 300; // Cap at 300 particles/sec instead of 1000
+    
+    // smoke (reduced emission)
+    new ParticleEmitter(
+        pos, radius/2, .15, min(50*radius, maxParticleRate), PI, // Reduced emitTime and capped rate
+        0, undefined,        // tileIndex, tileSize
+        new Color(0,0,0), new Color(0,0,0), // colorStartA, colorStartB
+        new Color(0,0,0,0), new Color(0,0,0,0), // colorEndA, colorEndB
+        .8, .5, 2, .1, .05, // Slightly shorter particleTime
+        .9, 1, -.3, PI, .1,  // damping, angleDamping, gravityScale, particleCone, fadeRate, 
+        .5, 0, 0, 0, 1e8              // randomness, collide, additive, randomColorLinear, renderOrder
+    );
+
+    // fire (reduced emission)
+    new ParticleEmitter(
+        pos, radius/2, .08, min(100*radius, maxFireRate), PI, // Reduced emitTime and capped rate
+        0, undefined,        // tileIndex, tileSize
+        new Color(1,.5,.1), new Color(1,.1,.1), // colorStartA, colorStartB
+        new Color(1,.5,.1,0), new Color(1,.1,.1,0), // colorEndA, colorEndB
+        .4, .5, 2, .1, .05, // Shorter particleTime
         .9, 1, 0, PI, .05,  // damping, angleDamping, gravityScale, particleCone, fadeRate, 
         .5, 0, 1, 0, 1e9              // randomness, collide, additive, randomColorLinear, renderOrder
     );

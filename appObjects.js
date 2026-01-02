@@ -446,6 +446,7 @@ class HammerProjectile extends GameObject
         this.gravityScale = 1; // Affected by gravity for ballistic trajectory
         this.damage = 5; // 5x bullet damage
         this.hasLanded = 0; // Track if projectile has landed
+        this.isNuking = 0; // Flag to prevent infinite recursion
         this.setCollision();
         this.color = new Color(0, 0, 0, 1); // All black
     }
@@ -480,7 +481,7 @@ class HammerProjectile extends GameObject
     {
         // If hit by an explosion (damage >= 6, which is grenade explosion damage of radius*2),
         // trigger nuke explosion like jackrock
-        if (damage >= 6)
+        if (damage >= 6 && !this.isNuking && !this.destroyed)
         {
             this.nuke();
             return 0; // Don't apply normal damage, we're exploding
@@ -491,11 +492,18 @@ class HammerProjectile extends GameObject
     
     nuke()
     {
-        if (this.destroyed)
+        if (this.destroyed || this.isNuking)
             return;
             
-        // Explode with same radius as jackrock (10)
-        explosion(this.pos, 10);
+        // Set flag to prevent infinite recursion
+        this.isNuking = 1;
+        
+        // Mark as destroyed first to prevent being damaged by own explosion
+        this.destroyed = 1;
+        this.health = 0;
+        
+        // Explode with optimized nuke explosion (radius 10, but with capped particles)
+        nukeExplosion(this.pos, 10);
         this.destroy();
     }
     
