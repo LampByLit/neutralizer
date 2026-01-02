@@ -1548,6 +1548,20 @@ class Malefactor extends Enemy
             this.mirror = this.sawPlayerPos.x < this.pos.x;
     }
 
+    kill(damagingObject)
+    {
+        // Call parent kill first
+        const result = super.kill(damagingObject);
+        
+        // Make dead malefactors persistent so they remain visible
+        if (this.isDead())
+        {
+            this.persistent = 1;
+        }
+        
+        return result;
+    }
+
     alert(playerPos, resetSawPlayer)
     {
         if (resetSawPlayer || !this.sawPlayerTimer.isSet())
@@ -1566,7 +1580,8 @@ class Malefactor extends Enemy
     
     render()
     {
-        if (!isOverlapping(this.pos, this.size, cameraPos, renderWindowSize))
+        // Allow persistent dead malefactors to render even when far away
+        if (!isOverlapping(this.pos, this.size, cameraPos, renderWindowSize) && !(this.persistent && this.isDead()))
             return;
 
         // set tile to use

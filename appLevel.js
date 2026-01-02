@@ -1227,9 +1227,10 @@ function nextLevel()
         }
     });
 
-    // CRITICAL VERIFICATION: Ensure level 4 has exactly 1 malefactor (guaranteed spawn)
+    // CRITICAL VERIFICATION: Ensure level 4 has exactly 1 malefactor and 1 spider (guaranteed spawn)
     if (level == 4)
     {
+        // Verify malefactor exists
         let malefactorCount = 0;
         forEachObject(0, 0, (o)=>
         {
@@ -1264,6 +1265,43 @@ function nextLevel()
             }
             
             new Malefactor(spawnPos);
+        }
+        
+        // Verify spider exists
+        let spiderCount = 0;
+        forEachObject(0, 0, (o)=>
+        {
+            // Check if it's a spider: enemy character with type 9 (type_spider) or sizeScale ~3.0
+            if (o.isCharacter && o.team == team_enemy && !o.destroyed)
+            {
+                // Spiders have type 9 and sizeScale of 3.0
+                if ((o.type === 9) || (o.sizeScale && abs(o.sizeScale - 3.0) < 0.1))
+                    ++spiderCount;
+            }
+        }, 0); // Check all objects, not just collide objects
+        
+        // If no spider found, force spawn one with platform (guaranteed location)
+        if (spiderCount == 0)
+        {
+            // Create a spawn platform away from checkpoint (different side from malefactor)
+            const platformX = checkpointPos.x - 50; // Opposite side from malefactor
+            const platformTest = vec2(platformX, levelSize.y);
+            let raycastHit = tileCollisionRaycast(platformTest, vec2(platformX, 0));
+            
+            let spawnPos;
+            if (raycastHit)
+            {
+                const groundY = (raycastHit.y - 0.5) | 0;
+                spawnPos = createMalefactorSpawnPlatform(platformX, groundY, 10, 6);
+            }
+            else
+            {
+                // Use checkpoint ground level (checkpointPos is 1 tile above ground)
+                const checkpointGroundY = (checkpointPos.y - 1) | 0;
+                spawnPos = createMalefactorSpawnPlatform(checkpointPos.x - 50, checkpointGroundY, 10, 6);
+            }
+            
+            new Spider(spawnPos);
         }
     }
 
@@ -1311,7 +1349,34 @@ function nextLevel()
     new Player(checkpointPos);
     //new Enemy(checkpointPos.add(vec2(3))); // test enemy
     
-    // spawn girls (surviving girls from previous level + 2 new ones)
+    // spawn girls (surviving girls from previous level + 1 new one)
     respawnSurvivingGirls(checkpointPos);
     spawnGirls(checkpointPos);
+    
+    // CRITICAL VERIFICATION: Ensure level 4 has at least 1 girl (guaranteed spawn)
+    if (level == 4)
+    {
+        let girlCount = 0;
+        forEachObject(0, 0, (o)=>
+        {
+            // Check if it's a girl: character with isGirl flag or team_player with bodyTile 23
+            if (o.isGirl || (o.isCharacter && o.team == team_player && o.bodyTile === 23))
+            {
+                if (!o.destroyed && !o.isDead())
+                    ++girlCount;
+            }
+        }, 0); // Check all objects, not just collide objects
+        
+        // If no girl found, force spawn one (guaranteed location)
+        if (girlCount == 0)
+        {
+            const girlSpawnPos = checkpointPos.add(vec2(1.5, 0));
+            const newGirl = new Girl(girlSpawnPos);
+            // Add to survivingGirls array
+            if (typeof survivingGirls !== 'undefined' && newGirl)
+            {
+                survivingGirls.push(newGirl);
+            }
+        }
+    }
 }
