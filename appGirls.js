@@ -12,6 +12,8 @@ let survivingGirls = [];
 function createProtectedWeapon(girl)
 {
     const weapon = new Weapon(girl.pos, girl);
+    // Ensure weapon is visible (not hidden)
+    weapon.hidden = 0;
     // Make sure weapon doesn't take damage or have health
     weapon.health = weapon.healthMax = 0; // No health
     weapon.noFallDamage = 1; // Prevent fall damage on weapon
@@ -99,6 +101,12 @@ class Girl extends Character
             return;
         }
 
+        // Ensure weapon exists (recreate if missing)
+        if (!this.weapon || this.weapon.destroyed)
+        {
+            createProtectedWeapon(this);
+        }
+        
         if (this.weapon)
             this.weapon.localPos = this.weapon.localOffset.scale(this.sizeScale);
 
@@ -573,6 +581,13 @@ function respawnSurvivingGirls(spawnPos)
         girl.velocity = vec2(0, 0);
         girl.health = girl.healthMax;
         girl.deadTimer.unset();
+        
+        // Ensure she has a weapon (recreate if missing)
+        if (!girl.weapon || girl.weapon.destroyed)
+        {
+            createProtectedWeapon(girl);
+        }
+        
         index++;
     }
 }
