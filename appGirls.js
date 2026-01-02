@@ -113,6 +113,9 @@ class Girl extends Character
     constructor(pos)
     {
         super(pos, 0.7); // Size scale 0.7
+        
+        // Debug log
+        console.log('Girl constructor called at pos:', pos, 'this:', this);
 
         this.team = team_player;
         this.persistent = 1; // Survive level transitions
