@@ -138,6 +138,7 @@ class Girl extends Character
         this.followDistance = 2 + rand() * 2; // Varying follow distance (2-4 units)
         this.coverTimer = new Timer;
         this.dodgeCooldownTimer = new Timer;
+        this.holdJumpTimer = new Timer; // Initialize holdJumpTimer for holding jump
         this.sightCheckFrame = rand(9)|0;
         this.maxVisionRange = 10;
         
@@ -281,7 +282,8 @@ class Girl extends Character
             // Shoot at enemy if in range and cooldown is ready
             if (enemyDist < 12 && abs(this.sawEnemyPos.y - this.pos.y) < 4)
             {
-                if (!this.weapon.shootCooldownTimer.isSet() || this.weapon.shootCooldownTimer.elapsed())
+                if (this.weapon && this.weapon.shootCooldownTimer && 
+                    (!this.weapon.shootCooldownTimer.isSet() || this.weapon.shootCooldownTimer.elapsed()))
                 {
                     this.holdingShoot = 1;
                 }
@@ -350,7 +352,7 @@ class Girl extends Character
             }
         }
 
-        this.holdingJump = this.holdJumpTimer.active();
+        this.holdingJump = (this.holdJumpTimer && this.holdJumpTimer.active()) || 0;
         super.update();
     }
     

@@ -1333,6 +1333,13 @@ function nextLevel()
                 // Move to checkpoint with slight offset
                 girl.pos = checkpointPos.add(vec2(rand(1, -1), rand(0.5, -0.5)));
                 girl.velocity = vec2();
+                
+                // Recreate weapon if it was destroyed during level transition
+                if (!girl.weapon || girl.weapon.destroyed)
+                {
+                    new GirlWeapon(girl.pos, girl);
+                }
+                
                 // Make sure they're in the arrays
                 if (engineObjects.indexOf(girl) < 0)
                     engineObjects.push(girl);
