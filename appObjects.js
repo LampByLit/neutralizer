@@ -557,6 +557,19 @@ class ToxicGasCloud extends GameObject
         this.radius = 2; // Damage radius
         this.setCollision();
         this.color = new Color(1, 0.4, 0.8, 0.6); // Pink gas color
+        this.renderOrder = 1e7; // Render on top of most objects
+        
+        // Create persistent pink gas particle emitter as a child
+        this.gasEmitter = new ParticleEmitter(
+            vec2(), this.radius, this.lifetime, 100, PI * 2, // pos, emitSize, emitTime, emitRate, emiteCone
+            0, undefined,        // tileIndex, tileSize
+            new Color(1, 0.4, 0.8, 0.9), new Color(1, 0.2, 0.6, 0.6), // Pink colorStartA, colorStartB
+            new Color(1, 0.4, 0.8, 0), new Color(1, 0.2, 0.6, 0), // colorEndA, colorEndB
+            1.5, .4, 1.2, .08, .03, // particleTime, sizeStart, sizeEnd, particleSpeed, particleAngleSpeed
+            .95, 1, -.15, PI * 2, .1,  // damping, angleDamping, gravityScale, particleCone, fadeRate, 
+            .6, 0, 1, 0, 1e8              // randomness, collide, additive, randomColorLinear, renderOrder
+        );
+        this.addChild(this.gasEmitter);
     }
 
     update()
@@ -566,6 +579,8 @@ class ToxicGasCloud extends GameObject
         // Check lifetime
         if (this.getAliveTime() > this.lifetime)
         {
+            if (this.gasEmitter)
+                this.gasEmitter.emitRate = 0; // Stop emitting before destroy
             this.destroy();
             return;
         }
@@ -590,26 +605,36 @@ class ToxicGasCloud extends GameObject
             });
             this.damageTimer.set(0.1);
         }
-
-        // Create pink gas particles
-        new ParticleEmitter(
-            this.pos, this.radius, 0, 50, PI * 2, // pos, emitSize, emitTime, emitRate, emiteCone
-            0, undefined,        // tileIndex, tileSize
-            new Color(1, 0.4, 0.8, 0.8), new Color(1, 0.2, 0.6, 0.4), // Pink colorStartA, colorStartB
-            new Color(1, 0.4, 0.8, 0), new Color(1, 0.2, 0.6, 0), // colorEndA, colorEndB
-            1.5, .3, 1, .05, .02, // particleTime, sizeStart, sizeEnd, particleSpeed, particleAngleSpeed
-            .95, 1, -.1, PI * 2, .1,  // damping, angleDamping, gravityScale, particleCone, fadeRate, 
-            .5, 0, 0, 0, 1e8              // randomness, collide, additive, randomColorLinear, renderOrder
-        );
     }
     
     render()
     {
-        // Draw semi-transparent pink cloud
-        setBlendMode(1);
-        const alpha = 0.3 * (1 - this.getAliveTime() / this.lifetime); // Fade out over time
-        drawTile(this.pos, vec2(this.radius), 0, vec2(16), new Color(1, 0.4, 0.8, alpha), 0);
-        setBlendMode(0);
+        // Draw highly visible pink gas cloud with multiple layers
+        const age = this.getAliveTime() / this.lifetime;
+        const alpha = Math.max(0, 0.7 * (1 - age)); // Much brighter, max 0.7 alpha
+        
+        if (alpha > 0)
+        {
+            // Use additive blending for glow effect
+            setBlendMode(1);
+            
+            // Draw multiple layers for a more visible cloud effect
+            const cloudSize = this.radius * (1 + age * 0.3); // Slightly expand over time
+            
+            // Outer glow layer
+            drawRect(this.pos, vec2(cloudSize * 1.5), new Color(1, 0.4, 0.8, alpha * 0.3), 0);
+            
+            // Middle layer
+            drawRect(this.pos, vec2(cloudSize * 1.2), new Color(1, 0.3, 0.7, alpha * 0.5), 0);
+            
+            // Main cloud layer
+            drawRect(this.pos, vec2(cloudSize), new Color(1, 0.4, 0.8, alpha), 0);
+            
+            // Inner bright core
+            drawRect(this.pos, vec2(cloudSize * 0.6), new Color(1, 0.5, 0.9, alpha * 0.8), 0);
+            
+            setBlendMode(0);
+        }
     }
 }
 
@@ -1719,32 +1744,49 @@ class SmokerWeapon extends Weapon
         
         if (pressingF)
         {
-            // Spawn gas clouds continuously while F is held
-            while (this.fireTimeBuffer >= this.gasSpawnRate)
+            // Get base aim angle from parent
+            const baseAimAngle = this.parent.aimAngle || 0;
+            
+            // Calculate forward direction based on mirror state and aim angle
+            const forwardDirection = vec2(this.parent.getMirrorSign(1), 0).rotate(baseAimAngle);
+            
+            // Only fire forward (check if direction matches facing direction)
+            const isFiringForward = (this.parent.mirror == 0 && forwardDirection.x >= 0) || 
+                                     (this.parent.mirror == 1 && forwardDirection.x <= 0);
+            
+            if (isFiringForward)
             {
-                this.fireTimeBuffer -= this.gasSpawnRate;
-                
-                // Calculate weapon position (where gas comes from)
-                const sizeScale = this.parent.sizeScale || 1;
-                const weaponPos = this.parent.pos.add(
-                    vec2(this.parent.getMirrorSign(.55), 0).scale(sizeScale)
-                );
-                
-                // Get forward direction based on aim
-                const baseAimAngle = this.parent.aimAngle || 0;
-                const forwardDirection = vec2(this.parent.getMirrorSign(1), 0).rotate(baseAimAngle);
-                
-                // Spawn gas cloud slightly forward
-                const gasPos = weaponPos.add(forwardDirection.scale(0.5));
-                
-                // Create toxic gas cloud
-                const gas = new ToxicGasCloud(gasPos, this.parent);
-                
-                // Add slight forward velocity
-                gas.velocity = this.parent.velocity.add(forwardDirection.scale(0.3));
-                
-                // Alert enemies
-                alertEnemies(gasPos, gasPos);
+                // Spawn gas clouds continuously while F is held
+                while (this.fireTimeBuffer >= this.gasSpawnRate)
+                {
+                    this.fireTimeBuffer -= this.gasSpawnRate;
+                    
+                    // Calculate weapon position (where gas comes from)
+                    const sizeScale = this.parent.sizeScale || 1;
+                    const weaponPos = this.parent.pos.add(
+                        vec2(this.parent.getMirrorSign(.55), 0).scale(sizeScale)
+                    );
+                    
+                    // Spawn gas cloud slightly forward
+                    const gasPos = weaponPos.add(forwardDirection.scale(0.5));
+                    
+                    // Create toxic gas cloud
+                    const gas = new ToxicGasCloud(gasPos, this.parent);
+                    
+                    // Add slight forward velocity
+                    gas.velocity = this.parent.velocity.add(forwardDirection.scale(0.3));
+                    
+                    // Play gas spray sound (low volume since it fires continuously)
+                    playSound(sound_walk, gasPos, 10, 0.2);
+                    
+                    // Alert enemies
+                    alertEnemies(gasPos, gasPos);
+                }
+            }
+            else
+            {
+                // Not firing forward, reset buffer
+                this.fireTimeBuffer = min(this.fireTimeBuffer, 0);
             }
         }
         else
