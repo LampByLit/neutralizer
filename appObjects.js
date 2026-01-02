@@ -120,7 +120,7 @@ class GameObject extends EngineObject
     
     heal(health)
     {
-        assert(health >= 0);
+        ASSERT(health >= 0);
         if (this.isDead())
             return 0;
         
@@ -291,6 +291,14 @@ class Prop extends GameObject
 
         if (this.type == propType_barrel_water)
             makeWater(this.pos);
+
+        // Drop item from wooden crates (10% chance)
+        if (this.type == propType_crate_wood && rand() < .1)
+        {
+            const itemTypes = getAllItemTypes();
+            const randomItemType = itemTypes[rand(itemTypes.length)|0];
+            new Item(this.pos, randomItemType);
+        }
 
         this.destroy();
         makeDebris(this.pos, this.color.scale(this.burnColorPercent(),1));
@@ -498,6 +506,178 @@ class KeyItem extends GameObject
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// Item type definitions
+// Order: Life (0), Health (1), Laser (2), Cannon (3), Jumper (4), Hammer (5), Radar (6)
+const itemType_life = 0;
+const itemType_health = 1;
+const itemType_laser = 2;
+const itemType_cannon = 3;
+const itemType_jumper = 4;
+const itemType_hammer = 5;
+const itemType_radar = 6;
+
+const itemType_consumable = 0;
+const itemType_equipable = 1;
+
+// Item registry - maps item type to properties
+const itemRegistry = {
+    [itemType_life]: { 
+        category: itemType_consumable, 
+        tileIndex: 0, 
+        effect: 'addLife' 
+    },
+    [itemType_health]: { 
+        category: itemType_consumable, 
+        tileIndex: 1, 
+        effect: 'heal', 
+        amount: 1 
+    },
+    [itemType_laser]: { 
+        category: itemType_equipable, 
+        tileIndex: 2, 
+        weaponType: 'LaserWeapon' 
+    },
+    [itemType_cannon]: { 
+        category: itemType_equipable, 
+        tileIndex: 3, 
+        weaponType: 'CannonWeapon' 
+    },
+    [itemType_jumper]: { 
+        category: itemType_equipable, 
+        tileIndex: 4, 
+        weaponType: 'JumperWeapon' 
+    },
+    [itemType_hammer]: { 
+        category: itemType_equipable, 
+        tileIndex: 5, 
+        weaponType: 'HammerWeapon' 
+    },
+    [itemType_radar]: { 
+        category: itemType_equipable, 
+        tileIndex: 6, 
+        weaponType: 'RadarWeapon' 
+    }
+};
+
+// Get all available item types for random selection
+const getAllItemTypes = ()=> [itemType_life, itemType_health, itemType_laser, itemType_cannon, itemType_jumper, itemType_hammer, itemType_radar];
+
+///////////////////////////////////////////////////////////////////////////////
+
+class Item extends GameObject
+{
+    constructor(pos, itemType)
+    {
+        const itemData = itemRegistry[itemType];
+        if (!itemData)
+        {
+            console.error('Invalid item type:', itemType);
+            return;
+        }
+        
+        super(pos, vec2(.4, .4), itemData.tileIndex, vec2(8));
+        
+        this.itemType = itemType;
+        this.itemData = itemData;
+        this.isItem = 1;
+        this.health = this.healthMax = 1e3; // Indestructible
+        this.canBurn = 0;
+        this.setCollision(1, 1);
+        this.renderOrder = 1e8;
+        this.color = new Color(1, 1, 1);
+        
+        // Physical properties - items are physical objects
+        this.elasticity = .3;
+        this.friction = .8;
+        this.mass = .5;
+        
+        // Give item slight upward velocity when spawned
+        this.velocity = vec2(rand(.1, -.1), rand(.15, .05));
+    }
+    
+    update()
+    {
+        super.update();
+        
+        // Check for player collision
+        for(const player of players)
+        {
+            if (player && !player.isDead() && this.pos.distanceSquared(player.pos) < .5)
+            {
+                this.collect(player);
+                break;
+            }
+        }
+    }
+    
+    collect(player)
+    {
+        if (this.itemData.category == itemType_consumable)
+        {
+            // Consumable - apply effect immediately
+            playSound(sound_checkpoint, this.pos);
+            if (this.itemData.effect == 'addLife')
+            {
+                ++playerLives;
+            }
+            else if (this.itemData.effect == 'heal')
+            {
+                player.heal(this.itemData.amount || 1);
+                
+                // Confetti effect since health does pretty much nothing
+                // Create multiple colorful particle emitters for confetti effect
+                const colors = [
+                    [new Color(1,0,0,.8), new Color(1,.2,.2,.8)], // Red
+                    [new Color(0,1,0,.8), new Color(.2,1,.2,.8)], // Green
+                    [new Color(0,0,1,.8), new Color(.2,.2,1,.8)], // Blue
+                    [new Color(1,1,0,.8), new Color(1,1,.2,.8)], // Yellow
+                    [new Color(1,0,1,.8), new Color(1,.2,1,.8)], // Magenta
+                    [new Color(0,1,1,.8), new Color(.2,1,1,.8)], // Cyan
+                ];
+                
+                colors.forEach((colorPair, i) => {
+                    const angleOffset = (i / colors.length) * PI * 2;
+                    new ParticleEmitter(
+                        this.pos, .3, .15, 150, PI * 2, // pos, emitSize, emitTime, emitRate, emitCone (full circle)
+                        0, undefined,     // tileIndex, tileSize
+                        colorPair[0], colorPair[1], // colorStartA, colorStartB
+                        new Color(colorPair[0].r, colorPair[0].g, colorPair[0].b, 0), 
+                        new Color(colorPair[1].r, colorPair[1].g, colorPair[1].b, 0), // colorEndA, colorEndB (fade to transparent)
+                        .4, .3, .15, .2, .2, // particleTime, sizeStart, sizeEnd, particleSpeed, particleAngleSpeed
+                        .95, 1, .8, PI * 2, .1,  // damping, angleDamping, gravityScale, particleCone, fadeRate
+                        .6, 0, 0, 0, 1e8  // randomness, collide, additive, randomColorLinear, renderOrder
+                    );
+                });
+            }
+            this.destroy();
+        }
+        else if (this.itemData.category == itemType_equipable)
+        {
+            // Equipable - only allow pickup if player has default weapon or no weapon
+            if (!player.equippedWeaponType || player.equippedWeaponType == 'Weapon')
+            {
+                // Player has default weapon or no weapon - equip this one
+                playSound(sound_checkpoint, this.pos); // Only play sound when equipping
+                player.equipWeapon(this.itemData.weaponType);
+                this.destroy();
+            }
+            // If player already has a special weapon equipped, don't collect the item
+            // Item remains on the ground for later pickup (no sound)
+        }
+    }
+    
+    render()
+    {
+        // Use drawTile2 if available, otherwise fallback to drawTile (items won't show correct sprite but won't crash)
+        if (typeof drawTile2 === 'function')
+            drawTile2(this.pos, this.size, this.tileIndex, this.tileSize, this.color, this.angle, this.mirror, this.additiveColor);
+        else
+            drawTile(this.pos, this.size, this.tileIndex, this.tileSize, this.color, this.angle, this.mirror, this.additiveColor);
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 class Weapon extends EngineObject 
 {
     constructor(pos, parent) 
@@ -696,6 +876,469 @@ class Bullet extends EngineObject
     {
         drawRect(this.pos, vec2(.4,.5), new Color(1,1,1,.5), this.velocity.angle());
         drawRect(this.pos, vec2(.2,.5), this.color, this.velocity.angle());
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class LaserBeam extends EngineObject 
+{
+    constructor(pos, attacker) 
+    { 
+        super(pos, vec2(0));
+        this.color = new Color(1,0,0,1); // Red laser
+        this.lastVelocity = this.velocity;
+        this.setCollision();
+
+        this.damage = 3; // 3x bullet damage
+        this.damping = 1;
+        this.gravityScale = 0;
+        this.attacker = attacker;
+        this.team = attacker.team;
+        this.renderOrder = 1e9;
+        this.range = 48; // 3x bullet range (16 * 3)
+    }
+
+    update()
+    {
+        this.lastVelocity = this.velocity;
+        super.update();
+
+        this.range -= this.velocity.length();
+        if (this.range < 0)
+        {
+            // Sparkly particle effect when laser expires
+            const emitter = new ParticleEmitter(
+                this.pos, .2, .1, 150, PI, // pos, emitSize, emitTime, emitRate, emiteCone
+                0, undefined,     // tileIndex, tileSize
+                new Color(1,0,0,.8), new Color(1,.5,.2,.8), // colorStartA, colorStartB (red to orange)
+                new Color(1,0,0,0), new Color(1,.5,.2,0), // colorEndA, colorEndB
+                .15, .3, .05, .15, .2, // particleTime, sizeStart, sizeEnd, particleSpeed, particleAngleSpeed
+                1, 1, .3, PI, .1,  // damping, angleDamping, gravityScale, particleCone, fadeRate, 
+                .6, 0, 1           // randomness, collide, additive, randomColorLinear, renderOrder
+            );
+
+            this.destroy();
+            return;
+        }
+
+        // check if hit someone
+        forEachObject(this.pos, this.size, (o)=>
+        {
+            if (o.isGameObject && !o.parent && o.team != this.team)
+            if (!o.dodgeTimer || !o.dodgeTimer.active())
+                this.collideWithObject(o)
+        });
+    }
+    
+    collideWithObject(o)
+    {
+        if (o.isGameObject)
+        {
+            o.damage(this.damage, this);
+            o.applyForce(this.velocity.scale(.1));
+            if (o.isCharacter)
+            {
+                // Sparkly particle effect on hit
+                const emitter = new ParticleEmitter(
+                    this.pos, .3, .15, 200, PI * 2, // pos, emitSize, emitTime, emitRate, emiteCone (full circle)
+                    0, undefined,     // tileIndex, tileSize
+                    new Color(1,0,0,1), new Color(1,.8,.2,1), // colorStartA, colorStartB (bright red to yellow)
+                    new Color(1,0,0,0), new Color(1,.8,.2,0), // colorEndA, colorEndB
+                    .2, .2, .1, .2, .3, // particleTime, sizeStart, sizeEnd, particleSpeed, particleAngleSpeed
+                    .95, 1, .2, PI * 2, .1,  // damping, angleDamping, gravityScale, particleCone, fadeRate, 
+                    .7, 0, 1           // randomness, collide, additive, randomColorLinear, renderOrder
+                );
+                
+                playSound(sound_walk, this.pos);
+                this.destroy();
+            }
+            else
+                this.kill();
+        }
+    
+        return 1; 
+    }
+
+    collideWithTile(data, pos)
+    {
+        // Laser does not damage tiles - return 0 to pass through
+        return 0;
+    }
+
+    kill()
+    {
+        if (this.destroyed)
+            return;
+
+        // Sparkly particle effect when destroyed
+        const emitter = new ParticleEmitter(
+            this.pos, .2, .1, 150, PI, // pos, emitSize, emitTime, emitRate, emiteCone
+            0, undefined,     // tileIndex, tileSize
+            new Color(1,0,0,.8), new Color(1,.5,.2,.8), // colorStartA, colorStartB
+            new Color(1,0,0,0), new Color(1,.5,.2,0), // colorEndA, colorEndB
+            .15, .3, .05, .15, .2, // particleTime, sizeStart, sizeEnd, particleSpeed, particleAngleSpeed
+            1, 1, .3, PI, .1,  // damping, angleDamping, gravityScale, particleCone, fadeRate, 
+            .6, 0, 1           // randomness, collide, additive, randomColorLinear, renderOrder
+        );
+        emitter.trailScale = 1;
+        emitter.angle = this.lastVelocity.angle() + PI;
+        emitter.elasticity = .3;
+
+        this.destroy();
+    }
+
+    render()
+    {
+        // Red laser beam - brighter and more visible than bullets
+        drawRect(this.pos, vec2(.5,.6), new Color(1,0,0,.3), this.velocity.angle());
+        drawRect(this.pos, vec2(.3,.6), this.color, this.velocity.angle());
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class LaserWeapon extends Weapon
+{
+    constructor(pos, parent)
+    {
+        super(pos, parent);
+        this.fireTimeBuffer = 0;
+        this.fireRate = 5; // Reasonable cooldown - fires 5 times per second
+        this.hidden = 1; // Don't render the weapon sprite (helmet is rendered separately)
+    }
+    
+    update()
+    {
+        super.update();
+        
+        // Only handle laser firing for player
+        if (!this.parent.isPlayer)
+            return;
+        
+        this.fireTimeBuffer += timeDelta;
+        
+        // Check if F key is pressed (key code 70)
+        const pressingLaser = !this.parent.playerIndex && keyIsDown(70);
+        
+        if (pressingLaser)
+        {
+            const rate = 1/this.fireRate;
+            const laserSpeed = 1.0; // Faster than bullets (.5)
+            
+            // Get base aim angle from parent
+            const baseAimAngle = this.parent.aimAngle || 0;
+            
+            // Calculate forward direction based on mirror state and aim angle
+            const forwardDirection = vec2(this.parent.getMirrorSign(1), 0).rotate(baseAimAngle);
+            
+            // Only fire forward (check if direction matches facing direction)
+            // If mirror is 0 (facing right), forwardDirection.x should be positive
+            // If mirror is 1 (facing left), forwardDirection.x should be negative
+            const isFiringForward = (this.parent.mirror == 0 && forwardDirection.x >= 0) || 
+                                     (this.parent.mirror == 1 && forwardDirection.x <= 0);
+            
+            if (isFiringForward)
+            {
+                for(; this.fireTimeBuffer > 0; this.fireTimeBuffer -= rate)
+                {
+                    // Calculate head position (where laser comes from)
+                    const sizeScale = this.parent.sizeScale || 1;
+                    const headPos = this.parent.pos.add(
+                        vec2(this.parent.getMirrorSign(.05), .46).scale(sizeScale)
+                    );
+                    
+                    // Create laser beam
+                    const laser = new LaserBeam(headPos, this.parent);
+                    
+                    // Fire laser in the direction of aim angle
+                    laser.velocity = forwardDirection.scale(laserSpeed);
+                    
+                    // Play laser sound
+                    playSound(sound_laser, headPos);
+                    
+                    // Alert enemies
+                    alertEnemies(headPos, headPos);
+                }
+            }
+            else
+            {
+                // Not firing forward, reset buffer
+                this.fireTimeBuffer = min(this.fireTimeBuffer, 0);
+            }
+        }
+        else
+        {
+            // Not pressing Ctrl, reset buffer
+            this.fireTimeBuffer = min(this.fireTimeBuffer, 0);
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class CannonBall extends GameObject
+{
+    constructor(pos, attacker) 
+    {
+        super(pos, vec2(.3), 5, vec2(8)); // Slightly larger than grenade
+
+        this.health = this.healthMax = 1e3;
+        this.attacker = attacker;
+        this.team = attacker.team;
+        this.elasticity = .3;
+        this.friction = .9;
+        this.angleDamping = .96;
+        this.renderOrder = 1e8;
+        this.gravityScale = 1; // Affected by gravity for ballistic trajectory
+        this.setCollision();
+        this.color = new Color(.8, .8, .8); // Gray/silver cannonball
+    }
+
+    update()
+    {
+        super.update();
+
+        // Check if hit an enemy
+        forEachObject(this.pos, this.size, (o)=>
+        {
+            if (o.isGameObject && !o.parent && o.team != this.team)
+            {
+                if (o.isCharacter)
+                {
+                    // Hit an enemy - explode
+                    this.explode();
+                    return;
+                }
+            }
+        });
+        
+        // Check if just landed on ground (explode on impact)
+        if (this.groundObject && this.velocity.y >= 0)
+        {
+            this.explode();
+            return;
+        }
+    }
+    
+    collideWithTile(data, pos)
+    {
+        if (data <= 0)
+            return 0;
+        
+        // Explode immediately on tile impact
+        this.explode();
+        return 1;
+    }
+    
+    explode()
+    {
+        if (this.destroyed)
+            return;
+            
+        // Big explosion with fire spreading
+        explosion(this.pos, 4); // Larger radius than grenades (which use 3)
+        this.destroy();
+    }
+       
+    render()
+    {
+        drawTile(this.pos, vec2(.4), this.tileIndex, this.tileSize, this.color, this.angle);
+        
+        // Add a subtle glow/trail effect
+        setBlendMode(1);
+        drawTile(this.pos, vec2(.6), 0, vec2(16), new Color(1,.5,.1,.3), this.angle);
+        setBlendMode(0);
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class CannonWeapon extends Weapon
+{
+    constructor(pos, parent)
+    {
+        super(pos, parent);
+        this.fireTimeBuffer = 0;
+        this.fireRate = 1.5; // Slower fire rate - fires 1.5 times per second (cannon reload time)
+        this.hidden = 1; // Don't render the weapon sprite (mask is rendered separately)
+    }
+    
+    update()
+    {
+        super.update();
+        
+        // Only handle cannon firing for player
+        if (!this.parent.isPlayer)
+            return;
+        
+        this.fireTimeBuffer += timeDelta;
+        
+        // Check if F key is pressed (key code 70)
+        const pressingCannon = !this.parent.playerIndex && keyIsDown(70);
+        
+        if (pressingCannon)
+        {
+            const rate = 1/this.fireRate;
+            
+            // Get base aim angle from parent
+            const baseAimAngle = this.parent.aimAngle || 0;
+            
+            // Calculate forward direction based on mirror state and aim angle
+            const forwardDirection = vec2(this.parent.getMirrorSign(1), 0).rotate(baseAimAngle);
+            
+            // Only fire forward (check if direction matches facing direction)
+            const isFiringForward = (this.parent.mirror == 0 && forwardDirection.x >= 0) || 
+                                     (this.parent.mirror == 1 && forwardDirection.x <= 0);
+            
+            if (isFiringForward)
+            {
+                for(; this.fireTimeBuffer > 0; this.fireTimeBuffer -= rate)
+                {
+                    // Calculate weapon position (where cannonball comes from)
+                    const sizeScale = this.parent.sizeScale || 1;
+                    const weaponPos = this.parent.pos.add(
+                        vec2(this.parent.getMirrorSign(.55), 0).scale(sizeScale)
+                    );
+                    
+                    // Create cannonball
+                    const cannonball = new CannonBall(weaponPos, this.parent);
+                    
+                    // Ballistic trajectory - faster than grenades but still arced
+                    // Grenades use: vec2(getMirrorSign(), rand(.8,.7)).normalize(.25+rand(.02))
+                    // Cannon uses faster speed (.45-.5) and similar upward arc
+                    const horizontalComponent = this.parent.getMirrorSign(1);
+                    const verticalComponent = rand(.7, .6); // Upward arc
+                    const direction = vec2(horizontalComponent, verticalComponent).normalize();
+                    
+                    // Apply aim angle to the direction
+                    const aimedDirection = direction.rotate(baseAimAngle);
+                    
+                    // Faster than grenades: .45-.5 vs grenade's .25-.27
+                    cannonball.velocity = this.parent.velocity.add(aimedDirection.scale(.45 + rand(.05)));
+                    cannonball.angleVelocity = this.parent.getMirrorSign() * rand(1, .6);
+                    
+                    // Play cannon sound
+                    playSound(sound_explosion, weaponPos, 20, .3); // Use explosion sound at lower volume
+                    
+                    // Alert enemies
+                    alertEnemies(weaponPos, weaponPos);
+                }
+            }
+            else
+            {
+                // Not firing forward, reset buffer
+                this.fireTimeBuffer = min(this.fireTimeBuffer, 0);
+            }
+        }
+        else
+        {
+            // Not pressing Ctrl, reset buffer
+            this.fireTimeBuffer = min(this.fireTimeBuffer, 0);
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class JumperWeapon extends Weapon
+{
+    constructor(pos, parent)
+    {
+        super(pos, parent);
+        this.hidden = 1; // Don't render the weapon sprite (helmet is rendered separately)
+        this.wasJumping = 0; // Track if jump was active last frame
+        this.fTriggeredJump = 0; // Track if current jump was triggered by F key
+    }
+    
+    update()
+    {
+        super.update();
+        
+        // Only handle jumper for player
+        if (!this.parent.isPlayer)
+            return;
+        
+        // Check if F key is pressed (key code 70)
+        const pressingF = !this.parent.playerIndex && keyIsDown(70);
+        const fJustPressed = !this.parent.playerIndex && keyWasPressed(70);
+        
+        // Track jump state
+        const isJumping = this.parent.jumpTimer.active();
+        const wasJumping = this.wasJumping;
+        const wasOnGround = this.parent.groundObject || this.parent.groundTimer.active();
+        this.wasJumping = isJumping;
+        
+        // If F was just pressed while on ground, mark that F will trigger this jump
+        if (fJustPressed && wasOnGround)
+        {
+            this.fTriggeredJump = 1;
+            // Set pressedJumpTimer to trigger jump
+            this.parent.pressedJumpTimer.set(.3);
+        }
+        
+        // If F is being held, maintain jump state (weapon updates after player, so this overrides)
+        if (pressingF)
+        {
+            // Keep pressedJumpTimer active while F is held
+            if (wasOnGround)
+                this.parent.pressedJumpTimer.set(.3);
+            // Set holdingJump for jump continuation
+            this.parent.holdingJump = 1;
+        }
+        
+        // If jump just ended, reset the F trigger flag
+        if (wasJumping && !isJumping)
+        {
+            this.fTriggeredJump = 0;
+        }
+        
+        // Boost jump height ONLY if F triggered the jump
+        if (this.fTriggeredJump && !wasJumping && isJumping && this.parent.velocity.y > 0)
+        {
+            // Much higher jump - 3x normal jump velocity (.15 -> .45)
+            if (this.parent.climbingWall)
+            {
+                this.parent.velocity.y = .6; // Higher wall jump (normal is .25) - 2.4x boost
+            }
+            else
+            {
+                this.parent.velocity.y = .45; // Much higher jump (normal is .15) - 3x boost
+            }
+            // Longer jump timer for more air time (also applies to wall jumps)
+            this.parent.jumpTimer.set(.4); // Longer than normal .2
+        }
+        
+        // Boost jump continuation while holding F and jumping (only if F triggered it)
+        // This works for both ground jumps and wall climbs
+        if (this.fTriggeredJump && isJumping && pressingF && this.parent.velocity.y > 0)
+        {
+            // Much stronger jump continuation (normal is .017, jumper is .05)
+            // Override the normal boost by adding extra
+            this.parent.velocity.y += .033; // .05 - .017 = .033 extra boost
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class HammerWeapon extends Weapon
+{
+    constructor(pos, parent)
+    {
+        super(pos, parent);
+        // Placeholder - behavior will be configured later
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class RadarWeapon extends Weapon
+{
+    constructor(pos, parent)
+    {
+        super(pos, parent);
+        // Placeholder - behavior will be configured later
     }
 }
 

@@ -53,15 +53,15 @@ engineInit(
     // handle title screen input
     if (gameState === 'title')
     {
-        // Level selector (number keys 1-5) - COMMENTED OUT FOR RELEASE
-        // for(let i = 1; i <= 5; i++)
-        // {
-        //     const keyCode = 48 + i; // 49 = '1', 50 = '2', etc.
-        //     if (keyWasPressed(keyCode))
-        //     {
-        //         selectedLevel = i;
-        //     }
-        // }
+        // Level selector (number keys 1-6)
+        for(let i = 1; i <= 6; i++)
+        {
+            const keyCode = 48 + i; // 49 = '1', 50 = '2', etc.
+            if (keyWasPressed(keyCode))
+            {
+                selectedLevel = i;
+            }
+        }
         
         // Start game
         if (keyWasPressed(32) || gamepadWasPressed(0))
@@ -287,23 +287,23 @@ engineInit(
             mainContext.fillText('MALEFACTOR', mainCanvas.width/2, mainCanvas.height/2 - 100);
         }
         
-        // Level selector - COMMENTED OUT FOR RELEASE
-        // mainContext.textAlign = 'center';
-        // mainContext.fillStyle = new Color(1,1,1).rgba();
-        // mainContext.font = 'bold 24px JetBrains Mono';
-        // mainContext.fillText('Select Level (Press 1-5):', mainCanvas.width/2, mainCanvas.height/2 + 20);
-        // 
-        // // Highlight selected level
-        // const levelY = mainCanvas.height/2 + 55;
-        // for(let i = 1; i <= 5; i++)
-        // {
-        //     const x = mainCanvas.width/2 - 80 + (i - 1) * 40;
-        //     const color = i === selectedLevel ? new Color(1,1,0) : new Color(0.7,0.7,0.7);
-        //     mainContext.fillStyle = color.rgba();
-        //     mainContext.font = 'bold 36px JetBrains Mono';
-        //     mainContext.textAlign = 'center';
-        //     mainContext.fillText(i.toString(), x, levelY);
-        // }
+        // Level selector
+        mainContext.textAlign = 'center';
+        mainContext.fillStyle = new Color(1,1,1).rgba();
+        mainContext.font = 'bold 24px JetBrains Mono';
+        mainContext.fillText('Select Level (Press 1-6):', mainCanvas.width/2, mainCanvas.height/2 + 20);
+        
+        // Highlight selected level
+        const levelY = mainCanvas.height/2 + 55;
+        for(let i = 1; i <= 6; i++)
+        {
+            const x = mainCanvas.width/2 - 100 + (i - 1) * 33;
+            const color = i === selectedLevel ? new Color(1,1,0) : new Color(0.7,0.7,0.7);
+            mainContext.fillStyle = color.rgba();
+            mainContext.font = 'bold 36px JetBrains Mono';
+            mainContext.textAlign = 'center';
+            mainContext.fillText(i.toString(), x, levelY);
+        }
         
         // Press to start text
         mainContext.textAlign = 'center';
@@ -324,6 +324,48 @@ engineInit(
     }
     else if (gameState === 'playing')
     {
+        // Render player helmets AFTER WebGL batch copy so they appear on top
+        for (const player of players)
+        {
+            if (player && !player.destroyed && player.isPlayer && player.equippedWeaponType && player.equippedWeaponType != 'Weapon')
+            {
+                // Check if player is visible (same check as Character.render())
+                if (!isOverlapping(player.pos, player.size, cameraPos, renderWindowSize))
+                    continue;
+                
+                let headwearTileIndex = -1;
+                if (player.equippedWeaponType == 'LaserWeapon')
+                    headwearTileIndex = 2; // itemType_laser tileIndex
+                else if (player.equippedWeaponType == 'CannonWeapon')
+                    headwearTileIndex = 3; // itemType_cannon tileIndex
+                else if (player.equippedWeaponType == 'JumperWeapon')
+                    headwearTileIndex = 4; // itemType_jumper tileIndex
+                else if (player.equippedWeaponType == 'HammerWeapon')
+                    headwearTileIndex = 5; // itemType_hammer tileIndex
+                else if (player.equippedWeaponType == 'RadarWeapon')
+                    headwearTileIndex = 6; // itemType_radar tileIndex
+                
+                if (headwearTileIndex >= 0 && typeof drawTile2 === 'function')
+                {
+                    const sizeScale = player.sizeScale;
+                    const headColor = player.team == team_enemy ? new Color() : player.color.scale(player.burnColorPercent(), 1);
+                    const meleeHeadOffset = player.meleeTimer && player.meleeTimer.active() ? -.12 * Math.sin(player.meleeTimer.getPercent() * PI) : 0;
+                    const headBasePos = vec2(player.getMirrorSign(.05) + meleeHeadOffset * player.getMirrorSign(), .46);
+                    const headwearPos = player.pos.add(headBasePos.scale(sizeScale).rotate(-player.angle));
+                    
+                    // Calculate additive color matching Character.render()
+                    let additive = player.additiveColor.add(player.extraAdditiveColor);
+                    if (player.isPlayer && !player.isDead() && player.dodgeRechargeTimer && player.dodgeRechargeTimer.elapsed() && player.dodgeRechargeTimer.get() < .2)
+                    {
+                        const v = .6 - player.dodgeRechargeTimer.get()*3;
+                        additive = additive.add(new Color(0,v,v,0)).clamp();
+                    }
+                    
+                    drawTile2(headwearPos, vec2(sizeScale/2 * 1.1), headwearTileIndex, vec2(8), headColor, player.angle, player.mirror, additive);
+                }
+            }
+        }
+        
         // Gameplay UI
         // check if any enemies left
         let enemiesCount = 0;

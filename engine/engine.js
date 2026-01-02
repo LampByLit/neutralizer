@@ -49,16 +49,23 @@ let cameraPos=vec2(), cameraScale=4*max(defaultTileSize.x, defaultTileSize.y);
 let tileImageSize, tileImageSizeInverse, shrinkTilesX, shrinkTilesY, drawCount;
 
 const tileImage = new Image(); // the tile image used by everything
+const tileImage2 = new Image(); // second tile image for items (tiles2.png)
+let tileImage2Size, tileImage2SizeInverse, shrinkTiles2X, shrinkTiles2Y;
 function engineInit(appInit, appUpdate, appUpdatePost, appRender, appRenderPost)
 {
-    // init engine when tiles load
-    tileImage.onload = ()=>
+    let tilesLoaded = 0;
+    const checkAllTilesLoaded = ()=>
     {
+        if (++tilesLoaded < 2) return;
+        
         // save tile image info
         tileImageSizeInverse = vec2(1).divide(tileImageSize = vec2(tileImage.width, tileImage.height));
+        tileImage2SizeInverse = vec2(1).divide(tileImage2Size = vec2(tileImage2.width, tileImage2.height));
         debug && (tileImage.onload=()=>ASSERT(1)); // tile sheet can not reloaded
         shrinkTilesX = tileBleedShrinkFix/tileImageSize.x;
         shrinkTilesY = tileBleedShrinkFix/tileImageSize.y;
+        shrinkTiles2X = tileBleedShrinkFix/tileImage2Size.x;
+        shrinkTiles2Y = tileBleedShrinkFix/tileImage2Size.y;
 
         // setup html
         document.body.appendChild(mainCanvas = document.createElement('canvas'));
@@ -71,6 +78,10 @@ function engineInit(appInit, appUpdate, appUpdatePost, appRender, appRenderPost)
         appInit();
         engineUpdate();
     };
+    
+    // init engine when tiles load
+    tileImage.onload = checkAllTilesLoaded;
+    tileImage2.onload = checkAllTilesLoaded;
 
     // main update loop
     const engineUpdate = (frameTimeMS=0)=>
@@ -180,6 +191,7 @@ function engineInit(appInit, appUpdate, appUpdatePost, appRender, appRenderPost)
     }
 
     tileImage.src = 'tiles.png';
+    tileImage2.src = 'tiles2.png';
     // Embedded base64 version (commented out for development - uncomment for JS13K build)
     //tileImage.src = 
     //`data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABABAMAAAAg+GJMAAAAJ1BMVEUAAAD///+AgID/AAAAAACJT6T/dwBIG11mlD2i91azs7PZ2dlAQEA9UPniAAAAAXRSTlMAQObYZgAAAoRJREFUeNqsk8dZw0AQhWfNiHDbARfgVAB0sNI3LTgcfSLcbasC0o0j6panHIYMT+FX+p8y/UdECJnNJlTn6PJnft4wEvHFasCkis2JakItl9dpemjZxgniywInnhX2hWAxXug0NIwKcduwjRTpF8hVLp7PJDSEuE5X24ofFZAQV7cAEZtDQ4jLJcSKgzuAXD8DDuVDdGOFmWjNaPN0v1zdPtU0BTSIi8cQY60ZPWcQ715r2oIzeqFupBQbZqVY0xY8PT1RN6zIh7QP8TTL+lcwmiE1megkRagif1DgvB8WsAILbQpYgZ2aD8kWsGLMUSybdfMpm1tgDRiJzfr7P5MteGufDpXchoE4jGcKj32C2oBKsM5jlPUlT4VKyN9TdFuSwKsfqrLHTcE5ucQgKL8H+GZW2n0YZptZKUXSXhIUic4nfa4OXrPPNmXTxI8BwzCBFcP6DjGxfwFmmwIwBv548/sccBJqPGRK10uYu5YCtRkD/r3xc8AEELDOk6ZAn3OHXR7h19D8OAckE3ukFiAkyb7V+lPXAqecd/8DYCSAkAGK+r37W3fhDZYCQqg4ICS/HKjNQsACbuYYRHLmHLh1BFfRHikKevd0dwATAQzTW3Dv7n8DKCrsZSF51wLh2hssfCOGQTLoegvZrn/j0iIlVEyKLSDjk0VaWGVjZERCQpHLqwywcEzIlbCChLArx1SbpQBgjITB5+f88l6bw+tLnbzW2eZWJQGEOMwKk3hz4JQnuy8FIH4tw+T2QNkNzSmeA0eA7T0BgFMc8mQox9qsCiQIY+AwDO/bNSOk4zaMIxxyvi8AMAW2xwcH1o+w/hHXf+P6RVq/yo86pjXn/PT09LTsL3dlHSBbTLmdAAAAAElFTkSuQmCC`;

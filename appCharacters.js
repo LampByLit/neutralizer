@@ -304,6 +304,8 @@ class Character extends GameObject
 
         const blinkScale = this.canBlink ? this.isDead() ? .3: .5 + .5*Math.cos(this.blinkTimer.getPercent()*PI*2) : 1;
             drawTile(this.pos.add(vec2(this.getMirrorSign(.05),.46).scale(sizeScale).rotate(-this.angle)),vec2(sizeScale/2, blinkScale*sizeScale/2),this.headTile+1,vec2(8), eyeColor, this.angle, this.mirror, this.additiveColor);
+
+        // Note: Headwear rendering moved to appRenderPost() to render after WebGL batch copy
     }
 
     damage(damage, damagingObject)
@@ -1628,7 +1630,10 @@ class Player extends Character
         this.persistent = this.wasHoldingJump = this.canBlink = this.isPlayer = 1;
         this.team = team_player;
         
-        new Weapon(this.pos, this);
+        // Initialize or restore equipped weapon
+        this.equippedWeaponType = playerEquippedWeapons[playerIndex] || 'Weapon';
+        this.equipWeapon(this.equippedWeaponType);
+        
         players[playerIndex] = this;
         
         // small jump on spawn
@@ -1717,6 +1722,7 @@ class Player extends Character
         this.pressingThrow = !this.playerIndex && (mouseIsDown(2) || keyIsDown(67)) || gamepadIsDown(1, this.playerIndex);
         this.pressedDodge  = !this.playerIndex && (mouseIsDown(1) || keyIsDown(16)) || gamepadIsDown(3, this.playerIndex); // Shift key for roll
         this.pressedMelee  = !this.playerIndex && keyWasPressed(69) || gamepadWasPressed(4, this.playerIndex); // E key for melee
+        this.pressedUnequip = !this.playerIndex && keyWasPressed(81) || gamepadWasPressed(5, this.playerIndex); // Q key for unequip
 
         // aiming with arrow keys - Up/Down for vertical aim
         if (!this.playerIndex)
@@ -1743,6 +1749,15 @@ class Player extends Character
             // Decay aim angle back to horizontal when not aiming
             if (!keyIsDown(38) && !keyIsDown(40))
                 this.aimAngle *= 0.95; // smooth decay
+        }
+
+        // Handle unequip (Q key) - unequip if player has any special weapon equipped
+        if (this.pressedUnequip)
+        {
+            if (this.equippedWeaponType && this.equippedWeaponType != 'Weapon')
+            {
+                this.unequipWeapon();
+            }
         }
 
         super.update();
@@ -1778,6 +1793,71 @@ class Player extends Character
                 }
                 else
                     this.kill();
+            }
+        }
+    }
+    
+    equipWeapon(weaponType)
+    {
+        // Destroy current weapon if it exists
+        if (this.weapon)
+        {
+            this.weapon.destroy();
+            this.weapon = null;
+        }
+        
+        // Create new weapon based on type
+        let newWeapon;
+        if (weaponType == 'LaserWeapon')
+            newWeapon = new LaserWeapon(this.pos, this);
+        else if (weaponType == 'CannonWeapon')
+            newWeapon = new CannonWeapon(this.pos, this);
+        else if (weaponType == 'JumperWeapon')
+            newWeapon = new JumperWeapon(this.pos, this);
+        else if (weaponType == 'HammerWeapon')
+            newWeapon = new HammerWeapon(this.pos, this);
+        else if (weaponType == 'RadarWeapon')
+            newWeapon = new RadarWeapon(this.pos, this);
+        else
+            newWeapon = new Weapon(this.pos, this);
+        
+        this.equippedWeaponType = weaponType;
+        playerEquippedWeapons[this.playerIndex] = weaponType; // Persist through respawn
+    }
+    
+    unequipWeapon()
+    {
+        // Store the weapon type before unequipping
+        const currentWeaponType = this.equippedWeaponType;
+        
+        // Replace with default weapon FIRST (this removes the helmet immediately)
+        this.equipWeapon('Weapon');
+        
+        // Drop the equipped item on the ground after unequipping
+        if (currentWeaponType != 'Weapon' && currentWeaponType)
+        {
+            // Map weaponType back to itemType (use numeric values as fallback)
+            let itemType = -1;
+            if (currentWeaponType == 'LaserWeapon')
+                itemType = typeof itemType_laser !== 'undefined' ? itemType_laser : 2;
+            else if (currentWeaponType == 'CannonWeapon')
+                itemType = typeof itemType_cannon !== 'undefined' ? itemType_cannon : 3;
+            else if (currentWeaponType == 'JumperWeapon')
+                itemType = typeof itemType_jumper !== 'undefined' ? itemType_jumper : 4;
+            else if (currentWeaponType == 'HammerWeapon')
+                itemType = typeof itemType_hammer !== 'undefined' ? itemType_hammer : 5;
+            else if (currentWeaponType == 'RadarWeapon')
+                itemType = typeof itemType_radar !== 'undefined' ? itemType_radar : 6;
+            
+            // Create item slightly away from player so it doesn't immediately get collected
+            if (itemType >= 0)
+            {
+                // Drop item slightly in front/behind player based on facing direction
+                const dropOffset = vec2(this.getMirrorSign(.8), 0);
+                const dropPos = this.pos.add(dropOffset);
+                const droppedItem = new Item(dropPos, itemType);
+                // Give item a small toss velocity so it's visible and doesn't immediately get collected
+                droppedItem.velocity = vec2(this.getMirrorSign(.15), -.1);
             }
         }
     }
