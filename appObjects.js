@@ -371,9 +371,13 @@ class Checkpoint extends GameObject
     {
         // draw flag
         const height = 4;
-        const color = activeCheckpoint == this ? new Color : new Color(1,0,0);
         const a = Math.sin(time*4+this.pos.x);
-        drawTile(this.pos.add(vec2(.5,height-.3-.5-.03*a)), vec2(1,.6), 14, undefined, color, a*.06);  
+        // Only draw flag when secured
+        if (activeCheckpoint == this)
+        {
+            const color = new Color(0,0,0); // Black when secured
+            drawTile(this.pos.add(vec2(.5,height-.3-.5-.03*a)), vec2(1,.6), 14, undefined, color, a*.06);  
+        }
         drawRect(this.pos.add(vec2(0,height/2-.5)), vec2(.1,height), new Color(.9,.9,.9));
     }
 }
@@ -710,7 +714,7 @@ class KeyItem extends GameObject
 ///////////////////////////////////////////////////////////////////////////////
 
 // Item type definitions
-// Order: Life (0), Health (1), Laser (2), Cannon (3), Jumper (4), Hammer (5), Radar (6), Smoker (7), Fang (8)
+// Order: Life (0), Health (1), Laser (2), Cannon (3), Jumper (4), Hammer (5), Radar (6), Smoker (7)
 const itemType_life = 0;
 const itemType_health = 1;
 const itemType_laser = 2;
@@ -719,7 +723,6 @@ const itemType_jumper = 4;
 const itemType_hammer = 5;
 const itemType_radar = 6;
 const itemType_smoker = 7;
-const itemType_fang = 8;
 
 const itemType_consumable = 0;
 const itemType_equipable = 1;
@@ -766,16 +769,11 @@ const itemRegistry = {
         category: itemType_equipable, 
         tileIndex: 7, 
         weaponType: 'SmokerWeapon' 
-    },
-    [itemType_fang]: { 
-        category: itemType_equipable, 
-        tileIndex: 8, 
-        weaponType: 'FangWeapon' 
     }
 };
 
 // Get all available item types for random selection
-const getAllItemTypes = ()=> [itemType_life, itemType_health, itemType_laser, itemType_cannon, itemType_jumper, itemType_hammer, itemType_radar, itemType_smoker, itemType_fang];
+const getAllItemTypes = ()=> [itemType_life, itemType_health, itemType_laser, itemType_cannon, itemType_jumper, itemType_hammer, itemType_radar, itemType_smoker];
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -1747,66 +1745,6 @@ class SmokerWeapon extends Weapon
                 
                 // Alert enemies
                 alertEnemies(gasPos, gasPos);
-            }
-        }
-        else
-        {
-            // Not pressing F, reset buffer
-            this.fireTimeBuffer = min(this.fireTimeBuffer, 0);
-        }
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-class FangWeapon extends Weapon
-{
-    constructor(pos, parent)
-    {
-        super(pos, parent);
-        this.fireTimeBuffer = 0;
-        this.hidden = 1; // Don't render the weapon sprite (helmet is rendered separately)
-    }
-    
-    update()
-    {
-        super.update();
-        
-        // Only handle venom spraying for player
-        if (!this.parent.isPlayer)
-            return;
-        
-        // Check if F key is pressed (key code 70)
-        const pressingF = !this.parent.playerIndex && keyIsDown(70);
-        
-        if (pressingF)
-        {
-            // Same parameters as spider venom spray
-            const particleSpeed = .3;
-            const particleRate = 8; // Fast firing rate
-            const spread = 0.03; // Very tight spread for good aim
-            
-            this.fireTimeBuffer += timeDelta;
-            const rate = 1/particleRate;
-            
-            // Get forward direction based on aim
-            const baseAimAngle = this.parent.aimAngle || 0;
-            const forwardDirection = vec2(this.parent.getMirrorSign(1), 0).rotate(baseAimAngle);
-            
-            // Calculate weapon position (where venom comes from)
-            const sizeScale = this.parent.sizeScale || 1;
-            const weaponPos = this.parent.pos.add(
-                vec2(this.parent.getMirrorSign(.55), 0).scale(sizeScale)
-            );
-            
-            for(; this.fireTimeBuffer > 0; this.fireTimeBuffer -= rate)
-            {
-                // Create red venom particle exactly like spider
-                const particle = new VenomParticle(weaponPos, this.parent, new Color(1, 0, 0));
-                
-                // Fire particle in forward direction with small spread
-                const spreadAngle = rand(spread, -spread);
-                particle.velocity = forwardDirection.rotate(spreadAngle).scale(particleSpeed);
             }
         }
         else
