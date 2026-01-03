@@ -2198,7 +2198,11 @@ class SolicitorWeapon extends EngineObject
 
         const particleSpeed = .3;
         const particleRate = 3; // 3 shots per second
+        const bulletSpeed = .5;
         const spread = 0.03; // Very tight spread for good aim
+        const bulletSpread = .1; // Spread for bullets
+
+        this.mirror = this.parent.mirror;
 
         // Burst fire pattern - more aggressive than slime
         if (!this.burstTimer.isSet())
@@ -2226,20 +2230,33 @@ class SolicitorWeapon extends EngineObject
             this.fireTimeBuffer += timeDelta;
             const rate = 1/particleRate;
             
-            // Get direction to player from head position
+            // Get direction to player from weapon position (for bullets) and head position (for venom)
             const headPos = this.parent.pos.add(vec2(this.parent.getMirrorSign(.05), .46).scale(this.parent.sizeScale || 1));
             const playerPos = this.parent.sawPlayerPos;
             const direction = playerPos.subtract(headPos).normalize();
+            const aimAngle = direction.angle();
+            
+            // Update weapon angle to face player
+            const spriteAngle = -aimAngle * this.getMirrorSign();
+            this.localAngle = spriteAngle;
             
             for(; this.fireTimeBuffer > 0; this.fireTimeBuffer -= rate)
             {
-                // Create venom particle from head position (yellow venom for solicitor)
+                // Shoot bullet from gun position
+                const speed = bulletSpeed * 0.5; // Enemy bullets are slower
+                const bullet = new Bullet(this.pos, this.parent);
+                const bulletDirection = vec2(this.getMirrorSign(speed), 0).rotate(aimAngle);
+                bullet.velocity = bulletDirection.rotate(rand(bulletSpread, -bulletSpread));
+                
+                // Also create venom particle from head position (yellow venom for solicitor)
                 const particle = new VenomParticle(headPos, this.parent, new Color(1, 1, 0));
                 
                 // Fire particle directly towards player with small spread
                 // Apply small random rotation to direction vector for spread
                 const spreadAngle = rand(spread, -spread);
                 particle.velocity = direction.rotate(spreadAngle).scale(particleSpeed);
+                
+                playSound(sound_shoot, this.pos);
             }
         }
         else

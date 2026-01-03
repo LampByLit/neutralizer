@@ -2058,11 +2058,10 @@ class Solicitor extends Enemy
             return;
 
         // set tile to use
-        // For Solicitor: the sprites are swapped - tile 25 has jump sprite, tile 26 has standing sprite
-        // So we swap the usage: standing uses tile 26, jump uses tile 25
-        // When on ground/walking: use bodyTile+1 (26) for standing, bodyTile+3 (28) for walking frame 2  
-        // When jumping: use bodyTile (25) for jump sprite
-        this.tileIndex = this.isDead() ? this.bodyTile+1 : this.climbingLadder || this.groundTimer.active() ? (this.bodyTile+1) + 2*this.walkCyclePercent|0 : this.bodyTile;
+        // For Solicitor: tile 25 (bodyTile) is standing, tile 26 is walking frame 2, tile 27 is jump
+        // When on ground/walking: use bodyTile (25) for standing, bodyTile+1 (26) for walking frame 2
+        // When jumping: use bodyTile+2 (27) for jump sprite
+        this.tileIndex = this.isDead() ? this.bodyTile : this.climbingLadder || this.groundTimer.active() ? this.bodyTile + this.walkCyclePercent|0 : this.bodyTile+2;
 
         let additive = this.additiveColor.add(this.extraAdditiveColor);
         if (this.isPlayer && !this.isDead() && this.dodgeRechargeTimer.elapsed() && this.dodgeRechargeTimer.get() < .2)
