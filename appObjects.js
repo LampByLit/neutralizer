@@ -1690,23 +1690,14 @@ class RadarWeapon extends Weapon
         // Check if F key is pressed (key code 70)
         const pressingF = keyIsDown(70);
         
-        // Set target zoom based on F key state
+        // Only control zoom when F is pressed - otherwise let X zoom handle it
         if (pressingF)
         {
-            // F is held - zoom out to 5x (divide scale by 5 to see more area)
-            this.targetZoom = defaultCameraScale / 5;
+            // F is held - zoom out to 6x (divide scale by 6 to see more area)
+            this.targetZoom = defaultCameraScale / 6;
             this.isActive = 1;
-        }
-        else
-        {
-            // F is released - zoom back to normal
-            this.targetZoom = defaultCameraScale;
-            this.isActive = 1;
-        }
-        
-        // Smoothly lerp cameraScale towards target zoom
-        if (this.isActive)
-        {
+            
+            // Smoothly lerp cameraScale towards target zoom
             cameraScale += (this.targetZoom - cameraScale) * this.zoomSpeed;
             
             // If we're very close to target, snap to it (prevents infinite tiny adjustments)
@@ -1714,6 +1705,11 @@ class RadarWeapon extends Weapon
             {
                 cameraScale = this.targetZoom;
             }
+        }
+        else
+        {
+            // F is not pressed - don't interfere with X zoom
+            this.isActive = 0;
         }
     }
     

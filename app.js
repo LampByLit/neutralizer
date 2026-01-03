@@ -230,24 +230,34 @@ engineInit(
     // X key zoom out
     if (gameState === 'playing')
     {
-        const pressingX = keyIsDown(88); // X key (keyCode 88)
-        const ctrlZoomSpeed = 0.05; // Smooth lerp factor for zoom transitions
-        const ctrlZoomFactor = 1.5; // Zoom out by 1.5x (a little bit)
+        // Check if radar is equipped and F is pressed - if so, skip X zoom to avoid conflict
+        const player = players[0];
+        const radarEquipped = player && !player.isDead() && player.equippedWeaponType == 'RadarWeapon';
+        const pressingF = keyIsDown(70); // F key (keyCode 70)
+        const radarFActive = radarEquipped && pressingF;
         
-        let targetZoom = defaultCameraScale;
-        if (pressingX)
+        // Only apply X zoom if radar F is not active
+        if (!radarFActive)
         {
-            // X is held - zoom out a little bit
-            targetZoom = defaultCameraScale / ctrlZoomFactor;
-        }
-        
-        // Smoothly lerp cameraScale towards target zoom
-        cameraScale += (targetZoom - cameraScale) * ctrlZoomSpeed;
-        
-        // If we're very close to target, snap to it (prevents infinite tiny adjustments)
-        if (abs(cameraScale - targetZoom) < 0.1)
-        {
-            cameraScale = targetZoom;
+            const pressingX = keyIsDown(88); // X key (keyCode 88)
+            const ctrlZoomSpeed = 0.05; // Smooth lerp factor for zoom transitions
+            const ctrlZoomFactor = 1.5; // Zoom out by 1.5x (a little bit)
+            
+            let targetZoom = defaultCameraScale;
+            if (pressingX)
+            {
+                // X is held - zoom out a little bit
+                targetZoom = defaultCameraScale / ctrlZoomFactor;
+            }
+            
+            // Smoothly lerp cameraScale towards target zoom
+            cameraScale += (targetZoom - cameraScale) * ctrlZoomSpeed;
+            
+            // If we're very close to target, snap to it (prevents infinite tiny adjustments)
+            if (abs(cameraScale - targetZoom) < 0.1)
+            {
+                cameraScale = targetZoom;
+            }
         }
     }
 
