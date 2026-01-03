@@ -1890,7 +1890,7 @@ class LadymakerWeapon extends Weapon
     constructor(pos, parent)
     {
         super(pos, parent);
-        this.fireTimeBuffer = 0;
+        this.girlSpawnTimeBuffer = 0; // Separate buffer for girl spawning (doesn't interfere with gun firing)
         this.fireRate = 0.5; // Spawns 1 every 2 seconds (1/2 = 0.5)
         this.hidden = 1; // Don't render the weapon sprite (helmet is rendered separately)
         this.hasSpawnedThisPress = 0; // Track if we've spawned on current F press
@@ -1909,11 +1909,11 @@ class LadymakerWeapon extends Weapon
         
         if (pressingF)
         {
-            this.fireTimeBuffer += timeDelta;
+            this.girlSpawnTimeBuffer += timeDelta;
             const rate = 1/this.fireRate; // 2 seconds
             
             // Spawn immediately on first press, then every 2 seconds while holding
-            const shouldSpawn = !this.hasSpawnedThisPress || this.fireTimeBuffer >= rate;
+            const shouldSpawn = !this.hasSpawnedThisPress || this.girlSpawnTimeBuffer >= rate;
             
             if (shouldSpawn)
             {
@@ -1938,14 +1938,14 @@ class LadymakerWeapon extends Weapon
                 playSound(sound_checkpoint, spawnPos);
                 
                 // Update spawn tracking
-                this.fireTimeBuffer -= rate;
+                this.girlSpawnTimeBuffer -= rate;
                 this.hasSpawnedThisPress = 1;
             }
         }
         else
         {
             // Not pressing F, reset buffer and spawn flag
-            this.fireTimeBuffer = min(this.fireTimeBuffer, 0);
+            this.girlSpawnTimeBuffer = min(this.girlSpawnTimeBuffer, 0);
             this.hasSpawnedThisPress = 0;
         }
     }
