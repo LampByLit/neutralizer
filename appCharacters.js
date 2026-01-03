@@ -2116,143 +2116,163 @@ class Spider extends Enemy
         drawTile(this.pos.add(vec2(0.1, -0.2).scale(sizeScale)), vec2(blobSize * 0.75), -1, undefined, translucentColor);
         setBlendMode(0);
         
-        // Draw spider legs - thick fuzzy quadratic curves
-        const legColor = new Color(1, 0, 0); // Red legs
-        const legThickness = sizeScale * 0.12; // Much thicker legs
-        
-        // Helper function to lerp
-        const lerp = (a, b, t) => a + (b - a) * t;
-        
-        // Ensure paws array exists
-        if (!this.paws || this.paws.length != 16)
+        // Draw spider legs - thick fuzzy quadratic curves (only when alive)
+        if (!this.isDead())
         {
-            this.paws = [];
-            const bodyTileX = (this.pos.x) | 0;
-            const bodyTileY = (this.pos.y) | 0;
+            const legColor = new Color(1, 0, 0); // Red legs
+            const legThickness = sizeScale * 0.12; // Much thicker legs
+            
+            // Helper function to lerp
+            const lerp = (a, b, t) => a + (b - a) * t;
+            
+            // Ensure paws array exists
+            if (!this.paws || this.paws.length != 16)
+            {
+                this.paws = [];
+                const bodyTileX = (this.pos.x) | 0;
+                const bodyTileY = (this.pos.y) | 0;
+                for(let i = 0; i < 16; i++)
+                {
+                    const angle = (i / 16) * PI * 2;
+                    const offsetX = Math.sin(angle) * this.pawRadius;
+                    const offsetY = Math.cos(angle) * this.pawRadius;
+                    let pawTileX = bodyTileX + (offsetX) | 0;
+                    let pawTileY = bodyTileY + 2;
+                    this.paws.push({
+                        tileX: pawTileX,
+                        tileY: pawTileY,
+                        worldPos: vec2(pawTileX + 0.5, pawTileY)
+                    });
+                }
+            }
+            
+            // Draw each leg as a thick fuzzy quadratic curve
             for(let i = 0; i < 16; i++)
             {
-                const angle = (i / 16) * PI * 2;
-                const offsetX = Math.sin(angle) * this.pawRadius;
-                const offsetY = Math.cos(angle) * this.pawRadius;
-                let pawTileX = bodyTileX + (offsetX) | 0;
-                let pawTileY = bodyTileY + 2;
-                this.paws.push({
-                    tileX: pawTileX,
-                    tileY: pawTileY,
-                    worldPos: vec2(pawTileX + 0.5, pawTileY)
-                });
-            }
-        }
-        
-        // Draw each leg as a thick fuzzy quadratic curve
-        for(let i = 0; i < 16; i++)
-        {
-            const paw = this.paws[i];
-            if (!paw || !paw.worldPos) continue;
-            
-            // Body attachment point
-            const bodyX = bodyPos.x;
-            const bodyY = bodyPos.y;
-            
-            // Paw position (snapped to tile surface)
-            const pawX = paw.worldPos.x;
-            const pawY = paw.worldPos.y;
-            
-            // Control point for quadratic curve (midpoint, raised up)
-            const controlX = lerp(bodyX, pawX, 0.5);
-            const controlY = lerp(bodyY, pawY - this.pawHeight, 0.5);
-            
-            // Draw leg as fuzzy quadratic curve - multiple overlapping lines for fuzzy effect
-            const segmentCount = 16; // More segments for smoother fuzzy curve
-            let prevX = bodyX;
-            let prevY = bodyY;
-            
-            // Store curve points for hair rendering
-            const curvePoints = [];
-            
-            // Draw multiple layers for fuzzy effect
-            for(let fuzzyLayer = 0; fuzzyLayer < 7; fuzzyLayer++)
-            {
-                const fuzzyOffset = (fuzzyLayer - 3) * legThickness * 0.12;
-                const fuzzyAlpha = 0.25 + (fuzzyLayer === 3 ? 0.5 : 0.08); // Center layer is brightest
-                const fuzzyColor = new Color(1, 0, 0, fuzzyAlpha);
+                const paw = this.paws[i];
+                if (!paw || !paw.worldPos) continue;
                 
-                prevX = bodyX;
-                prevY = bodyY;
+                // Body attachment point
+                const bodyX = bodyPos.x;
+                const bodyY = bodyPos.y;
                 
-                for(let seg = 1; seg <= segmentCount; seg++)
+                // Paw position (snapped to tile surface)
+                const pawX = paw.worldPos.x;
+                const pawY = paw.worldPos.y;
+                
+                // Calculate leg direction and perpendicular for consistent elbow bending
+                const legDirX = pawX - bodyX;
+                const legDirY = pawY - bodyY;
+                const legAngle = Math.atan2(legDirY, legDirX);
+                
+                // Perpendicular direction (outward) for consistent elbow placement
+                const perpAngle = legAngle + PI / 2;
+                const elbowOffset = this.pawRadius * 0.3; // How far elbows bend outward
+                
+                // First elbow at 1/3 distance, raised and offset outward
+                const elbow1X = lerp(bodyX, pawX, 1/3) + Math.cos(perpAngle) * elbowOffset;
+                const elbow1Y = lerp(bodyY, pawY, 1/3) - this.pawHeight * 0.6;
+                
+                // Second elbow at 2/3 distance, raised and offset outward
+                const elbow2X = lerp(bodyX, pawX, 2/3) + Math.cos(perpAngle) * elbowOffset;
+                const elbow2Y = lerp(bodyY, pawY, 2/3) - this.pawHeight * 0.4;
+                
+                // Draw leg as fuzzy cubic bezier curve with 2 elbows - multiple overlapping lines for fuzzy effect
+                const segmentCount = 16; // More segments for smoother fuzzy curve
+                let prevX = bodyX;
+                let prevY = bodyY;
+                
+                // Store curve points for hair rendering
+                const curvePoints = [];
+                
+                // Draw multiple layers for fuzzy effect
+                for(let fuzzyLayer = 0; fuzzyLayer < 7; fuzzyLayer++)
                 {
-                    const t = seg / segmentCount;
+                    const fuzzyOffset = (fuzzyLayer - 3) * legThickness * 0.12;
+                    const fuzzyAlpha = 0.25 + (fuzzyLayer === 3 ? 0.5 : 0.08); // Center layer is brightest
+                    const fuzzyColor = new Color(1, 0, 0, fuzzyAlpha);
                     
-                    // Quadratic bezier curve: (1-t)^2*P0 + 2*(1-t)*t*P1 + t^2*P2
-                    const mt = 1 - t;
-                    let x = mt * mt * bodyX + 2 * mt * t * controlX + t * t * pawX;
-                    let y = mt * mt * bodyY + 2 * mt * t * controlY + t * t * pawY;
+                    prevX = bodyX;
+                    prevY = bodyY;
                     
-                    // Add fuzzy offset perpendicular to leg direction
-                    if (seg > 1)
+                    for(let seg = 1; seg <= segmentCount; seg++)
                     {
-                        const angle = Math.atan2(y - prevY, x - prevX) + PI/2;
-                        x += Math.cos(angle) * fuzzyOffset;
-                        y += Math.sin(angle) * fuzzyOffset;
+                        const t = seg / segmentCount;
+                        
+                        // Cubic bezier curve: (1-t)³P₀ + 3(1-t)²tP₁ + 3(1-t)t²P₂ + t³P₃
+                        const mt = 1 - t;
+                        const mt2 = mt * mt;
+                        const mt3 = mt2 * mt;
+                        const t2 = t * t;
+                        const t3 = t2 * t;
+                        let x = mt3 * bodyX + 3 * mt2 * t * elbow1X + 3 * mt * t2 * elbow2X + t3 * pawX;
+                        let y = mt3 * bodyY + 3 * mt2 * t * elbow1Y + 3 * mt * t2 * elbow2Y + t3 * pawY;
+                        
+                        // Add fuzzy offset perpendicular to leg direction
+                        if (seg > 1)
+                        {
+                            const angle = Math.atan2(y - prevY, x - prevX) + PI/2;
+                            x += Math.cos(angle) * fuzzyOffset;
+                            y += Math.sin(angle) * fuzzyOffset;
+                        }
+                        
+                        // Store point for hair rendering (only on center layer)
+                        if (fuzzyLayer === 3)
+                        {
+                            curvePoints.push({x: x, y: y, angle: Math.atan2(y - prevY, x - prevX)});
+                        }
+                        
+                        // Draw line segment with fuzzy color
+                        drawLine(vec2(prevX, prevY), vec2(x, y), legThickness * (0.6 + fuzzyLayer * 0.08), fuzzyColor);
+                        
+                        prevX = x;
+                        prevY = y;
                     }
-                    
-                    // Store point for hair rendering (only on center layer)
-                    if (fuzzyLayer === 3)
-                    {
-                        curvePoints.push({x: x, y: y, angle: Math.atan2(y - prevY, x - prevX)});
-                    }
-                    
-                    // Draw line segment with fuzzy color
-                    drawLine(vec2(prevX, prevY), vec2(x, y), legThickness * (0.6 + fuzzyLayer * 0.08), fuzzyColor);
-                    
-                    prevX = x;
-                    prevY = y;
                 }
-            }
-            
-            // Draw hairy texture - small lines perpendicular to leg
-            for(let hairIndex = 0; hairIndex < curvePoints.length; hairIndex += 2) // Every other point
-            {
-                const point = curvePoints[hairIndex];
-                const hairAngle = point.angle + PI/2; // Perpendicular to leg
-                const hairLength = legThickness * 0.4; // Hair length
-                const hairCount = 3; // Multiple hairs per point
                 
-                // Deterministic pseudo-random based on leg and hair indices
-                const seed = (i * 17 + hairIndex * 7 + time * 0.1) % 1000;
-                const rand1 = (Math.sin(seed) * 0.5 + 0.5);
-                const rand2 = (Math.cos(seed * 1.3) * 0.5 + 0.5);
-                const rand3 = (Math.sin(seed * 2.1) * 0.5 + 0.5);
-                
-                for(let h = 0; h < hairCount; h++)
+                // Draw hairy texture - small lines perpendicular to leg
+                for(let hairIndex = 0; hairIndex < curvePoints.length; hairIndex += 2) // Every other point
                 {
-                    const hairOffset = (h - (hairCount-1)/2) * legThickness * 0.15;
-                    const hairStartX = point.x + Math.cos(hairAngle) * hairOffset;
-                    const hairStartY = point.y + Math.sin(hairAngle) * hairOffset;
+                    const point = curvePoints[hairIndex];
+                    const hairAngle = point.angle + PI/2; // Perpendicular to leg
+                    const hairLength = legThickness * 0.4; // Hair length
+                    const hairCount = 3; // Multiple hairs per point
                     
-                    // Use deterministic pseudo-random for hair length variation
-                    const lengthVariation = 0.7 + (h === 0 ? rand1 : h === 1 ? rand2 : rand3) * 0.3;
-                    const hairEndX = hairStartX + Math.cos(hairAngle) * hairLength * lengthVariation;
-                    const hairEndY = hairStartY + Math.sin(hairAngle) * hairLength * lengthVariation;
+                    // Deterministic pseudo-random based on leg and hair indices
+                    const seed = (i * 17 + hairIndex * 7 + time * 0.1) % 1000;
+                    const rand1 = (Math.sin(seed) * 0.5 + 0.5);
+                    const rand2 = (Math.cos(seed * 1.3) * 0.5 + 0.5);
+                    const rand3 = (Math.sin(seed * 2.1) * 0.5 + 0.5);
                     
-                    // Deterministic hair color variation (slightly darker/lighter)
-                    const hairBrightness = 0.7 + (h === 0 ? rand1 : h === 1 ? rand2 : rand3) * 0.3;
-                    const hairColor = new Color(hairBrightness, 0, 0, 0.6);
-                    
-                    // Draw hair as thin line
-                    drawLine(vec2(hairStartX, hairStartY), vec2(hairEndX, hairEndY), legThickness * 0.15, hairColor);
+                    for(let h = 0; h < hairCount; h++)
+                    {
+                        const hairOffset = (h - (hairCount-1)/2) * legThickness * 0.15;
+                        const hairStartX = point.x + Math.cos(hairAngle) * hairOffset;
+                        const hairStartY = point.y + Math.sin(hairAngle) * hairOffset;
+                        
+                        // Use deterministic pseudo-random for hair length variation
+                        const lengthVariation = 0.7 + (h === 0 ? rand1 : h === 1 ? rand2 : rand3) * 0.3;
+                        const hairEndX = hairStartX + Math.cos(hairAngle) * hairLength * lengthVariation;
+                        const hairEndY = hairStartY + Math.sin(hairAngle) * hairLength * lengthVariation;
+                        
+                        // Deterministic hair color variation (slightly darker/lighter)
+                        const hairBrightness = 0.7 + (h === 0 ? rand1 : h === 1 ? rand2 : rand3) * 0.3;
+                        const hairColor = new Color(hairBrightness, 0, 0, 0.6);
+                        
+                        // Draw hair as thin line
+                        drawLine(vec2(hairStartX, hairStartY), vec2(hairEndX, hairEndY), legThickness * 0.15, hairColor);
+                    }
                 }
-            }
-            
-            // Draw fuzzy foot at ground contact (on tile surface)
-            const pawRadius = sizeScale * 0.12; // Larger foot
-            for(let fuzzyFoot = 0; fuzzyFoot < 3; fuzzyFoot++)
-            {
-                const footOffset = (fuzzyFoot - 1) * pawRadius * 0.2;
-                const footAlpha = 0.4 + (fuzzyFoot === 1 ? 0.4 : 0.1);
-                const footColor = new Color(1, 0, 0, footAlpha);
-                drawTile(paw.worldPos.add(vec2(footOffset, 0)), vec2(pawRadius * (0.8 + fuzzyFoot * 0.1)), -1, undefined, footColor, 0, false, additive);
+                
+                // Draw fuzzy foot at ground contact (on tile surface)
+                const pawRadius = sizeScale * 0.12; // Larger foot
+                for(let fuzzyFoot = 0; fuzzyFoot < 3; fuzzyFoot++)
+                {
+                    const footOffset = (fuzzyFoot - 1) * pawRadius * 0.2;
+                    const footAlpha = 0.4 + (fuzzyFoot === 1 ? 0.4 : 0.1);
+                    const footColor = new Color(1, 0, 0, footAlpha);
+                    drawTile(paw.worldPos.add(vec2(footOffset, 0)), vec2(pawRadius * (0.8 + fuzzyFoot * 0.1)), -1, undefined, footColor, 0, false, additive);
+                }
             }
         }
         
@@ -2758,100 +2778,120 @@ class Spiderling extends Enemy
         drawTile(this.pos.add(vec2(0.1, -0.2).scale(sizeScale)), vec2(blobSize * 0.75), -1, undefined, translucentColor);
         setBlendMode(0);
         
-        // Draw spiderling legs - thick fuzzy quadratic curves
-        const legColor = new Color(0.1, 0.1, 0.1); // Black legs
-        const legThickness = sizeScale * 0.12; // Much thicker legs
-        
-        // Helper function to lerp
-        const lerp = (a, b, t) => a + (b - a) * t;
-        
-        // Ensure paws array exists
-        if (!this.paws || this.paws.length != 16)
+        // Draw spiderling legs - thick fuzzy quadratic curves (only when alive)
+        if (!this.isDead())
         {
-            this.paws = [];
-            const bodyTileX = (this.pos.x) | 0;
-            const bodyTileY = (this.pos.y) | 0;
-            for(let i = 0; i < 16; i++)
+            const legColor = new Color(0.1, 0.1, 0.1); // Black legs
+            const legThickness = sizeScale * 0.12; // Much thicker legs
+            
+            // Helper function to lerp
+            const lerp = (a, b, t) => a + (b - a) * t;
+            
+            // Ensure paws array exists
+            if (!this.paws || this.paws.length != 16)
             {
-                const angle = (i / 16) * PI * 2;
-                const offsetX = Math.sin(angle) * this.pawRadius;
-                const offsetY = Math.cos(angle) * this.pawRadius;
-                let pawTileX = bodyTileX + (offsetX) | 0;
-                let pawTileY = bodyTileY + 2;
-                this.paws.push({
-                    tileX: pawTileX,
-                    tileY: pawTileY,
-                    worldPos: vec2(pawTileX + 0.5, pawTileY)
-                });
-            }
-        }
-        
-        // Draw each leg as a thick fuzzy quadratic curve
-        for(let i = 0; i < 16; i++)
-        {
-            const paw = this.paws[i];
-            if (!paw || !paw.worldPos) continue;
-            
-            // Body attachment point
-            const bodyX = bodyPos.x;
-            const bodyY = bodyPos.y;
-            
-            // Paw position (snapped to tile surface)
-            const pawX = paw.worldPos.x;
-            const pawY = paw.worldPos.y;
-            
-            // Control point for quadratic curve (midpoint, raised up)
-            const controlX = lerp(bodyX, pawX, 0.5);
-            const controlY = lerp(bodyY, pawY - this.pawHeight, 0.5);
-            
-            // Draw leg as fuzzy quadratic curve - multiple overlapping lines for fuzzy effect
-            const segmentCount = 12; // More segments for smoother fuzzy curve
-            let prevX = bodyX;
-            let prevY = bodyY;
-            
-            // Draw multiple layers for fuzzy effect
-            for(let fuzzyLayer = 0; fuzzyLayer < 5; fuzzyLayer++)
-            {
-                const fuzzyOffset = (fuzzyLayer - 2) * legThickness * 0.15;
-                const fuzzyAlpha = 0.3 + (fuzzyLayer === 2 ? 0.4 : 0.1); // Center layer is brightest
-                const fuzzyColor = new Color(0.1, 0.1, 0.1, fuzzyAlpha);
-                
-                prevX = bodyX;
-                prevY = bodyY;
-                
-                for(let seg = 1; seg <= segmentCount; seg++)
+                this.paws = [];
+                const bodyTileX = (this.pos.x) | 0;
+                const bodyTileY = (this.pos.y) | 0;
+                for(let i = 0; i < 16; i++)
                 {
-                    const t = seg / segmentCount;
-                    
-                    // Quadratic bezier curve: (1-t)^2*P0 + 2*(1-t)*t*P1 + t^2*P2
-                    const mt = 1 - t;
-                    let x = mt * mt * bodyX + 2 * mt * t * controlX + t * t * pawX;
-                    let y = mt * mt * bodyY + 2 * mt * t * controlY + t * t * pawY;
-                    
-                    // Add fuzzy offset perpendicular to leg direction
-                    if (seg > 1)
-                    {
-                        const angle = Math.atan2(y - prevY, x - prevX) + PI/2;
-                        x += Math.cos(angle) * fuzzyOffset;
-                        y += Math.sin(angle) * fuzzyOffset;
-                    }
-                    
-                    // Draw line segment with fuzzy color
-                    drawLine(vec2(prevX, prevY), vec2(x, y), legThickness * (0.7 + fuzzyLayer * 0.1), fuzzyColor);
-                    
-                    prevX = x;
-                    prevY = y;
+                    const angle = (i / 16) * PI * 2;
+                    const offsetX = Math.sin(angle) * this.pawRadius;
+                    const offsetY = Math.cos(angle) * this.pawRadius;
+                    let pawTileX = bodyTileX + (offsetX) | 0;
+                    let pawTileY = bodyTileY + 2;
+                    this.paws.push({
+                        tileX: pawTileX,
+                        tileY: pawTileY,
+                        worldPos: vec2(pawTileX + 0.5, pawTileY)
+                    });
                 }
             }
             
-            // Draw fuzzy foot at ground contact (on tile surface)
-            const pawRadius = sizeScale * 0.12; // Larger foot
-            for(let fuzzyFoot = 0; fuzzyFoot < 3; fuzzyFoot++)
+            // Draw each leg as a thick fuzzy quadratic curve
+            for(let i = 0; i < 16; i++)
             {
-                const footOffset = (fuzzyFoot - 1) * pawRadius * 0.2;
-                const footAlpha = 0.4 + (fuzzyFoot === 1 ? 0.4 : 0.1);
-                const footColor = new Color(0.1, 0.1, 0.1, footAlpha);
-                drawTile(paw.worldPos.add(vec2(footOffset, 0)), vec2(pawRadius * (0.8 + fuzzyFoot * 0.1)), -1, undefined, footColor, 0, false, additive);
+                const paw = this.paws[i];
+                if (!paw || !paw.worldPos) continue;
+                
+                // Body attachment point
+                const bodyX = bodyPos.x;
+                const bodyY = bodyPos.y;
+                
+                // Paw position (snapped to tile surface)
+                const pawX = paw.worldPos.x;
+                const pawY = paw.worldPos.y;
+                
+                // Calculate leg direction and perpendicular for consistent elbow bending
+                const legDirX = pawX - bodyX;
+                const legDirY = pawY - bodyY;
+                const legAngle = Math.atan2(legDirY, legDirX);
+                
+                // Perpendicular direction (outward) for consistent elbow placement
+                const perpAngle = legAngle + PI / 2;
+                const elbowOffset = this.pawRadius * 0.3; // How far elbows bend outward
+                
+                // First elbow at 1/3 distance, raised and offset outward
+                const elbow1X = lerp(bodyX, pawX, 1/3) + Math.cos(perpAngle) * elbowOffset;
+                const elbow1Y = lerp(bodyY, pawY, 1/3) - this.pawHeight * 0.6;
+                
+                // Second elbow at 2/3 distance, raised and offset outward
+                const elbow2X = lerp(bodyX, pawX, 2/3) + Math.cos(perpAngle) * elbowOffset;
+                const elbow2Y = lerp(bodyY, pawY, 2/3) - this.pawHeight * 0.4;
+                
+                // Draw leg as fuzzy cubic bezier curve with 2 elbows - multiple overlapping lines for fuzzy effect
+                const segmentCount = 12; // More segments for smoother fuzzy curve
+                let prevX = bodyX;
+                let prevY = bodyY;
+                
+                // Draw multiple layers for fuzzy effect
+                for(let fuzzyLayer = 0; fuzzyLayer < 5; fuzzyLayer++)
+                {
+                    const fuzzyOffset = (fuzzyLayer - 2) * legThickness * 0.15;
+                    const fuzzyAlpha = 0.3 + (fuzzyLayer === 2 ? 0.4 : 0.1); // Center layer is brightest
+                    const fuzzyColor = new Color(0.1, 0.1, 0.1, fuzzyAlpha);
+                    
+                    prevX = bodyX;
+                    prevY = bodyY;
+                    
+                    for(let seg = 1; seg <= segmentCount; seg++)
+                    {
+                        const t = seg / segmentCount;
+                        
+                        // Cubic bezier curve: (1-t)³P₀ + 3(1-t)²tP₁ + 3(1-t)t²P₂ + t³P₃
+                        const mt = 1 - t;
+                        const mt2 = mt * mt;
+                        const mt3 = mt2 * mt;
+                        const t2 = t * t;
+                        const t3 = t2 * t;
+                        let x = mt3 * bodyX + 3 * mt2 * t * elbow1X + 3 * mt * t2 * elbow2X + t3 * pawX;
+                        let y = mt3 * bodyY + 3 * mt2 * t * elbow1Y + 3 * mt * t2 * elbow2Y + t3 * pawY;
+                        
+                        // Add fuzzy offset perpendicular to leg direction
+                        if (seg > 1)
+                        {
+                            const angle = Math.atan2(y - prevY, x - prevX) + PI/2;
+                            x += Math.cos(angle) * fuzzyOffset;
+                            y += Math.sin(angle) * fuzzyOffset;
+                        }
+                        
+                        // Draw line segment with fuzzy color
+                        drawLine(vec2(prevX, prevY), vec2(x, y), legThickness * (0.7 + fuzzyLayer * 0.1), fuzzyColor);
+                        
+                        prevX = x;
+                        prevY = y;
+                    }
+                }
+                
+                // Draw fuzzy foot at ground contact (on tile surface)
+                const pawRadius = sizeScale * 0.12; // Larger foot
+                for(let fuzzyFoot = 0; fuzzyFoot < 3; fuzzyFoot++)
+                {
+                    const footOffset = (fuzzyFoot - 1) * pawRadius * 0.2;
+                    const footAlpha = 0.4 + (fuzzyFoot === 1 ? 0.4 : 0.1);
+                    const footColor = new Color(0.1, 0.1, 0.1, footAlpha);
+                    drawTile(paw.worldPos.add(vec2(footOffset, 0)), vec2(pawRadius * (0.8 + fuzzyFoot * 0.1)), -1, undefined, footColor, 0, false, additive);
+                }
             }
         }
         
