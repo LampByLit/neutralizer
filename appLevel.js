@@ -36,7 +36,7 @@ const levelLimits = {
     1: [20, 1, 0, 0, 0, 1, 0],  // Level 1: 1 spider boss
     2: [40, 3, 0, 0, 0, 0, 3],  // Level 2: max 3 spiderlings
     3: [50, 10, 15, 0, 0, 0, 5],  // Level 3: max 5 spiderlings
-    4: [2, 0, 0, 1, 0, 1, 0],  // Level 4: 1 malefactor and 1 spider
+    4: [30, 0, 28, 1, 0, 1, 0],  // Level 4: 30 total (1 malefactor, 1 spider, 28 bastards)
     5: [60, 20, 15, 10, 1, 0, 8],  // Level 5: 60 enemies total, including 10 malefactors, 1 foe, and 8 spiderlings
     // 6: [1, 0, 0, 0, 0]  // Level 6: Flat level with 1 weak enemy and many crates - REMOVED
 };
@@ -860,6 +860,32 @@ function generateLevel()
                 new Spider(spawnPos);
                 ++totalSpidersSpawnedRef.value;
                 ++totalEnemiesSpawnedRef.value;
+            }
+        }
+    }
+
+    // Spawn bastards on level 4 (after malefactor and spider)
+    if (level == 4 && levelMaxBastards > 0)
+    {
+        // Spawn bastards until we reach the limit
+        for(let attempts = 200; totalBastardsSpawnedRef.value < levelMaxBastards && totalEnemiesSpawnedRef.value < levelMaxEnemies && attempts--;)
+        {
+            // Find a random position across the level
+            const pos = vec2(randSeeded(levelSize.x-40, 40), levelSize.y);
+            raycastHit = tileCollisionRaycast(pos, vec2(pos.x, 0));
+            
+            // Must not be too close to checkpoint (keep distance from start)
+            if (raycastHit && abs(checkpointPos.x-pos.x) > 20)
+            {
+                const spawnPos = raycastHit.add(vec2(0, 2));
+                
+                // Make sure there's solid ground and empty space
+                if (getTileCollisionData(spawnPos) <= 0)
+                {
+                    new Bastard(spawnPos);
+                    ++totalBastardsSpawnedRef.value;
+                    ++totalEnemiesSpawnedRef.value;
+                }
             }
         }
     }
