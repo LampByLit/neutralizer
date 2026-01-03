@@ -1275,7 +1275,7 @@ class Barrister extends Enemy
         
         // Barrister is 2x normal size
         this.size = this.size.scale(this.sizeScale = 2.0);
-        this.health = this.healthMax = 50; // Same health as spider
+        this.health = this.healthMax = 20;
         this.maxSpeed = maxCharacterSpeed * 3.5; // Very fast - 3.5x faster than normal
         
         // Unique sprite - use tile 24 from tiles2.png (16x16 pixels)
@@ -1705,7 +1705,7 @@ class Solicitor extends Enemy
         
         // Solicitor is 2x normal size
         this.size = this.size.scale(this.sizeScale = 2.0);
-        this.health = this.healthMax = 50; // Same health as barrister
+        this.health = this.healthMax = 20;
         this.maxSpeed = maxCharacterSpeed * 3.5; // Very fast - 3.5x faster than normal
         
         // Unique sprite - use tiles 25-26 from tiles2.png (16x16 pixels) - next 2 tiles after barrister
@@ -1962,7 +1962,7 @@ class Prosecutor extends Enemy
         
         // Prosecutor is 3x normal size
         this.size = this.size.scale(this.sizeScale = 3.0);
-        this.health = this.healthMax = 50; // Same health as solicitor
+        this.health = this.healthMax = 20;
         this.maxSpeed = maxCharacterSpeed * 0.5; // Slow - 0.5x normal speed
         
         // Unique sprite - use tiles 28-29 from tiles2.png (16x16 pixels)
