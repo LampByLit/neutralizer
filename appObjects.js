@@ -744,7 +744,7 @@ class KeyItem extends GameObject
 ///////////////////////////////////////////////////////////////////////////////
 
 // Item type definitions
-// Order: Life (0), Health (1), Laser (2), Cannon (3), Jumper (4), Hammer (5), Radar (6), Smoker (7)
+// Order: Life (0), Health (1), Laser (2), Cannon (3), Jumper (4), Hammer (5), Radar (6), Smoker (7), Fang (8)
 const itemType_life = 0;
 const itemType_health = 1;
 const itemType_laser = 2;
@@ -753,6 +753,7 @@ const itemType_jumper = 4;
 const itemType_hammer = 5;
 const itemType_radar = 6;
 const itemType_smoker = 7;
+const itemType_fang = 8;
 
 const itemType_consumable = 0;
 const itemType_equipable = 1;
@@ -799,11 +800,16 @@ const itemRegistry = {
         category: itemType_equipable, 
         tileIndex: 7, 
         weaponType: 'SmokerWeapon' 
+    },
+    [itemType_fang]: { 
+        category: itemType_equipable, 
+        tileIndex: 8, 
+        weaponType: 'FangWeapon' 
     }
 };
 
 // Get all available item types for random selection
-const getAllItemTypes = ()=> [itemType_life, itemType_health, itemType_laser, itemType_cannon, itemType_jumper, itemType_hammer, itemType_radar, itemType_smoker];
+const getAllItemTypes = ()=> [itemType_life, itemType_health, itemType_laser, itemType_cannon, itemType_jumper, itemType_hammer, itemType_radar, itemType_smoker, itemType_fang];
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -1788,6 +1794,17 @@ class SmokerWeapon extends Weapon
             // Not pressing F, reset buffer
             this.gasTimeBuffer = min(this.gasTimeBuffer, 0);
         }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class FangWeapon extends Weapon
+{
+    constructor(pos, parent)
+    {
+        super(pos, parent);
+        this.hidden = 1; // Don't render the weapon sprite (helmet is rendered separately)
     }
 }
 
