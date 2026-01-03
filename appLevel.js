@@ -36,11 +36,11 @@ let gameState = 'title'; // game states: 'title', 'playing', 'gameOver', 'win'
 
 // level enemy limits: [maxEnemies, maxSlimes, maxBastards, maxMalefactors, maxFoes, maxSpiders, maxSpiderlings, maxBarristers]
 const levelLimits = {
-    1: [20, 1, 0, 0, 0, 1, 0, 10],  // Level 1: 1 spider boss, 10 barristers
-    2: [40, 3, 0, 0, 0, 0, 3, 0],  // Level 2: max 3 spiderlings
-    3: [50, 10, 15, 0, 0, 0, 5, 0],  // Level 3: max 5 spiderlings
-    4: [30, 0, 28, 1, 0, 1, 0, 0],  // Level 4: 30 total (1 malefactor, 1 spider, 28 bastards)
-    5: [60, 20, 15, 10, 1, 0, 8, 0],  // Level 5: 60 enemies total, including 10 malefactors, 1 foe, and 8 spiderlings
+    1: [20, 1, 0, 0, 0, 1, 0, 1],  // Level 1: 1 spider boss, 1 barrister
+    2: [40, 3, 0, 0, 0, 0, 3, 1],  // Level 2: max 3 spiderlings, 1 barrister
+    3: [50, 10, 15, 0, 0, 0, 5, 1],  // Level 3: max 5 spiderlings, 1 barrister
+    4: [30, 0, 28, 1, 0, 1, 0, 1],  // Level 4: 30 total (1 malefactor, 1 spider, 28 bastards), 1 barrister
+    5: [60, 20, 15, 10, 1, 0, 8, 1],  // Level 5: 60 enemies total, including 10 malefactors, 1 foe, and 8 spiderlings, 1 barrister
     // 6: [1, 0, 0, 0, 0]  // Level 6: Flat level with 1 weak enemy and many crates - REMOVED
 };
 let levelMaxEnemies, levelMaxSlimes, levelMaxBastards, levelMaxMalefactors, levelMaxFoes, levelMaxSpiders, levelMaxSpiderlings, levelMaxBarristers;

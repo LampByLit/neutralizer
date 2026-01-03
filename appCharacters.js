@@ -1506,7 +1506,7 @@ class Barrister extends Enemy
         }
         
         // Update liquid trail particle physics
-        const spacing = this.sizeScale * 0.3; // Interaction distance
+        const spacing = this.sizeScale * 0.2; // Tighter interaction distance
         const limit = spacing * 0.66; // Boundary limit
         
         for(let i = 0; i < this.liquidTrailParticles.length; i++)
@@ -1586,13 +1586,15 @@ class Barrister extends Enemy
                 p.y -= dy;
             }
             
-            // Boundary constraints (keep particles near barrister)
+            // Boundary constraints (keep particles tight around barrister)
             const distFromBarrister = Math.sqrt((p.x - this.pos.x) ** 2 + (p.y - this.pos.y) ** 2);
-            if (distFromBarrister > this.sizeScale * 2)
+            const maxDistance = this.sizeScale * 0.8; // Much tighter - only 0.8x size away
+            if (distFromBarrister > maxDistance)
             {
-                // Pull back towards barrister
-                const pullX = (this.pos.x - p.x) * 0.1;
-                const pullY = (this.pos.y - p.y) * 0.1;
+                // Stronger pull back towards barrister
+                const pullStrength = 0.3; // Increased from 0.1 for tighter control
+                const pullX = (this.pos.x - p.x) * pullStrength;
+                const pullY = (this.pos.y - p.y) * pullStrength;
                 p.x += pullX;
                 p.y += pullY;
             }
