@@ -744,7 +744,7 @@ class KeyItem extends GameObject
 ///////////////////////////////////////////////////////////////////////////////
 
 // Item type definitions
-// Order: Life (0), Health (1), Laser (2), Cannon (3), Jumper (4), Hammer (5), Radar (6), Smoker (7), Fang (8)
+// Order: Life (0), Health (1), Laser (2), Cannon (3), Jumper (4), Hammer (5), Radar (6), Smoker (7), Fang (8), Ladymaker (9)
 const itemType_life = 0;
 const itemType_health = 1;
 const itemType_laser = 2;
@@ -754,6 +754,7 @@ const itemType_hammer = 5;
 const itemType_radar = 6;
 const itemType_smoker = 7;
 const itemType_fang = 8;
+const itemType_ladymaker = 9;
 
 const itemType_consumable = 0;
 const itemType_equipable = 1;
@@ -805,11 +806,16 @@ const itemRegistry = {
         category: itemType_equipable, 
         tileIndex: 8, 
         weaponType: 'FangWeapon' 
+    },
+    [itemType_ladymaker]: { 
+        category: itemType_equipable, 
+        tileIndex: 9, 
+        weaponType: 'LadymakerWeapon' 
     }
 };
 
 // Get all available item types for random selection
-const getAllItemTypes = ()=> [itemType_life, itemType_health, itemType_laser, itemType_cannon, itemType_jumper, itemType_hammer, itemType_radar, itemType_smoker, itemType_fang];
+const getAllItemTypes = ()=> [itemType_life, itemType_health, itemType_laser, itemType_cannon, itemType_jumper, itemType_hammer, itemType_radar, itemType_smoker, itemType_fang, itemType_ladymaker];
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -1877,6 +1883,74 @@ class FangWeapon extends Weapon
         {
             // Not pressing F, reset buffer
             this.fireTimeBuffer = min(this.fireTimeBuffer, 0);
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class LadymakerWeapon extends Weapon
+{
+    constructor(pos, parent)
+    {
+        super(pos, parent);
+        this.fireTimeBuffer = 0;
+        this.fireRate = 0.5; // Spawns 1 every 2 seconds (1/2 = 0.5)
+        this.hidden = 1; // Don't render the weapon sprite (helmet is rendered separately)
+        this.hasSpawnedThisPress = 0; // Track if we've spawned on current F press
+    }
+    
+    update()
+    {
+        super.update();
+        
+        // Only handle girl spawning for player
+        if (!this.parent.isPlayer)
+            return;
+        
+        // Check if F key is pressed (key code 70)
+        const pressingF = !this.parent.playerIndex && keyIsDown(70);
+        
+        if (pressingF)
+        {
+            this.fireTimeBuffer += timeDelta;
+            const rate = 1/this.fireRate; // 2 seconds
+            
+            // Spawn immediately on first press, then every 2 seconds while holding
+            const shouldSpawn = !this.hasSpawnedThisPress || this.fireTimeBuffer >= rate;
+            
+            if (shouldSpawn)
+            {
+                // Calculate spawn position - throw girl out in front of player
+                const sizeScale = this.parent.sizeScale || 1;
+                const forwardOffset = vec2(this.parent.getMirrorSign(0.8), 0).scale(sizeScale);
+                const spawnPos = this.parent.pos.add(forwardOffset);
+                
+                // Create new girl
+                const girl = new Girl(spawnPos);
+                
+                // Add to survivingGirls array if it exists
+                if (typeof survivingGirls !== 'undefined')
+                {
+                    survivingGirls.push(girl);
+                }
+                
+                // Give girl a small forward velocity to "throw" her out
+                girl.velocity = vec2(this.parent.getMirrorSign(0.3), 0.1);
+                
+                // Play sound
+                playSound(sound_checkpoint, spawnPos);
+                
+                // Update spawn tracking
+                this.fireTimeBuffer -= rate;
+                this.hasSpawnedThisPress = 1;
+            }
+        }
+        else
+        {
+            // Not pressing F, reset buffer and spawn flag
+            this.fireTimeBuffer = min(this.fireTimeBuffer, 0);
+            this.hasSpawnedThisPress = 0;
         }
     }
 }

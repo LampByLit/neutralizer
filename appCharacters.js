@@ -4068,6 +4068,8 @@ class Player extends Character
             newWeapon = new SmokerWeapon(this.pos, this);
         else if (weaponType == 'FangWeapon')
             newWeapon = new FangWeapon(this.pos, this);
+        else if (weaponType == 'LadymakerWeapon')
+            newWeapon = new LadymakerWeapon(this.pos, this);
         else
             newWeapon = new Weapon(this.pos, this);
         
@@ -4102,6 +4104,8 @@ class Player extends Character
                 itemType = typeof itemType_smoker !== 'undefined' ? itemType_smoker : 7;
             else if (currentWeaponType == 'FangWeapon')
                 itemType = typeof itemType_fang !== 'undefined' ? itemType_fang : 8;
+            else if (currentWeaponType == 'LadymakerWeapon')
+                itemType = typeof itemType_ladymaker !== 'undefined' ? itemType_ladymaker : 9;
             
             // Create item slightly away from player so it doesn't immediately get collected
             if (itemType >= 0)

@@ -594,6 +594,8 @@ engineInit(
                     headwearTileIndex = 7; // itemType_smoker tileIndex
                 else if (player.equippedWeaponType == 'FangWeapon')
                     headwearTileIndex = 8; // itemType_fang tileIndex
+                else if (player.equippedWeaponType == 'LadymakerWeapon')
+                    headwearTileIndex = 9; // itemType_ladymaker tileIndex
                 
                 if (headwearTileIndex >= 0 && typeof drawTile2 === 'function')
                 {
