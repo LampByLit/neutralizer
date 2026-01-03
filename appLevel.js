@@ -574,7 +574,7 @@ function generateLevel()
     }
     checkpointPos = raycastHit.add(vec2(0,1));
 
-    // track total enemies, slimes, bastards, malefactors, foes, spiders, and spiderlings spawned for this level
+    // track total enemies, slimes, bastards, malefactors, foes, spiders, spiderlings, and barristers spawned for this level
     totalEnemiesSpawned = 0;
     totalSlimesSpawned = 0;
     totalBastardsSpawned = 0;
@@ -582,12 +582,14 @@ function generateLevel()
     totalFoesSpawned = 0;
     totalSpidersSpawned = 0;
     totalSpiderlingsSpawned = 0;
+    totalBarristersSpawned = 0;
     const totalSlimesSpawnedRef = { value: 0 };
     const totalBastardsSpawnedRef = { value: 0 };
     const totalMalefactorsSpawnedRef = { value: 0 };
     const totalFoesSpawnedRef = { value: 0 };
     const totalSpidersSpawnedRef = { value: 0 };
     const totalSpiderlingsSpawnedRef = { value: 0 };
+    const totalBarristersSpawnedRef = { value: 0 };
     const totalEnemiesSpawnedRef = { value: 0 };
     
     // Level 6: Special generation - flat level with many crates and 1 weak enemy - REMOVED
@@ -1004,7 +1006,7 @@ function generateLevel()
             if (!tries--)
                 break; // stop if we can't spawn more bases
 
-            if (buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefactorsSpawnedRef, totalEnemiesSpawnedRef, totalSpiderlingsSpawnedRef))
+            if (buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefactorsSpawnedRef, totalEnemiesSpawnedRef, totalSpiderlingsSpawnedRef, totalBarristersSpawnedRef))
                 break; // stop if buildBase returns error or limit reached
         }
     }
@@ -1017,6 +1019,7 @@ function generateLevel()
     totalFoesSpawned = totalFoesSpawnedRef.value;
     totalSpidersSpawned = totalSpidersSpawnedRef.value;
     totalSpiderlingsSpawned = totalSpiderlingsSpawnedRef.value;
+    totalBarristersSpawned = totalBarristersSpawnedRef.value;
 
     // spawn jackrock - one per level
     // First, find all existing spiders to avoid spawning too close
@@ -1267,6 +1270,7 @@ function nextLevel()
     levelMaxFoes = limits[4] || 0;
     levelMaxSpiders = limits[5] || 0;
     levelMaxSpiderlings = limits[6] || 0;
+    levelMaxBarristers = limits[7] || 0;
     levelEnemyCount = levelMaxEnemies; // keep for compatibility with existing code
     levelSeed = randSeed = rand(1e9)|0;
     levelSize = level == 1 ? vec2(300,200) : vec2(min(level*99,400),200);
