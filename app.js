@@ -172,47 +172,47 @@ engineInit(
     if (debug)
     {
         randSeeded(randSeeded(randSeeded(randSeed = Date.now()))); // set random seed for debug mode stuf
-        if (keyWasPressed(188)) // Comma key
-            new Malefactor(mousePosWorld);
+        // if (keyWasPressed(188)) // Comma key
+        //     new Malefactor(mousePosWorld);
 
-        if (keyWasPressed(84))
-        {
-            //for(let i=30;i--;)
-                new Prop(mousePosWorld);
-        }
+        // if (keyWasPressed(84))
+        // {
+        //     //for(let i=30;i--;)
+        //         new Prop(mousePosWorld);
+        // }
 
-        if (keyWasPressed(190))
-            explosion(mousePosWorld);
+        // if (keyWasPressed(190))
+        //     explosion(mousePosWorld);
 
-        if (keyIsDown(89))
-        {
-            let e = new ParticleEmitter(mousePosWorld);
+        // if (keyIsDown(89))
+        // {
+        //     let e = new ParticleEmitter(mousePosWorld);
 
-            // test
-            e.collideTiles = 1;
-            //e.tileIndex=7;
-            e.emitSize = 2;
-            e.colorStartA = new Color(1,1,1,1);
-            e.colorStartB = new Color(0,1,1,1);
-            e.colorEndA = new Color(0,0,1,0);
-            e.colorEndB = new Color(0,.5,1,0);
-            e.emitConeAngle = .1;
-            e.particleTime = 1
-            e.speed = .3
-            e.elasticity = .1
-            e.gravityScale = 1;
-            //e.additive = 1;
-            e.angle = -PI;
-        }
+        //     // test
+        //     e.collideTiles = 1;
+        //     //e.tileIndex=7;
+        //     e.emitSize = 2;
+        //     e.colorStartA = new Color(1,1,1,1);
+        //     e.colorStartB = new Color(0,1,1,1);
+        //     e.colorEndA = new Color(0,0,1,0);
+        //     e.colorEndB = new Color(0,.5,1,0);
+        //     e.emitConeAngle = .1;
+        //     e.particleTime = 1
+        //     e.speed = .3
+        //     e.elasticity = .1
+        //     e.gravityScale = 1;
+        //     //e.additive = 1;
+        //     e.angle = -PI;
+        // }
 
-        if (mouseWheel) // mouse zoom
-            cameraScale = clamp(cameraScale*(1-mouseWheel/10), defaultTileSize.x*16, defaultTileSize.x/16);
+        // if (mouseWheel) // mouse zoom
+        //     cameraScale = clamp(cameraScale*(1-mouseWheel/10), defaultTileSize.x*16, defaultTileSize.x/16);
 
         //if (keyWasPressed(77))
         //    playSong([[[,0,219,,,,,1.1,,-.1,-50,-.05,-.01,1],[2,0,84,,,.1,,.7,,,,.5,,6.7,1,.05]],[[[0,-1,1,0,5,0],[1,1,8,8,0,3]]],[0,0,0,0],90]) // music test
 
-        if (keyWasPressed(77))
-            players[0].pos = mousePosWorld;
+        // if (keyWasPressed(77))
+        //     players[0].pos = mousePosWorld;
 
         /*if (keyWasPressed(32))
         {
