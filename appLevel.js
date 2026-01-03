@@ -1003,6 +1003,19 @@ function generateLevel()
     totalSpiderlingsSpawned = totalSpiderlingsSpawnedRef.value;
 
     // spawn jackrock - one per level
+    // First, find all existing spiders to avoid spawning too close
+    const spiderPositions = [];
+    forEachObject(0, 0, (o)=>
+    {
+        // Check if it's a spider: enemy character with type 9 (type_spider) or sizeScale ~3.0
+        if (o.isCharacter && o.team == team_enemy && !o.destroyed)
+        {
+            // Spiders have type 9 and sizeScale of 3.0
+            if ((o.type === 9) || (o.sizeScale && abs(o.sizeScale - 3.0) < 0.1))
+                spiderPositions.push(o.pos);
+        }
+    }, 0); // Check all objects, not just collide objects
+    
     for(let tries=99; tries--;)
     {
         const jackrockX = randSeeded(levelSize.x - 50, 50);
@@ -1012,12 +1025,28 @@ function generateLevel()
         if (raycastHit && abs(checkpointPos.x - jackrockX) > 40)
         {
             const jackrockPos = raycastHit.add(vec2(0, 1));
-            // Make sure there's enough space for the large rock
-            if (getTileCollisionData(jackrockPos) <= 0 &&
-                getTileCollisionData(jackrockPos.add(vec2(0, -2))) <= 0)
+            
+            // Check if too close to any spider (spider is 3x size, jackrock is 4x size, need buffer)
+            let tooCloseToSpider = 0;
+            for(const spiderPos of spiderPositions)
             {
-                new Prop(jackrockPos, propType_rock_jackrock);
-                break;
+                // Check horizontal distance - need at least 40 tiles buffer for both large objects
+                if (abs(jackrockPos.x - spiderPos.x) < 40)
+                {
+                    tooCloseToSpider = 1;
+                    break;
+                }
+            }
+            
+            if (!tooCloseToSpider)
+            {
+                // Make sure there's enough space for the large rock
+                if (getTileCollisionData(jackrockPos) <= 0 &&
+                    getTileCollisionData(jackrockPos.add(vec2(0, -2))) <= 0)
+                {
+                    new Prop(jackrockPos, propType_rock_jackrock);
+                    break;
+                }
             }
         }
     }
