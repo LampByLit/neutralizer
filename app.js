@@ -227,6 +227,30 @@ engineInit(
             nextLevel();
     }
 
+    // Ctrl key zoom out (both left and right Ctrl keys)
+    if (gameState === 'playing')
+    {
+        const pressingCtrl = leftCtrlDown || rightCtrlDown || keyIsDown(17); // Check both Ctrl keys explicitly, fallback to keyCode
+        const ctrlZoomSpeed = 0.05; // Smooth lerp factor for zoom transitions
+        const ctrlZoomFactor = 1.3; // Zoom out by 1.3x (a little bit)
+        
+        let targetZoom = defaultCameraScale;
+        if (pressingCtrl)
+        {
+            // Ctrl is held - zoom out a little bit
+            targetZoom = defaultCameraScale / ctrlZoomFactor;
+        }
+        
+        // Smoothly lerp cameraScale towards target zoom
+        cameraScale += (targetZoom - cameraScale) * ctrlZoomSpeed;
+        
+        // If we're very close to target, snap to it (prevents infinite tiny adjustments)
+        if (abs(cameraScale - targetZoom) < 0.1)
+        {
+            cameraScale = targetZoom;
+        }
+    }
+
     // only run gameplay logic when in playing state
     if (gameState === 'playing')
     {

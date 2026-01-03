@@ -89,7 +89,7 @@ function engineInit(appInit, appUpdate, appUpdatePost, appRender, appRenderPost)
         requestAnimationFrame(engineUpdate);
         
         if (!document.hasFocus())
-            inputData[0].length = 0; // clear input when lost focus
+            clearInput(); // clear input when lost focus
 
         // prepare to update time
         const realFrameTimeDeltaMS = frameTimeMS - frameTimeLastMS;

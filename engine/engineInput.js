@@ -20,7 +20,16 @@ const inputData = [[]];
 const keyIsDown      = (key, device=0)=> inputData[device][key] && inputData[device][key].d ? 1 : 0;
 const keyWasPressed  = (key, device=0)=> inputData[device][key] && inputData[device][key].p ? 1 : 0;
 const keyWasReleased = (key, device=0)=> inputData[device][key] && inputData[device][key].r ? 1 : 0;
-const clearInput     = ()=> inputData[0].length = 0;
+const clearInput     = ()=> {
+    inputData[0].length = 0;
+    leftCtrlDown = 0;
+    rightCtrlDown = 0;
+};
+
+// Track both left and right Ctrl keys separately
+// Left Ctrl: location 1, Right Ctrl: location 2, Both use keyCode 17
+let leftCtrlDown = 0;
+let rightCtrlDown = 0;
 
 // mouse input is stored with keyboard
 let hadInput   = 0;
@@ -36,11 +45,25 @@ onkeydown   = e=>
 {
     if (debug && e.target != document.body) return;
     e.repeat || (inputData[isUsingGamepad = 0][remapKeyCode(e.keyCode)] = {d:hadInput=1, p:1});
+    // Track left and right Ctrl keys separately
+    if (e.keyCode === 17) // Ctrl key
+    {
+        if (e.location === 1) leftCtrlDown = 1;  // Left Ctrl
+        else if (e.location === 2) rightCtrlDown = 1;  // Right Ctrl
+        else leftCtrlDown = 1; // Fallback: if location not available, assume left
+    }
 }
 onkeyup     = e=>
 {
     if (debug && e.target != document.body) return;
     const c = remapKeyCode(e.keyCode); inputData[0][c] && (inputData[0][c].d = 0, inputData[0][c].r = 1);
+    // Track left and right Ctrl keys separately
+    if (e.keyCode === 17) // Ctrl key
+    {
+        if (e.location === 1) leftCtrlDown = 0;  // Left Ctrl
+        else if (e.location === 2) rightCtrlDown = 0;  // Right Ctrl
+        else leftCtrlDown = 0; // Fallback: if location not available, assume left
+    }
 }
 onmousedown = e=> (inputData[0][e.button] = {d:hadInput=1, p:1}, onmousemove(e));
 onmouseup   = e=> inputData[0][e.button] && (inputData[0][e.button].d = 0, inputData[0][e.button].r = 1);
