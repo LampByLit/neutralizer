@@ -1271,10 +1271,10 @@ class Barrister extends Enemy
         // Override type to be barrister
         this.type = type_barrister;
         
-        // Barrister is fast and agile (same as bastard)
-        this.size = this.size.scale(this.sizeScale = 1.0);
-        this.health = this.healthMax = 2; // Moderate health
-        this.maxSpeed = maxCharacterSpeed * 1.5; // 50% faster than normal
+        // Barrister is 2x normal size
+        this.size = this.size.scale(this.sizeScale = 2.0);
+        this.health = this.healthMax = 2;
+        this.maxSpeed = maxCharacterSpeed * 3.5; // Very fast - 3.5x faster than normal
         
         // Unique sprite - use tile 24 from tiles2.png (16x16 pixels)
         this.bodyTile = 24;
@@ -1285,34 +1285,36 @@ class Barrister extends Enemy
         this.color = new Color(1, 0.4, 0);
         this.eyeColor = new Color(1, 0, 0);
         
-        // Remove weapon - barrister is melee only
-        if (this.weapon)
-        {
-            this.weapon.destroy();
-            this.weapon = null;
-        }
+        // Very long vision range - 50 tiles
+        this.maxVisionRange = 50;
         
-        // Enhanced vision range for aggressive chasing
-        this.maxVisionRange = 15;
+        // Replace weapon with barrister weapon (shoots blue venom)
+        this.weapon && this.weapon.destroy();
+        new BarristerWeapon(this.pos, this);
         
-        // Melee attack timer for aggressive melee attacks
-        this.meleeAttackTimer = new Timer;
-        this.meleeCooldownTimer = new Timer;
-        
-        // Don't burn (optional - can remove if you want them to burn)
-        // this.canBurn = 0;
+        // Blue liquid trail particles
+        this.liquidTrailParticles = [];
+        this.maxTrailParticles = 40; // Maximum number of liquid particles
+        this.lastTrailPos = this.pos.copy();
+        this.trailTimer = new Timer;
+        this.trailTimer.set(0.05); // Spawn particles more frequently for smoother liquid
     }
     
     update()
     {
-        if (!aiEnable || levelWarmup || this.isDead() || !this.inUpdateWindow())
+        // Bypass levelWarmup - barrister acts immediately
+        if (!aiEnable || this.isDead() || !this.inUpdateWindow())
         {
-            // Call Character.update() directly, not Enemy.update() since we have no weapon
+            if (this.weapon)
+                this.weapon.triggerIsDown = 0;
             Character.prototype.update.call(this);
             return;
         }
 
-        // update check if players are visible (same as Enemy)
+        if (this.weapon)
+            this.weapon.localPos = this.weapon.localOffset.scale(this.sizeScale);
+
+        // update check if players are visible
         const sightCheckFrames = 9;
         ASSERT(this.sawPlayerPos || !this.sawPlayerTimer.isSet());
         if (frame%sightCheckFrames == this.sightCheckFrame)
@@ -1322,9 +1324,10 @@ class Barrister extends Enemy
             debugAI && debugCircle(this.pos, visionRangeSquared**.5, '#f003', .1);
             for(const player of players)
             {
+                // check range
                 if (player && !player.isDead())
                 if (sawRecently || this.getMirrorSign() == sign(player.pos.x - this.pos.x))
-                if (sawRecently || abs(player.pos.x - this.pos.x) > abs(player.pos.y - this.pos.y))
+                if (sawRecently || abs(player.pos.x - this.pos.x) > abs(player.pos.y - this.pos.y) ) // 45 degree slope
                 if (this.pos.distanceSquared(player.pos) < visionRangeSquared)
                 {
                     const raycastHit = tileCollisionRaycast(this.pos, player.pos);
@@ -1341,6 +1344,7 @@ class Barrister extends Enemy
 
             if (sawRecently)
             {
+                // alert nearby enemies
                 alertEnemies(this.pos, this.sawPlayerPos);
             }
         }
@@ -1364,7 +1368,7 @@ class Barrister extends Enemy
         {
             debugAI && debugPoint(this.sawPlayerPos, '#f00');
 
-            // Aggressive wall climbing - barrister climbs walls like strong enemies
+            // Aggressive wall climbing - barrister climbs walls
             if (this.moveInput.x && !this.velocity.x && this.velocity.y < 0)
             {
                 this.velocity.y *=.8;
@@ -1374,6 +1378,8 @@ class Barrister extends Enemy
             }
             
             const timeSinceSawPlayer = this.sawPlayerTimer.get();
+            if (this.weapon)
+                this.weapon.localAngle *= .8;
             if (this.reactionTimer.active())
             {
                 // just saw player for first time, act surprised
@@ -1385,37 +1391,26 @@ class Barrister extends Enemy
                     
                 if (!this.dodgeTimer.active())
                 {
-                    const playerDirection = sign(this.sawPlayerPos.x - this.pos.x);
-                    const playerDistance = this.pos.distance(this.sawPlayerPos);
+                    const delta = this.sawPlayerPos.subtract(this.pos);
+                    const dist = delta.length();
+                    const playerDirection = sign(delta.x);
                     
-                    // Aggressive melee attack when close
-                    if (playerDistance < 2.5 && !this.meleeCooldownTimer.isSet())
-                    {
-                        this.pressedMelee = 1;
-                        this.meleeCooldownTimer.set(1.5); // Cooldown between melee attacks
-                    }
-                    
-                    if (rand()<.05)
-                        this.facePlayerTimer.set(rand(2,.5));
-
-                    // Frequent aggressive jumps
-                    if (rand()<.02) // Much more frequent than normal enemies
-                    {
-                        this.pressedJumpTimer.set(.1);
-                        this.holdJumpTimer.set(rand(.2));
-                    }
-                    
-                    // Aggressive movement towards player
-                    if (rand()<.01)
-                        this.moveInput.x = 0;
-                    else
-                        this.moveInput.x = playerDirection * rand(.8, .5); // Move faster towards player
+                    // Very aggressive - always move towards player
+                    this.moveInput.x = playerDirection;
                     
                     // Aggressive ladder climbing - always try to climb towards player
+                    this.moveInput.y = clamp(delta.y, .8, -.8);
+                    
+                    // Jump frequently to close distance
+                    if (this.groundTimer.active() && dist > 2 && rand() < 0.15)
+                    {
+                        this.pressedJumpTimer.set(.1);
+                        this.holdJumpTimer.set(rand(.15));
+                    }
+                    
+                    // Face player
                     if (rand()<.05)
-                        this.moveInput.y = 0;
-                    else
-                        this.moveInput.y = clamp(this.sawPlayerPos.y - this.pos.y, .8, -.8); // Aggressive vertical movement
+                        this.facePlayerTimer.set(rand(2,.5));
                 }
             }
             else
@@ -1444,36 +1439,167 @@ class Barrister extends Enemy
         }
         else
         {
-            // try to act normal
-            if (rand()<.03)
-                this.moveInput.x = 0;
-            else if (rand()<.005)
-                this.moveInput.x = randSign()*rand(.2, .1);
-            else if (rand()<.001)
-                this.moveInput.x = randSign()*1e-9;
+            // Very aggressive - always seek player, no idle behavior
+            // Try to find player by moving around
+            if (rand()<.01)
+                this.moveInput.x = randSign();
+            if (rand()<.005 && this.groundTimer.active())
+                this.pressedJumpTimer.set(.1);
         }
 
-        this.holdingShoot = 0; // No shooting for barrister
+        this.holdingShoot = 0; // No shooting for barrister (weapon handles it)
         this.holdingJump = this.holdJumpTimer.active();
 
-        // Call Character.update() directly instead of Enemy.update() to avoid weapon access
+        // Call Character.update() directly (not Enemy.update() to avoid unwanted AI)
         Character.prototype.update.call(this);
         
-        // Override velocity clamping to allow faster movement than normal enemies
-        // Character.update() already applied acceleration clamped to maxCharacterSpeed
-        // Now we allow it to go up to maxSpeed (1.5x faster) by continuing acceleration
-        if (this.moveInput.x && abs(this.velocity.x) < this.maxSpeed)
-        {
-            // Continue accelerating if we haven't reached maxSpeed yet
-            this.velocity.x = clamp(this.velocity.x + this.moveInput.x * .042, this.maxSpeed, -this.maxSpeed);
-        }
-        // Ensure velocity doesn't exceed maxSpeed
+        // Override velocity clamping to allow faster movement
         if (abs(this.velocity.x) > this.maxSpeed)
             this.velocity.x = sign(this.velocity.x) * this.maxSpeed;
 
         // override default mirror to face player
         if (this.facePlayerTimer.active() && !this.dodgeTimer.active() && !this.reactionTimer.active())
             this.mirror = this.sawPlayerPos.x < this.pos.x;
+        
+        // Update liquid trail particles
+        if (this.trailTimer.elapsed())
+        {
+            this.trailTimer.set(0.05); // Reset timer
+            
+            // Ensure lastTrailPos is valid Vector2
+            if (!this.lastTrailPos || this.lastTrailPos.x == undefined || this.lastTrailPos.y == undefined)
+            {
+                this.lastTrailPos = this.pos.copy();
+            }
+            
+            // Ensure pos is valid before subtracting
+            if (this.pos && this.pos.x != undefined && this.pos.y != undefined)
+            {
+                const distMoved = this.pos.subtract(this.lastTrailPos).length();
+                if (distMoved > 0.05) // Spawn particles more frequently
+                {
+                    // Spawn new liquid particle at barrister position
+                    const particle = {
+                        x: this.pos.x,
+                        y: this.pos.y,
+                        px: this.pos.x, // Previous position
+                        py: this.pos.y,
+                        vx: 0,
+                        vy: 0,
+                        radius: this.sizeScale * 0.15,
+                        lifetime: 3.0, // How long particle lives
+                        spawnTime: time,
+                        alpha: 0.8
+                    };
+                    
+                    this.liquidTrailParticles.push(particle);
+                    
+                    // Remove oldest particles if over limit
+                    if (this.liquidTrailParticles.length > this.maxTrailParticles)
+                    {
+                        this.liquidTrailParticles.shift();
+                    }
+                    
+                    this.lastTrailPos = this.pos.copy();
+                }
+            }
+        }
+        
+        // Update liquid trail particle physics
+        const spacing = this.sizeScale * 0.3; // Interaction distance
+        const limit = spacing * 0.66; // Boundary limit
+        
+        for(let i = 0; i < this.liquidTrailParticles.length; i++)
+        {
+            const p = this.liquidTrailParticles[i];
+            
+            // Check lifetime
+            const age = time - p.spawnTime;
+            if (age > p.lifetime)
+            {
+                this.liquidTrailParticles.splice(i, 1);
+                i--;
+                continue;
+            }
+            
+            // Calculate velocity from position delta
+            p.vx = p.x - p.px;
+            p.vy = p.y - p.py;
+            
+            // Apply gravity
+            p.vx += 0;
+            p.vy += 0.01; // Small downward gravity
+            
+            // Apply damping
+            p.vx *= 0.95;
+            p.vy *= 0.95;
+            
+            // Store previous position
+            p.px = p.x;
+            p.py = p.y;
+            
+            // Update position
+            p.x += p.vx;
+            p.y += p.vy;
+            
+            // Particle interactions - find nearby particles
+            let force = 0;
+            let force_b = 0;
+            const close = [];
+            
+            for(let j = 0; j < this.liquidTrailParticles.length; j++)
+            {
+                if (i === j) continue;
+                
+                const neighbor = this.liquidTrailParticles[j];
+                const dx = neighbor.x - p.x;
+                const dy = neighbor.y - p.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < spacing && distance > 0.01)
+                {
+                    const m = 1 - (distance / spacing);
+                    force += m * m;
+                    force_b += (m * m * m) / 2;
+                    
+                    neighbor.m = m;
+                    neighbor.dfx = (dx / distance) * m;
+                    neighbor.dfy = (dy / distance) * m;
+                    close.push(neighbor);
+                }
+            }
+            
+            // Apply interaction forces
+            force = (force - 3) * 0.3; // Adjust force strength
+            
+            for(let k = 0; k < close.length; k++)
+            {
+                const neighbor = close[k];
+                const press = force + force_b * neighbor.m;
+                
+                const dx = neighbor.dfx * press * 0.3;
+                const dy = neighbor.dfy * press * 0.3;
+                
+                neighbor.x += dx;
+                neighbor.y += dy;
+                p.x -= dx;
+                p.y -= dy;
+            }
+            
+            // Boundary constraints (keep particles near barrister)
+            const distFromBarrister = Math.sqrt((p.x - this.pos.x) ** 2 + (p.y - this.pos.y) ** 2);
+            if (distFromBarrister > this.sizeScale * 2)
+            {
+                // Pull back towards barrister
+                const pullX = (this.pos.x - p.x) * 0.1;
+                const pullY = (this.pos.y - p.y) * 0.1;
+                p.x += pullX;
+                p.y += pullY;
+            }
+            
+            // Fade alpha over lifetime
+            p.alpha = 0.8 * (1 - age / p.lifetime);
+        }
     }
 
     alert(playerPos, resetSawPlayer)
@@ -1482,9 +1608,9 @@ class Barrister extends Enemy
         {
             if (!this.reactionTimer.isSet())
             {
-                this.reactionTimer.set(rand(.5,.3)); // Faster reaction than normal enemies
+                this.reactionTimer.set(rand(.2,.1)); // Very fast reaction
                 this.facePlayerTimer.set(rand(2,1));
-                if (this.groundObject && rand() < .3) // More likely to jump when alerted
+                if (this.groundObject && rand() < .5) // Very likely to jump when alerted
                     this.pressedJumpTimer.set(.1);
             }
             this.sawPlayerPos = playerPos.copy();
@@ -1516,6 +1642,32 @@ class Barrister extends Enemy
         const meleeHeadOffset = this.meleeTimer.active() ? -.12 * Math.sin(this.meleeTimer.getPercent() * PI) : 0;
 
         const bodyPos = this.pos.add(vec2(0,-.1+.06*Math.sin(this.walkCyclePercent*PI)).scale(sizeScale));
+        
+        // Draw blue liquid trail particles - actual liquid physics
+        if (this.liquidTrailParticles.length > 0)
+        {
+            setBlendMode(0); // Regular blend for translucent effect
+            for(let i = 0; i < this.liquidTrailParticles.length; i++)
+            {
+                const p = this.liquidTrailParticles[i];
+                
+                // Clamp alpha to valid range (0-1)
+                const clampedAlpha = Math.max(0, Math.min(1, p.alpha));
+                
+                // Draw particle as blue liquid blob with radial gradient effect
+                const particleColor = new Color(0, 0.5, 1, clampedAlpha);
+                const particleSize = p.radius;
+                
+                // Draw main particle blob
+                drawTile(vec2(p.x, p.y), vec2(particleSize), -1, undefined, particleColor, 0, false, additive);
+                
+                // Draw outer glow for liquid effect
+                const glowAlpha = Math.max(0, Math.min(1, clampedAlpha * 0.4));
+                const glowColor = new Color(0, 0.7, 1, glowAlpha);
+                drawTile(vec2(p.x, p.y), vec2(particleSize * 1.3), -1, undefined, glowColor, 0, false, additive);
+            }
+            setBlendMode(0);
+        }
         
         // Draw body using drawTile2 from tiles2.png (16x16 sprite)
         if (typeof drawTile2 === 'function')

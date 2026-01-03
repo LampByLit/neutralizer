@@ -2074,6 +2074,98 @@ class SpiderWeapon extends EngineObject
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class BarristerWeapon extends EngineObject 
+{
+    constructor(pos, parent) 
+    { 
+        super(pos, vec2(.6), 4, vec2(8));
+
+        this.isWeapon = 1;
+        this.fireTimeBuffer = this.localAngle = 0;
+        this.burstTimer = new Timer;
+        this.burstActive = 0;
+        this.burstDuration = 2.0; // Shorter bursts but more frequent
+        this.burstCooldown = 0.6; // Very short cooldown for aggression
+        
+        this.renderOrder = parent.renderOrder+1;
+        this.hidden = 1; // Don't render the weapon (barrister shoots from head, not gun)
+
+        parent.weapon = this;
+        parent.addChild(this, this.localOffset = vec2(.55,0));
+    }
+    
+    render()
+    {
+        // Don't render - barrister shoots from head, not a visible weapon
+    }
+
+    update()
+    {
+        super.update();
+
+        const particleSpeed = .3;
+        const particleRate = 8; // Fast firing rate
+        const spread = 0.03; // Very tight spread for good aim
+
+        // Burst fire pattern - more aggressive than slime
+        if (!this.burstTimer.isSet())
+        {
+            // Start new burst
+            this.burstActive = 1;
+            this.burstTimer.set(this.burstDuration);
+        }
+        else if (this.burstTimer.get() > this.burstDuration - 0.1)
+        {
+            // Burst just started
+            this.burstActive = 1;
+        }
+        else if (this.burstTimer.get() < 0.1)
+        {
+            // Burst ending, start cooldown
+            this.burstActive = 0;
+            this.burstTimer.set(-this.burstCooldown);
+        }
+
+        // Only shoot when parent sees player and burst is active
+        if (this.parent.sawPlayerTimer && this.parent.sawPlayerTimer.isSet() && 
+            this.parent.sawPlayerTimer.get() < 10 && this.burstActive)
+        {
+            this.fireTimeBuffer += timeDelta;
+            const rate = 1/particleRate;
+            
+            // Get direction to player from head position
+            const headPos = this.parent.pos.add(vec2(this.parent.getMirrorSign(.05), .46).scale(this.parent.sizeScale || 1));
+            const playerPos = this.parent.sawPlayerPos;
+            const direction = playerPos.subtract(headPos).normalize();
+            
+            for(; this.fireTimeBuffer > 0; this.fireTimeBuffer -= rate)
+            {
+                // Create venom particle from head position (blue venom for barrister)
+                const particle = new VenomParticle(headPos, this.parent, new Color(0, 0.5, 1));
+                
+                // Fire particle directly towards player with small spread
+                // Apply small random rotation to direction vector for spread
+                const spreadAngle = rand(spread, -spread);
+                particle.velocity = direction.rotate(spreadAngle).scale(particleSpeed);
+            }
+        }
+        else
+        {
+            this.fireTimeBuffer = min(this.fireTimeBuffer, 0);
+            // Face player even when not shooting
+            if (this.parent.sawPlayerTimer && this.parent.sawPlayerTimer.isSet())
+            {
+                const playerPos = this.parent.sawPlayerPos;
+                const direction = playerPos.subtract(this.pos).normalize();
+                const aimAngle = direction.angle();
+                this.localAngle = -aimAngle * this.getMirrorSign();
+            }
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 class SpiderlingWeapon extends EngineObject 
 {
     constructor(pos, parent) 
