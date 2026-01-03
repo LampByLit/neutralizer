@@ -1804,7 +1804,80 @@ class FangWeapon extends Weapon
     constructor(pos, parent)
     {
         super(pos, parent);
+        this.fireTimeBuffer = 0;
+        this.fireRate = 2; // Fires 2 times per second
         this.hidden = 1; // Don't render the weapon sprite (helmet is rendered separately)
+    }
+    
+    update()
+    {
+        super.update();
+        
+        // Only handle venom firing for player
+        if (!this.parent.isPlayer)
+            return;
+        
+        this.fireTimeBuffer += timeDelta;
+        
+        // Check if F key is pressed (key code 70)
+        const pressingFang = !this.parent.playerIndex && keyIsDown(70);
+        
+        if (pressingFang)
+        {
+            const rate = 1/this.fireRate;
+            const venomSpeed = 0.3; // Same speed as spider venom
+            const spread = 0.03; // Spread angle for venom particles
+            
+            // Get base aim angle from parent
+            const baseAimAngle = this.parent.aimAngle || 0;
+            
+            // Calculate forward direction based on mirror state and aim angle
+            const forwardDirection = vec2(this.parent.getMirrorSign(1), 0).rotate(baseAimAngle);
+            
+            // Only fire forward (check if direction matches facing direction)
+            // If mirror is 0 (facing right), forwardDirection.x should be positive
+            // If mirror is 1 (facing left), forwardDirection.x should be negative
+            const isFiringForward = (this.parent.mirror == 0 && forwardDirection.x >= 0) || 
+                                     (this.parent.mirror == 1 && forwardDirection.x <= 0);
+            
+            if (isFiringForward)
+            {
+                for(; this.fireTimeBuffer > 0; this.fireTimeBuffer -= rate)
+                {
+                    // Calculate head position (where venom comes from)
+                    const sizeScale = this.parent.sizeScale || 1;
+                    const headPos = this.parent.pos.add(
+                        vec2(this.parent.getMirrorSign(.05), .46).scale(sizeScale)
+                    );
+                    
+                    // Create red venom particle
+                    const particle = new VenomParticle(headPos, this.parent, new Color(1, 0, 0));
+                    
+                    // Set damage to 2 (instead of default 0.5)
+                    particle.damage = 2;
+                    
+                    // Apply spread to direction
+                    const spreadAngle = rand(spread, -spread);
+                    particle.velocity = forwardDirection.rotate(spreadAngle).scale(venomSpeed);
+                    
+                    // Play sound (using shoot sound or could use a different one)
+                    playSound(sound_shoot, headPos, 10, 0.3);
+                    
+                    // Alert enemies
+                    alertEnemies(headPos, headPos);
+                }
+            }
+            else
+            {
+                // Not firing forward, reset buffer
+                this.fireTimeBuffer = min(this.fireTimeBuffer, 0);
+            }
+        }
+        else
+        {
+            // Not pressing F, reset buffer
+            this.fireTimeBuffer = min(this.fireTimeBuffer, 0);
+        }
     }
 }
 
