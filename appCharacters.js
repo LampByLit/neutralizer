@@ -443,7 +443,8 @@ const type_foe    = 8;
 const type_spider = 9;
 const type_spiderling = 10;
 const type_barrister = 11;
-const type_count  = 12;
+const type_solicitor = 12;
+const type_count  = 13;
 
 function alertEnemies(pos, playerPos)
 {
@@ -1667,6 +1668,436 @@ class Barrister extends Enemy
                 // Draw outer glow for liquid effect
                 const glowAlpha = Math.max(0, Math.min(1, clampedAlpha * 0.4));
                 const glowColor = new Color(0, 0.7, 1, glowAlpha);
+                drawTile(vec2(p.x, p.y), vec2(particleSize * 1.3), -1, undefined, glowColor, 0, false, additive);
+            }
+            setBlendMode(0);
+        }
+        
+        // Draw body using drawTile2 from tiles2.png (16x16 sprite)
+        if (typeof drawTile2 === 'function')
+            drawTile2(bodyPos, vec2(sizeScale), this.tileIndex, this.tileSize, color, this.angle, this.mirror, additive);
+        else
+            drawTile(bodyPos, vec2(sizeScale), this.tileIndex, this.tileSize, color, this.angle, this.mirror, additive);
+        
+        // Draw head (like normal enemies)
+        drawTile(this.pos.add(vec2(this.getMirrorSign(.05) + meleeHeadOffset * this.getMirrorSign(),.46).scale(sizeScale).rotate(-this.angle)),vec2(sizeScale/2),this.headTile,vec2(8), headColor,this.angle,this.mirror, additive);
+
+        // Draw eyes on head (like normal enemies)
+        if (!this.isDead())
+        {
+            const blinkScale = this.canBlink ? this.isDead() ? .3: .5 + .5*Math.cos(this.blinkTimer.getPercent()*PI*2) : 1;
+            drawTile(this.pos.add(vec2(this.getMirrorSign(.05),.46).scale(sizeScale).rotate(-this.angle)),vec2(sizeScale/2, blinkScale*sizeScale/2),this.headTile+1,vec2(8), eyeColor, this.angle, this.mirror, this.additiveColor);
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class Solicitor extends Enemy
+{
+    constructor(pos) 
+    { 
+        super(pos);
+        
+        // Override type to be solicitor
+        this.type = type_solicitor;
+        
+        // Solicitor is 2x normal size
+        this.size = this.size.scale(this.sizeScale = 2.0);
+        this.health = this.healthMax = 50; // Same health as barrister
+        this.maxSpeed = maxCharacterSpeed * 3.5; // Very fast - 3.5x faster than normal
+        
+        // Unique sprite - use tiles 25-26 from tiles2.png (16x16 pixels) - next 2 tiles after barrister
+        this.bodyTile = 25;
+        this.tileSize = vec2(16); // 16x16 pixel sprite
+        this.headTile = 2; // Use same head tile as normal enemies
+        
+        // Yellow color to distinguish from other enemies
+        this.color = new Color(1, 1, 0);
+        this.eyeColor = new Color(1, 1, 0);
+        
+        // Very long vision range - 50 tiles
+        this.maxVisionRange = 50;
+        
+        // Replace weapon with solicitor weapon (shoots yellow venom, visible gun)
+        this.weapon && this.weapon.destroy();
+        new SolicitorWeapon(this.pos, this);
+        
+        // Yellow liquid trail particles (very slow, subtle)
+        this.liquidTrailParticles = [];
+        this.maxTrailParticles = 40; // Maximum number of liquid particles
+        this.lastTrailPos = this.pos.copy();
+        this.trailTimer = new Timer;
+        this.trailTimer.set(0.05); // Spawn particles more frequently for smoother liquid
+    }
+    
+    update()
+    {
+        // Bypass levelWarmup - solicitor acts immediately
+        if (!aiEnable || this.isDead() || !this.inUpdateWindow())
+        {
+            if (this.weapon)
+                this.weapon.triggerIsDown = 0;
+            Character.prototype.update.call(this);
+            return;
+        }
+
+        if (this.weapon)
+            this.weapon.localPos = this.weapon.localOffset.scale(this.sizeScale);
+
+        // update check if players are visible
+        const sightCheckFrames = 9;
+        ASSERT(this.sawPlayerPos || !this.sawPlayerTimer.isSet());
+        if (frame%sightCheckFrames == this.sightCheckFrame)
+        {
+            const sawRecently = this.sawPlayerTimer.isSet() && this.sawPlayerTimer.get() < 5;
+            const visionRangeSquared = (sawRecently ? this.maxVisionRange * 1.2 : this.maxVisionRange)**2;
+            debugAI && debugCircle(this.pos, visionRangeSquared**.5, '#f003', .1);
+            for(const player of players)
+            {
+                // check range
+                if (player && !player.isDead())
+                if (sawRecently || this.getMirrorSign() == sign(player.pos.x - this.pos.x))
+                if (sawRecently || abs(player.pos.x - this.pos.x) > abs(player.pos.y - this.pos.y) ) // 45 degree slope
+                if (this.pos.distanceSquared(player.pos) < visionRangeSquared)
+                {
+                    const raycastHit = tileCollisionRaycast(this.pos, player.pos);
+                    if (!raycastHit)
+                    {
+                        this.alert(player.pos, 1);
+                        debugAI && debugLine(this.pos, player.pos, '#0f0',.1)
+                        break;
+                    }
+                    debugAI && debugLine(this.pos, player.pos, '#f00',.1)
+                    debugAI && raycastHit && debugPoint(raycastHit, '#ff0',.1)
+                }
+            }
+
+            if (sawRecently)
+            {
+                // alert nearby enemies
+                alertEnemies(this.pos, this.sawPlayerPos);
+            }
+        }
+
+        this.pressedDodge = this.climbingWall = this.pressingThrow = 0;
+        
+        if (this.burnTimer.isSet())
+        {
+            // burning, run around
+            this.facePlayerTimer.unset();
+            if (rand()< .005)
+            {
+                this.pressedJumpTimer.set(.05);
+                this.holdJumpTimer.set(rand(.05));
+            }
+            if (rand()<.05)
+                this.moveInput.x = randSign()*rand(.6, .3);
+            this.moveInput.y = 0;
+        }
+        else if (this.sawPlayerTimer.isSet() && this.sawPlayerTimer.get() < 10)
+        {
+            debugAI && debugPoint(this.sawPlayerPos, '#f00');
+
+            // Aggressive wall climbing - solicitor climbs walls
+            if (this.moveInput.x && !this.velocity.x && this.velocity.y < 0)
+            {
+                this.velocity.y *=.8;
+                this.climbingWall = 1;
+                this.pressedJumpTimer.set(.1);
+                this.holdJumpTimer.set(rand(.2));
+            }
+            
+            const timeSinceSawPlayer = this.sawPlayerTimer.get();
+            if (this.weapon)
+                this.weapon.localAngle *= .8;
+            if (this.reactionTimer.active())
+            {
+                // just saw player for first time, act surprised
+                this.moveInput.x = 0;
+            }
+            else if (timeSinceSawPlayer < 5)
+            {
+                debugAI && debugRect(this.pos, this.size, '#00f');
+                    
+                if (!this.dodgeTimer.active())
+                {
+                    const delta = this.sawPlayerPos.subtract(this.pos);
+                    const dist = delta.length();
+                    const playerDirection = sign(delta.x);
+                    
+                    // Very aggressive - always move towards player
+                    this.moveInput.x = playerDirection;
+                    
+                    // Aggressive ladder climbing - always try to climb towards player
+                    this.moveInput.y = clamp(delta.y, .8, -.8);
+
+                    // Jump frequently to close distance
+                    if (this.groundTimer.active() && dist > 2 && rand() < 0.15)
+                    {
+                        this.pressedJumpTimer.set(.1);
+                        this.holdJumpTimer.set(rand(.15));
+                    }
+                    
+                    // Face player
+                    if (rand()<.05)
+                        this.facePlayerTimer.set(rand(2,.5));
+                }
+            }
+            else
+            {
+                // was fighting but lost player - still aggressive
+                debugAI && debugRect(this.pos, this.size, '#00f');
+
+                if (rand()<.04)
+                    this.facePlayerTimer.set(rand(2,.5));
+
+                if (rand()<.02)
+                    this.moveInput.x = 0;
+                else if (rand()<.01)
+                    this.moveInput.x = randSign()*rand(.4, .2);
+
+                // Still jump when searching
+                if (rand() < .01)
+                {
+                    this.pressedJumpTimer.set(.1);
+                    this.holdJumpTimer.set(rand(.2));
+                }
+                
+                // Move up/down in direction last player was seen
+                this.moveInput.y = clamp(this.sawPlayerPos.y - this.pos.y,.8,-.8);
+            }
+        }
+        else
+        {
+            // Very aggressive - always seek player, no idle behavior
+            // Try to find player by moving around
+            if (rand()<.01)
+                this.moveInput.x = randSign();
+            if (rand()<.005 && this.groundTimer.active())
+                this.pressedJumpTimer.set(.1);
+        }
+
+        this.holdingShoot = 0; // No shooting for solicitor (weapon handles it)
+        this.holdingJump = this.holdJumpTimer.active();
+
+        // Call Character.update() directly (not Enemy.update() to avoid unwanted AI)
+        Character.prototype.update.call(this);
+        
+        // Override velocity clamping to allow faster movement
+        if (abs(this.velocity.x) > this.maxSpeed)
+            this.velocity.x = sign(this.velocity.x) * this.maxSpeed;
+
+        // override default mirror to face player
+        if (this.facePlayerTimer.active() && !this.dodgeTimer.active() && !this.reactionTimer.active())
+            this.mirror = this.sawPlayerPos.x < this.pos.x;
+        
+        // Update liquid trail particles (very slow, subtle)
+        if (this.trailTimer.elapsed())
+        {
+            this.trailTimer.set(0.05); // Reset timer
+            
+            // Ensure lastTrailPos is valid Vector2
+            if (!this.lastTrailPos || this.lastTrailPos.x == undefined || this.lastTrailPos.y == undefined)
+            {
+                this.lastTrailPos = this.pos.copy();
+            }
+            
+            // Ensure pos is valid before subtracting
+            if (this.pos && this.pos.x != undefined && this.pos.y != undefined)
+            {
+                const distMoved = this.pos.subtract(this.lastTrailPos).length();
+                if (distMoved > 0.05) // Spawn particles more frequently
+                {
+                    // Spawn new liquid particle at solicitor position
+                    const particle = {
+                        x: this.pos.x,
+                        y: this.pos.y,
+                        px: this.pos.x, // Previous position
+                        py: this.pos.y,
+                        vx: 0,
+                        vy: 0,
+                        radius: this.sizeScale * 0.15,
+                        lifetime: 5.0, // Longer lifetime for slower particles
+                        spawnTime: time,
+                        alpha: 0.6 // More subtle
+                    };
+                    
+                    this.liquidTrailParticles.push(particle);
+                    
+                    // Remove oldest particles if over limit
+                    if (this.liquidTrailParticles.length > this.maxTrailParticles)
+                    {
+                        this.liquidTrailParticles.shift();
+                    }
+                    
+                    this.lastTrailPos = this.pos.copy();
+                }
+            }
+        }
+        
+        // Update liquid trail particle physics (very slow movement)
+        const spacing = this.sizeScale * 0.2; // Tighter interaction distance
+        const limit = spacing * 0.66; // Boundary limit
+        
+        for(let i = 0; i < this.liquidTrailParticles.length; i++)
+        {
+            const p = this.liquidTrailParticles[i];
+            
+            // Check lifetime
+            const age = time - p.spawnTime;
+            if (age > p.lifetime)
+            {
+                this.liquidTrailParticles.splice(i, 1);
+                i--;
+                continue;
+            }
+            
+            // Calculate velocity from position delta
+            p.vx = p.x - p.px;
+            p.vy = p.y - p.py;
+            
+            // Apply gravity (very minimal)
+            p.vx += 0;
+            p.vy += 0.002; // Much smaller downward gravity
+            
+            // Apply damping (stronger damping for slower movement)
+            p.vx *= 0.90; // Stronger damping
+            p.vy *= 0.90;
+            
+            // Store previous position
+            p.px = p.x;
+            p.py = p.y;
+            
+            // Update position - scale down velocity significantly to make particles very slow
+            const speedScale = 0.1; // Much slower - 0.1x speed (even slower than barrister's 0.5x)
+            p.x += p.vx * speedScale;
+            p.y += p.vy * speedScale;
+            
+            // Particle interactions - find nearby particles
+            let force = 0;
+            let force_b = 0;
+            const close = [];
+            
+            for(let j = 0; j < this.liquidTrailParticles.length; j++)
+            {
+                if (i === j) continue;
+                
+                const neighbor = this.liquidTrailParticles[j];
+                const dx = neighbor.x - p.x;
+                const dy = neighbor.y - p.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < spacing && distance > 0.01)
+                {
+                    const m = 1 - (distance / spacing);
+                    force += m * m;
+                    force_b += (m * m * m) / 2;
+                    
+                    neighbor.m = m;
+                    neighbor.dfx = (dx / distance) * m;
+                    neighbor.dfy = (dy / distance) * m;
+                    close.push(neighbor);
+                }
+            }
+            
+            // Apply interaction forces
+            force = (force - 3) * 0.3; // Adjust force strength
+            
+            for(let k = 0; k < close.length; k++)
+            {
+                const neighbor = close[k];
+                const press = force + force_b * neighbor.m;
+                
+                const dx = neighbor.dfx * press * 0.3;
+                const dy = neighbor.dfy * press * 0.3;
+                
+                neighbor.x += dx;
+                neighbor.y += dy;
+                p.x -= dx;
+                p.y -= dy;
+            }
+            
+            // Boundary constraints (keep particles tight around solicitor)
+            const distFromSolicitor = Math.sqrt((p.x - this.pos.x) ** 2 + (p.y - this.pos.y) ** 2);
+            const maxDistance = this.sizeScale * 0.8; // Much tighter - only 0.8x size away
+            if (distFromSolicitor > maxDistance)
+            {
+                // Stronger pull back towards solicitor
+                const pullStrength = 0.3; // Increased from 0.1 for tighter control
+                const pullX = (this.pos.x - p.x) * pullStrength;
+                const pullY = (this.pos.y - p.y) * pullStrength;
+                p.x += pullX;
+                p.y += pullY;
+            }
+            
+            // Fade alpha over lifetime
+            p.alpha = 0.6 * (1 - age / p.lifetime);
+        }
+    }
+
+    alert(playerPos, resetSawPlayer)
+    {
+        if (resetSawPlayer || !this.sawPlayerTimer.isSet())
+        {
+            if (!this.reactionTimer.isSet())
+            {
+                this.reactionTimer.set(rand(.2,.1)); // Very fast reaction
+                this.facePlayerTimer.set(rand(2,1));
+                if (this.groundObject && rand() < .5) // Very likely to jump when alerted
+                    this.pressedJumpTimer.set(.1);
+            }
+            this.sawPlayerPos = playerPos.copy();
+            this.sawPlayerTimer.set();
+        }
+    }
+    
+    render()
+    {
+        if (!isOverlapping(this.pos, this.size, cameraPos, renderWindowSize))
+            return;
+
+        // set tile to use
+        this.tileIndex = this.isDead() ? this.bodyTile : this.climbingLadder || this.groundTimer.active() ? this.bodyTile + 2*this.walkCyclePercent|0 : this.bodyTile+1;
+
+        let additive = this.additiveColor.add(this.extraAdditiveColor);
+        if (this.isPlayer && !this.isDead() && this.dodgeRechargeTimer.elapsed() && this.dodgeRechargeTimer.get() < .2)
+        {
+            const v = .6 - this.dodgeRechargeTimer.get()*3;
+            additive = additive.add(new Color(0,v,v,0)).clamp();
+        }
+
+        const sizeScale = this.sizeScale;
+        const color = this.color.scale(this.burnColorPercent(),1);
+        const eyeColor = this.eyeColor.scale(this.burnColorPercent(),1);
+        const headColor = this.team == team_enemy ? new Color() : color; // enemies use neutral color for head
+
+        // melee animation - head moves back
+        const meleeHeadOffset = this.meleeTimer.active() ? -.12 * Math.sin(this.meleeTimer.getPercent() * PI) : 0;
+
+        const bodyPos = this.pos.add(vec2(0,-.1+.06*Math.sin(this.walkCyclePercent*PI)).scale(sizeScale));
+        
+        // Draw yellow liquid trail particles - actual liquid physics
+        if (this.liquidTrailParticles.length > 0)
+        {
+            setBlendMode(0); // Regular blend for translucent effect
+            for(let i = 0; i < this.liquidTrailParticles.length; i++)
+            {
+                const p = this.liquidTrailParticles[i];
+                
+                // Clamp alpha to valid range (0-1)
+                const clampedAlpha = Math.max(0, Math.min(1, p.alpha));
+                
+                // Draw particle as yellow liquid blob with radial gradient effect
+                const particleColor = new Color(1, 1, 0, clampedAlpha);
+                const particleSize = p.radius;
+                
+                // Draw main particle blob
+                drawTile(vec2(p.x, p.y), vec2(particleSize), -1, undefined, particleColor, 0, false, additive);
+                
+                // Draw outer glow for liquid effect
+                const glowAlpha = Math.max(0, Math.min(1, clampedAlpha * 0.4));
+                const glowColor = new Color(1, 0.9, 0.3, glowAlpha);
                 drawTile(vec2(p.x, p.y), vec2(particleSize * 1.3), -1, undefined, glowColor, 0, false, additive);
             }
             setBlendMode(0);
