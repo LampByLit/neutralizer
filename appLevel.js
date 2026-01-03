@@ -1210,6 +1210,9 @@ function nextLevel()
     playerLives = level == 0 ? 3 : playerLives + 4; // start with 3 lives, then add 4 for beating a level plus 1 for respawning
     ++level;
     
+    // Clear checkpoint tracking for new level
+    allCheckpoints = [];
+    
     // set level limits
     const limits = levelLimits[level] || levelLimits[5]; // use level 5 limits for levels beyond 5
     levelMaxEnemies = limits[0];
@@ -1247,7 +1250,9 @@ function nextLevel()
     createMalefactorSpawnPlatform(checkpointPos.x, checkpointGroundY, 20, 4); // 20 tiles wide, 4 tiles tall platform
     
     // objects that effect the level must be added here
-    const firstCheckpoint = new Checkpoint(checkpointPos).setActive();
+    const firstCheckpoint = new Checkpoint(checkpointPos);
+    firstCheckpoint.setActive();
+    firstCheckpoint.secured = true; // First checkpoint is already secured
 
     applyArtToLevel();
 

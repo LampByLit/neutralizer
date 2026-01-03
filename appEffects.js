@@ -49,7 +49,7 @@ const persistentParticleDestroyCallback = (particle)=>
 {
     // copy particle to tile layer on death
     ASSERT(particle.tileIndex < 0); // quick draw to tile layer uses canvas 2d so must be untextured
-    if (particle.groundObject)
+    if (particle.groundObject && tileLayer)
         tileLayer.drawTile(particle.pos, particle.size, particle.tileIndex, particle.tileSize, particle.color, particle.angle, particle.mirror);
 }
 
@@ -513,98 +513,14 @@ function updateSky()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-let silhouetteParallaxLayer = null;
-
-// Silhouette parallax layer - renders between background and game
-class SilhouetteParallax extends EngineObject
-{
-    constructor()
-    {
-        super(vec2(), vec2());
-        this.renderOrder = -2500; // Between background (-3e3) and tile background (-2e3)
-        this.parallaxSpeed = 0.3; // Slower than camera for depth effect
-        this.groundY = 100; // Ground level in world coordinates (below lowest ground at ~99)
-    }
-
-    update()
-    {
-        // Update position based on camera with parallax effect
-        const parallax = vec2(150, 30).scale(this.parallaxSpeed);
-        const cameraDeltaFromCenter = cameraPos.subtract(levelSize.scale(.5)).divide(levelSize.scale(-.5).divide(parallax));
-        
-        // Position silhouette with parallax scrolling
-        // The X position scrolls with parallax, Y is fixed at ground level
-        this.pos = vec2(
-            cameraPos.x + cameraDeltaFromCenter.x * this.parallaxSpeed,
-            this.groundY // This will be the bottom of the silhouette
-        );
-    }
-
-    render()
-    {
-        // Check if silhouette image is available and loaded
-        if (typeof silhouetteImage === 'undefined' || !silhouetteImage || 
-            !silhouetteImage.complete || !silhouetteImage.width || !silhouetteImage.height)
-            return;
-
-        // Use a scale factor to convert image pixels to world units
-        // Tiles are typically 16x16 pixels, so we'll scale the silhouette similarly
-        // For a good visual size, let's make the silhouette height match roughly 100-150 world units
-        const targetHeightWorld = 120; // Height in world units (roughly from ground to top of screen)
-        const scaleFactor = targetHeightWorld / silhouetteImage.height;
-        const silhouetteWidthWorld = silhouetteImage.width * scaleFactor;
-        const silhouetteHeightWorld = silhouetteImage.height * scaleFactor;
-        
-        // Calculate screen bounds in world coordinates
-        const screenLeft = cameraPos.x - mainCanvas.width / (2 * cameraScale);
-        const screenRight = cameraPos.x + mainCanvas.width / (2 * cameraScale);
-        
-        // Calculate starting X position for tiling (leftmost visible tile)
-        // Align tiles so they start before the left edge
-        let startX = screenLeft - (screenLeft % silhouetteWidthWorld);
-        if (startX > screenLeft) startX -= silhouetteWidthWorld;
-        const endX = screenRight + silhouetteWidthWorld;
-        
-        // Draw tiled silhouette
-        for (let x = startX; x < endX; x += silhouetteWidthWorld)
-        {
-            // Position: bottom of silhouette at groundY, so top is at groundY - height
-            const worldPos = vec2(x, this.groundY - silhouetteHeightWorld);
-            const screenPos = worldToScreen(worldPos);
-            
-            // Draw at scaled size
-            const drawWidth = silhouetteWidthWorld * cameraScale;
-            const drawHeight = silhouetteHeightWorld * cameraScale;
-            
-            // Only draw if on screen
-            if (screenPos.x + drawWidth > 0 && screenPos.x < mainCanvas.width &&
-                screenPos.y + drawHeight > 0 && screenPos.y < mainCanvas.height)
-            {
-                mainContext.drawImage(
-                    silhouetteImage,
-                    screenPos.x, screenPos.y,
-                    drawWidth, drawHeight
-                );
-            }
-        }
-    }
-}
+// Silhouette parallax layer removed - not needed
 
 function generateParallaxLayers()
 {
-    // Destroy old silhouette layer if it exists
-    if (silhouetteParallaxLayer)
-    {
-        silhouetteParallaxLayer.destroy();
-        silhouetteParallaxLayer = null;
-    }
-    
-    // Create new silhouette parallax layer
-    silhouetteParallaxLayer = new SilhouetteParallax();
+    // No parallax layers needed
 }
 
 function updateParallaxLayers()
 {
-    // Silhouette layer updates itself in its update() method
-    // This function is kept for compatibility but does nothing now
+    // No parallax layers to update
 }

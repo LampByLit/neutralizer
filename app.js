@@ -59,15 +59,7 @@ nightGifImage.onerror = function() {
 };
 nightGifImage.src = 'night.gif';
 
-// Silhouette image for parallax layer
-const silhouetteImage = new Image();
-silhouetteImage.onload = function() {
-    // Image loaded successfully
-};
-silhouetteImage.onerror = function() {
-    console.warn('Failed to load silhouette.png');
-};
-silhouetteImage.src = 'silhouette.png';
+// Silhouette image removed - not needed
 
 const team_none = 0;
 const team_player = 1;
@@ -618,7 +610,21 @@ engineInit(
             }
         }
 
-        if (!enemiesCount && !levelEndTimer.isSet())
+        // Count secured checkpoints
+        let securedCheckpoints = 0;
+        let totalCheckpoints = 0;
+        for (const checkpoint of allCheckpoints)
+        {
+            if (checkpoint && !checkpoint.destroyed)
+            {
+                ++totalCheckpoints;
+                if (checkpoint.secured)
+                    ++securedCheckpoints;
+            }
+        }
+
+        // Level completion requires: all enemies dead AND all checkpoints secured
+        if (!enemiesCount && totalCheckpoints > 0 && securedCheckpoints >= totalCheckpoints && !levelEndTimer.isSet())
             levelEndTimer.set();
 
         mainContext.fillStyle = new Color(1,1,1).rgba();
@@ -631,10 +637,11 @@ engineInit(
         mainContext.fillText('LEVEL ' + level, hudX, hudY);
         mainContext.fillText('LIVES ' + playerLives, hudX, hudY + lineHeight);
         mainContext.fillText('ENEMIES ' + enemiesCount, hudX, hudY + lineHeight * 2);
+        mainContext.fillText('CHECKPOINTS ' + securedCheckpoints + '/' + totalCheckpoints, hudX, hudY + lineHeight * 3);
         
         // Clean up and count living girls
         cleanupSurvivingGirls();
-        mainContext.fillText('GIRLS ' + survivingGirls.length, hudX, hudY + lineHeight * 3);
+        mainContext.fillText('GIRLS ' + survivingGirls.length, hudX, hudY + lineHeight * 4);
 
         // fade in level transition
         const fade = levelEndTimer.isSet() ? percent(levelEndTimer.get(), 3, 1) : percent(levelTimer.get(), .5, 2);

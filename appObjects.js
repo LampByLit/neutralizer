@@ -334,6 +334,7 @@ class Prop extends GameObject
 ///////////////////////////////////////////////////////////////////////////////
 
 let checkpointPos, activeCheckpoint, checkpointTimer = new Timer;
+let allCheckpoints = []; // Track all checkpoints
 
 class Checkpoint extends GameObject 
 {
@@ -342,6 +343,8 @@ class Checkpoint extends GameObject
         super(pos.int().add(vec2(.5)))
         this.renderOrder = tileRenderOrder-1;
         this.isCheckpoint = 1;
+        this.secured = false; // Track if this checkpoint has been secured
+        allCheckpoints.push(this); // Add to global array
         for(let x=3;x--;)
         for(let y=6;y--;)
             setTileCollisionData(pos.subtract(vec2(x-1,1-y)), y ? tileType_empty : tileType_solid);
@@ -364,7 +367,9 @@ class Checkpoint extends GameObject
 
         checkpointPos = this.pos;
         activeCheckpoint = this;
+        this.secured = true; // Mark as secured when activated
         checkpointTimer.set(.1);
+        return this; // Return this for method chaining
     }
 
     render()
@@ -372,8 +377,8 @@ class Checkpoint extends GameObject
         // draw flag
         const height = 4;
         const a = Math.sin(time*4+this.pos.x);
-        // Only draw flag when secured
-        if (activeCheckpoint == this)
+        // Draw flag when secured
+        if (this.secured)
         {
             const color = new Color(0,0,0); // Black when secured
             drawTile(this.pos.add(vec2(.5,height-.3-.5-.03*a)), vec2(1,.6), 14, undefined, color, a*.06);  
