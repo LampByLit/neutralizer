@@ -1400,7 +1400,7 @@ class Barrister extends Enemy
                     
                     // Aggressive ladder climbing - always try to climb towards player
                     this.moveInput.y = clamp(delta.y, .8, -.8);
-                    
+
                     // Jump frequently to close distance
                     if (this.groundTimer.active() && dist > 2 && rand() < 0.15)
                     {

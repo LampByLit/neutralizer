@@ -429,7 +429,25 @@ function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefact
                 }
                 else if (spawnBarrister)
                 {
-                    new Barrister(pos);
+                    // Create a platform for the barrister (2x size, needs clearance)
+                    const platformX = pos.x;
+                    const platformTest = vec2(platformX, levelSize.y);
+                    let raycastHit = tileCollisionRaycast(platformTest, vec2(platformX, 0));
+                    
+                    let spawnPos;
+                    if (raycastHit)
+                    {
+                        const groundY = (raycastHit.y - 0.5) | 0;
+                        spawnPos = createMalefactorSpawnPlatform(platformX, groundY, 10, 6);
+                    }
+                    else
+                    {
+                        // Fallback: use floor position
+                        const floorGroundY = (floorBottomCenterPos.y + 0.5) | 0;
+                        spawnPos = createMalefactorSpawnPlatform(platformX, floorGroundY, 10, 6);
+                    }
+                    
+                    new Barrister(spawnPos);
                     ++totalBarristersSpawnedRef.value;
                     ++totalEnemiesSpawnedRef.value;
                 }
