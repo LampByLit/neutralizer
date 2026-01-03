@@ -358,34 +358,41 @@ engineInit(
         // Draw animated GIF background (day or night) with parallax
         if (levelBackgroundGif && levelBackgroundGif.complete && levelBackgroundGif.width > 0)
         {
+            // Calculate maximum possible parallax offset
+            // Max level width is 400 tiles, parallax speed is 0.1, so max offset is ~40 tiles
+            // Convert to screen pixels: 40 * cameraScale
+            const maxParallaxOffsetPixels = levelSize.x * 0.1 * cameraScale;
+            
             // Scale GIF to cover entire canvas while maintaining aspect ratio
             const gifAspect = levelBackgroundGif.width / levelBackgroundGif.height;
             const canvasAspect = mainCanvas.width / mainCanvas.height;
             
-            // Calculate size needed to cover canvas, then add generous buffer for parallax
-            // Use the larger dimension to ensure full coverage
+            // Calculate base size to cover canvas, then add HUGE buffer for parallax
+            // Need to cover canvas + max parallax offset in both directions
             let drawWidth, drawHeight;
             if (gifAspect > canvasAspect)
             {
-                // GIF is wider - scale to cover width with extra buffer
-                drawWidth = mainCanvas.width * 2.0; // Large buffer to account for parallax
+                // GIF is wider - scale to cover width + parallax buffer
+                drawWidth = mainCanvas.width + maxParallaxOffsetPixels * 2; // Buffer on both sides
                 drawHeight = drawWidth / gifAspect;
-                // Make sure height also covers canvas
-                if (drawHeight < mainCanvas.height * 2.0)
+                // Make sure height also covers canvas + parallax
+                const minHeight = mainCanvas.height + maxParallaxOffsetPixels * 2;
+                if (drawHeight < minHeight)
                 {
-                    drawHeight = mainCanvas.height * 2.0;
+                    drawHeight = minHeight;
                     drawWidth = drawHeight * gifAspect;
                 }
             }
             else
             {
-                // GIF is taller - scale to cover height with extra buffer
-                drawHeight = mainCanvas.height * 2.0; // Large buffer to account for parallax
+                // GIF is taller - scale to cover height + parallax buffer
+                drawHeight = mainCanvas.height + maxParallaxOffsetPixels * 2; // Buffer on both sides
                 drawWidth = drawHeight * gifAspect;
-                // Make sure width also covers canvas
-                if (drawWidth < mainCanvas.width * 2.0)
+                // Make sure width also covers canvas + parallax
+                const minWidth = mainCanvas.width + maxParallaxOffsetPixels * 2;
+                if (drawWidth < minWidth)
                 {
-                    drawWidth = mainCanvas.width * 2.0;
+                    drawWidth = minWidth;
                     drawHeight = drawWidth / gifAspect;
                 }
             }
@@ -411,8 +418,6 @@ engineInit(
             mainContext.fillStyle = gradient;
             mainContext.fillRect(0,0,mainCanvas.width, mainCanvas.height);
         }
-
-        drawStars();
     }
     else if (gameState === 'title' && titleScreenReady)
     {
