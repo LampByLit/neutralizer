@@ -36,15 +36,15 @@ let gameState = 'title'; // game states: 'title', 'playing', 'gameOver', 'win'
 
 // level enemy limits: [maxEnemies, maxSlimes, maxBastards, maxMalefactors, maxFoes, maxSpiders, maxSpiderlings, maxBarristers, maxSolicitors]
 const levelLimits = {
-    1: [20, 1, 0, 0, 0, 1, 0, 1, 0],  // Level 1: 1 spider boss, 1 barrister, 0 solicitors
-    2: [40, 3, 0, 0, 0, 0, 3, 1, 1],  // Level 2: max 3 spiderlings, 1 barrister, 1 solicitor
-    3: [50, 10, 15, 0, 0, 0, 5, 1, 1],  // Level 3: max 5 spiderlings, 1 barrister, 1 solicitor
-    4: [30, 0, 28, 1, 0, 1, 0, 1, 1],  // Level 4: 30 total (1 malefactor, 1 spider, 28 bastards), 1 barrister, 1 solicitor
-    5: [60, 20, 15, 10, 1, 0, 8, 1, 1],  // Level 5: 60 enemies total, including 10 malefactors, 1 foe, and 8 spiderlings, 1 barrister, 1 solicitor
+    1: [20, 1, 0, 0, 0, 1, 0, 1, 0, 0],  // Level 1: 1 spider boss, 1 barrister, 0 solicitors, 0 prosecutors
+    2: [40, 3, 0, 0, 0, 0, 3, 1, 1, 0],  // Level 2: max 3 spiderlings, 1 barrister, 1 solicitor, 0 prosecutors
+    3: [50, 10, 15, 0, 0, 0, 5, 1, 1, 1],  // Level 3: max 5 spiderlings, 1 barrister, 1 solicitor, 1 prosecutor
+    4: [30, 0, 28, 1, 0, 1, 0, 1, 1, 1],  // Level 4: 30 total (1 malefactor, 1 spider, 28 bastards), 1 barrister, 1 solicitor, 1 prosecutor
+    5: [60, 20, 15, 10, 1, 0, 8, 1, 1, 1],  // Level 5: 60 enemies total, including 10 malefactors, 1 foe, and 8 spiderlings, 1 barrister, 1 solicitor, 1 prosecutor
     // 6: [1, 0, 0, 0, 0]  // Level 6: Flat level with 1 weak enemy and many crates - REMOVED
 };
-let levelMaxEnemies, levelMaxSlimes, levelMaxBastards, levelMaxMalefactors, levelMaxFoes, levelMaxSpiders, levelMaxSpiderlings, levelMaxBarristers, levelMaxSolicitors;
-let totalEnemiesSpawned, totalSlimesSpawned, totalBastardsSpawned, totalMalefactorsSpawned, totalFoesSpawned, totalSpidersSpawned, totalSpiderlingsSpawned, totalBarristersSpawned, totalSolicitorsSpawned;
+let levelMaxEnemies, levelMaxSlimes, levelMaxBastards, levelMaxMalefactors, levelMaxFoes, levelMaxSpiders, levelMaxSpiderlings, levelMaxBarristers, levelMaxSolicitors, levelMaxProsecutors;
+let totalEnemiesSpawned, totalSlimesSpawned, totalBastardsSpawned, totalMalefactorsSpawned, totalFoesSpawned, totalSpidersSpawned, totalSpiderlingsSpawned, totalBarristersSpawned, totalSolicitorsSpawned, totalProsecutorsSpawned;
 
 let tileBackground, keyItemSpawned;
 const setTileBackgroundData = (pos, data=0)=>
@@ -233,7 +233,7 @@ function spawnProps(pos)
     }
 }
 
-function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefactorsSpawnedRef, totalEnemiesSpawnedRef, totalSpiderlingsSpawnedRef, totalBarristersSpawnedRef, totalSolicitorsSpawnedRef)
+function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefactorsSpawnedRef, totalEnemiesSpawnedRef, totalSpiderlingsSpawnedRef, totalBarristersSpawnedRef, totalSolicitorsSpawnedRef, totalProsecutorsSpawnedRef)
 {
     // check if we've hit limits
     if (totalEnemiesSpawnedRef.value >= levelMaxEnemies)
@@ -367,12 +367,13 @@ function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefact
                 
                 const pos = floorBottomCenterPos.add(vec2(randSeeded( floorWidth-1,-floorWidth+1),.7));
                 
-                // decide what to spawn: slime, bastard, spiderling, barrister, solicitor, or regular enemy
+                // decide what to spawn: slime, bastard, spiderling, barrister, solicitor, prosecutor, or regular enemy
                 let spawnSlime = 0;
                 let spawnBastard = 0;
                 let spawnSpiderling = 0;
                 let spawnBarrister = 0;
                 let spawnSolicitor = 0;
+                let spawnProsecutor = 0;
                 
                 // Check for spiderling first (levels 2, 3, and 5)
                 if ((level == 2 || level == 3 || level == 5) && totalSpiderlingsSpawnedRef.value < levelMaxSpiderlings)
@@ -413,8 +414,23 @@ function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefact
                     }
                 }
                 
-                // If not spawning spiderling, barrister, or solicitor, check for bastard
-                if (!spawnSpiderling && !spawnBarrister && !spawnSolicitor && level >= 3 && totalBastardsSpawnedRef.value < levelMaxBastards)
+                // If not spawning spiderling, barrister, or solicitor, check for prosecutor (levels 3+)
+                if (!spawnSpiderling && !spawnBarrister && !spawnSolicitor && level >= 3 && totalProsecutorsSpawnedRef.value < levelMaxProsecutors)
+                {
+                    // Guaranteed spawn if we haven't spawned one yet, otherwise use chance
+                    if (totalProsecutorsSpawnedRef.value == 0)
+                        spawnProsecutor = 1; // Guaranteed first prosecutor
+                    else
+                    {
+                        // Small chance for additional prosecutors (shouldn't happen with limit of 1)
+                        let prosecutorChance = 0.1;
+                        if (randSeeded() < prosecutorChance)
+                            spawnProsecutor = 1;
+                    }
+                }
+                
+                // If not spawning spiderling, barrister, solicitor, or prosecutor, check for bastard
+                if (!spawnSpiderling && !spawnBarrister && !spawnSolicitor && !spawnProsecutor && level >= 3 && totalBastardsSpawnedRef.value < levelMaxBastards)
                 {
                     // Chance to spawn bastard based on level
                     let bastardChance = level == 3 ? 0.4 : (level == 4 ? 0.25 : 0.2); // 40% level 3, 25% level 4, 20% level 5
@@ -422,8 +438,8 @@ function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefact
                         spawnBastard = 1;
                 }
                 
-                // If not spawning spiderling, barrister, solicitor, or bastard, check for slime
-                if (!spawnSpiderling && !spawnBarrister && !spawnSolicitor && !spawnBastard && totalSlimesSpawnedRef.value < levelMaxSlimes)
+                // If not spawning spiderling, barrister, solicitor, prosecutor, or bastard, check for slime
+                if (!spawnSpiderling && !spawnBarrister && !spawnSolicitor && !spawnProsecutor && !spawnBastard && totalSlimesSpawnedRef.value < levelMaxSlimes)
                 {
                     // we can still spawn slimes, use chance-based logic
                     if (level == 1)
@@ -489,6 +505,30 @@ function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefact
                     
                     new Solicitor(spawnPos);
                     ++totalSolicitorsSpawnedRef.value;
+                    ++totalEnemiesSpawnedRef.value;
+                }
+                else if (spawnProsecutor)
+                {
+                    // Create a platform for the prosecutor (3x size, needs larger clearance)
+                    const platformX = pos.x;
+                    const platformTest = vec2(platformX, levelSize.y);
+                    let raycastHit = tileCollisionRaycast(platformTest, vec2(platformX, 0));
+                    
+                    let spawnPos;
+                    if (raycastHit)
+                    {
+                        const groundY = (raycastHit.y - 0.5) | 0;
+                        spawnPos = createMalefactorSpawnPlatform(platformX, groundY, 12, 8);
+                    }
+                    else
+                    {
+                        // Fallback: use floor position
+                        const floorGroundY = (floorBottomCenterPos.y + 0.5) | 0;
+                        spawnPos = createMalefactorSpawnPlatform(platformX, floorGroundY, 12, 8);
+                    }
+                    
+                    new Prosecutor(spawnPos);
+                    ++totalProsecutorsSpawnedRef.value;
                     ++totalEnemiesSpawnedRef.value;
                 }
                 else if (spawnBastard)
@@ -648,6 +688,7 @@ function generateLevel()
     totalSpiderlingsSpawned = 0;
     totalBarristersSpawned = 0;
     totalSolicitorsSpawned = 0;
+    totalProsecutorsSpawned = 0;
     const totalSlimesSpawnedRef = { value: 0 };
     const totalBastardsSpawnedRef = { value: 0 };
     const totalMalefactorsSpawnedRef = { value: 0 };
@@ -656,6 +697,7 @@ function generateLevel()
     const totalSpiderlingsSpawnedRef = { value: 0 };
     const totalBarristersSpawnedRef = { value: 0 };
     const totalSolicitorsSpawnedRef = { value: 0 };
+    const totalProsecutorsSpawnedRef = { value: 0 };
     const totalEnemiesSpawnedRef = { value: 0 };
     
     // Level 6: Special generation - flat level with many crates and 1 weak enemy - REMOVED
@@ -1072,7 +1114,7 @@ function generateLevel()
             if (!tries--)
                 break; // stop if we can't spawn more bases
 
-            if (buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefactorsSpawnedRef, totalEnemiesSpawnedRef, totalSpiderlingsSpawnedRef, totalBarristersSpawnedRef, totalSolicitorsSpawnedRef))
+            if (buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefactorsSpawnedRef, totalEnemiesSpawnedRef, totalSpiderlingsSpawnedRef, totalBarristersSpawnedRef, totalSolicitorsSpawnedRef, totalProsecutorsSpawnedRef))
                 break; // stop if buildBase returns error or limit reached
         }
     }
@@ -1087,6 +1129,7 @@ function generateLevel()
     totalSpiderlingsSpawned = totalSpiderlingsSpawnedRef.value;
     totalBarristersSpawned = totalBarristersSpawnedRef.value;
     totalSolicitorsSpawned = totalSolicitorsSpawnedRef.value;
+    totalProsecutorsSpawned = totalProsecutorsSpawnedRef.value;
 
     // spawn jackrock - one per level
     // First, find all existing spiders to avoid spawning too close
@@ -1339,6 +1382,7 @@ function nextLevel()
     levelMaxSpiderlings = limits[6] || 0;
     levelMaxBarristers = limits[7] || 0;
     levelMaxSolicitors = limits[8] || 0;
+    levelMaxProsecutors = limits[9] || 0;
     levelEnemyCount = levelMaxEnemies; // keep for compatibility with existing code
     levelSeed = randSeed = rand(1e9)|0;
     levelSize = level == 1 ? vec2(300,200) : vec2(min(level*99,400),200);
@@ -1544,6 +1588,46 @@ function nextLevel()
             }
             
             new Solicitor(spawnPos);
+        }
+    }
+
+    // CRITICAL VERIFICATION: Ensure every level from level 3 onward has exactly 1 prosecutor (guaranteed spawn)
+    if (level >= 3)
+    {
+        let prosecutorCount = 0;
+        forEachObject(0, 0, (o)=>
+        {
+            // Check if it's a prosecutor: enemy character with type 13 (type_prosecutor)
+            if (o.isCharacter && o.team == team_enemy && !o.destroyed)
+            {
+                // Prosecutors have type 13
+                if (o.type === 13)
+                    ++prosecutorCount;
+            }
+        }, 0); // Check all objects, not just collide objects
+
+        // If no prosecutor found, force spawn one with platform (guaranteed location)
+        if (prosecutorCount == 0 && levelMaxProsecutors > 0)
+        {
+            // Create a spawn platform away from checkpoint (different from barrister and solicitor)
+            const platformX = checkpointPos.x + 40;
+            const platformTest = vec2(platformX, levelSize.y);
+            let raycastHit = tileCollisionRaycast(platformTest, vec2(platformX, 0));
+            
+            let spawnPos;
+            if (raycastHit)
+            {
+                const groundY = (raycastHit.y - 0.5) | 0;
+                spawnPos = createMalefactorSpawnPlatform(platformX, groundY, 12, 8);
+            }
+            else
+            {
+                // Use checkpoint ground level (checkpointPos is 1 tile above ground)
+                const checkpointGroundY = (checkpointPos.y - 1) | 0;
+                spawnPos = createMalefactorSpawnPlatform(checkpointPos.x + 40, checkpointGroundY, 12, 8);
+            }
+            
+            new Prosecutor(spawnPos);
         }
     }
 

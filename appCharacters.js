@@ -444,7 +444,8 @@ const type_spider = 9;
 const type_spiderling = 10;
 const type_barrister = 11;
 const type_solicitor = 12;
-const type_count  = 13;
+const type_prosecutor = 13;
+const type_count  = 14;
 
 function alertEnemies(pos, playerPos)
 {
@@ -1912,6 +1913,246 @@ class Solicitor extends Enemy
         // When on ground/walking: use bodyTile+1 (26) for standing, bodyTile+2 (27) for walking frame 2
         // When jumping: use bodyTile+2 (27) for jump sprite
         this.tileIndex = this.isDead() ? this.bodyTile+1 : this.climbingLadder || this.groundTimer.active() ? (this.bodyTile+1) + this.walkCyclePercent|0 : this.bodyTile+2;
+
+        let additive = this.additiveColor.add(this.extraAdditiveColor);
+        if (this.isPlayer && !this.isDead() && this.dodgeRechargeTimer.elapsed() && this.dodgeRechargeTimer.get() < .2)
+        {
+            const v = .6 - this.dodgeRechargeTimer.get()*3;
+            additive = additive.add(new Color(0,v,v,0)).clamp();
+        }
+
+        const sizeScale = this.sizeScale;
+        const color = this.color.scale(this.burnColorPercent(),1);
+        const eyeColor = this.eyeColor.scale(this.burnColorPercent(),1);
+        const headColor = this.team == team_enemy ? new Color() : color; // enemies use neutral color for head
+
+        // melee animation - head moves back
+        const meleeHeadOffset = this.meleeTimer.active() ? -.12 * Math.sin(this.meleeTimer.getPercent() * PI) : 0;
+
+        const bodyPos = this.pos.add(vec2(0,-.1+.06*Math.sin(this.walkCyclePercent*PI)).scale(sizeScale));
+        
+        // Draw body using drawTile2 from tiles2.png (16x16 sprite)
+        if (typeof drawTile2 === 'function')
+            drawTile2(bodyPos, vec2(sizeScale), this.tileIndex, this.tileSize, color, this.angle, this.mirror, additive);
+        else
+            drawTile(bodyPos, vec2(sizeScale), this.tileIndex, this.tileSize, color, this.angle, this.mirror, additive);
+        
+        // Draw head (like normal enemies)
+        drawTile(this.pos.add(vec2(this.getMirrorSign(.05) + meleeHeadOffset * this.getMirrorSign(),.46).scale(sizeScale).rotate(-this.angle)),vec2(sizeScale/2),this.headTile,vec2(8), headColor,this.angle,this.mirror, additive);
+
+        // Draw eyes on head (like normal enemies)
+        if (!this.isDead())
+        {
+            const blinkScale = this.canBlink ? this.isDead() ? .3: .5 + .5*Math.cos(this.blinkTimer.getPercent()*PI*2) : 1;
+            drawTile(this.pos.add(vec2(this.getMirrorSign(.05),.46).scale(sizeScale).rotate(-this.angle)),vec2(sizeScale/2, blinkScale*sizeScale/2),this.headTile+1,vec2(8), eyeColor, this.angle, this.mirror, this.additiveColor);
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class Prosecutor extends Enemy
+{
+    constructor(pos) 
+    { 
+        super(pos);
+        
+        // Override type to be prosecutor
+        this.type = type_prosecutor;
+        
+        // Prosecutor is 3x normal size
+        this.size = this.size.scale(this.sizeScale = 3.0);
+        this.health = this.healthMax = 50; // Same health as solicitor
+        this.maxSpeed = maxCharacterSpeed * 0.5; // Slow - 0.5x normal speed
+        
+        // Unique sprite - use tiles 28-29 from tiles2.png (16x16 pixels)
+        this.bodyTile = 28;
+        this.tileSize = vec2(16); // 16x16 pixel sprite
+        this.headTile = 2; // Use same head tile as normal enemies
+        
+        // Brown color to distinguish from other enemies
+        this.color = new Color(0.6, 0.4, 0.2);
+        this.eyeColor = new Color(0.6, 0.4, 0.2);
+        
+        // Very long vision range - 50 tiles (same as solicitor)
+        this.maxVisionRange = 50;
+        
+        // Replace weapon with prosecutor weapon (shoots brown venom, no visible gun)
+        this.weapon && this.weapon.destroy();
+        new ProsecutorWeapon(this.pos, this);
+    }
+    
+    update()
+    {
+        // Bypass levelWarmup - prosecutor acts immediately
+        if (!aiEnable || this.isDead() || !this.inUpdateWindow())
+        {
+            if (this.weapon)
+                this.weapon.triggerIsDown = 0;
+            Character.prototype.update.call(this);
+            return;
+        }
+
+        if (this.weapon)
+            this.weapon.localPos = this.weapon.localOffset.scale(this.sizeScale);
+
+        // update check if players are visible
+        const sightCheckFrames = 9;
+        ASSERT(this.sawPlayerPos || !this.sawPlayerTimer.isSet());
+        if (frame%sightCheckFrames == this.sightCheckFrame)
+        {
+            const sawRecently = this.sawPlayerTimer.isSet() && this.sawPlayerTimer.get() < 5;
+            const visionRangeSquared = (sawRecently ? this.maxVisionRange * 1.2 : this.maxVisionRange)**2;
+            debugAI && debugCircle(this.pos, visionRangeSquared**.5, '#f003', .1);
+            for(const player of players)
+            {
+                // check range
+                if (player && !player.isDead())
+                if (sawRecently || this.getMirrorSign() == sign(player.pos.x - this.pos.x))
+                if (sawRecently || abs(player.pos.x - this.pos.x) > abs(player.pos.y - this.pos.y) ) // 45 degree slope
+                if (this.pos.distanceSquared(player.pos) < visionRangeSquared)
+                {
+                    const raycastHit = tileCollisionRaycast(this.pos, player.pos);
+                    if (!raycastHit)
+                    {
+                        this.alert(player.pos, 1);
+                        debugAI && debugLine(this.pos, player.pos, '#0f0',.1)
+                        break;
+                    }
+                    debugAI && debugLine(this.pos, player.pos, '#f00',.1)
+                    debugAI && raycastHit && debugPoint(raycastHit, '#ff0',.1)
+                }
+            }
+
+            if (sawRecently)
+            {
+                // alert nearby enemies
+                alertEnemies(this.pos, this.sawPlayerPos);
+            }
+        }
+
+        this.pressedDodge = this.climbingWall = this.pressingThrow = 0;
+        
+        if (this.burnTimer.isSet())
+        {
+            // burning, run around
+            this.facePlayerTimer.unset();
+            // No jumping when burning
+            if (rand()<.05)
+                this.moveInput.x = randSign()*rand(.6, .3);
+            this.moveInput.y = 0;
+        }
+        else if (this.sawPlayerTimer.isSet() && this.sawPlayerTimer.get() < 10)
+        {
+            debugAI && debugPoint(this.sawPlayerPos, '#f00');
+
+            // Wall climbing - prosecutor can walk up walls
+            if (this.moveInput.x && !this.velocity.x && this.velocity.y < 0)
+            {
+                this.velocity.y *=.8;
+                this.climbingWall = 1;
+                // No jump timer - prosecutor doesn't jump
+            }
+            
+            const timeSinceSawPlayer = this.sawPlayerTimer.get();
+            if (this.weapon)
+                this.weapon.localAngle *= .8;
+            if (this.reactionTimer.active())
+            {
+                // just saw player for first time, act surprised
+                this.moveInput.x = 0;
+            }
+            else if (timeSinceSawPlayer < 5)
+            {
+                debugAI && debugRect(this.pos, this.size, '#00f');
+                    
+                if (!this.dodgeTimer.active())
+                {
+                    const delta = this.sawPlayerPos.subtract(this.pos);
+                    const dist = delta.length();
+                    const playerDirection = sign(delta.x);
+                    
+                    // Always move towards player (slowly)
+                    this.moveInput.x = playerDirection;
+                    
+                    // Aggressive ladder climbing - always try to climb towards player
+                    this.moveInput.y = clamp(delta.y, .8, -.8);
+
+                    // No jumping - prosecutor only walks
+                    
+                    // Face player
+                    if (rand()<.05)
+                        this.facePlayerTimer.set(rand(2,.5));
+                }
+            }
+            else
+            {
+                // was fighting but lost player - still aggressive
+                debugAI && debugRect(this.pos, this.size, '#00f');
+
+                if (rand()<.04)
+                    this.facePlayerTimer.set(rand(2,.5));
+
+                if (rand()<.02)
+                    this.moveInput.x = 0;
+                else if (rand()<.01)
+                    this.moveInput.x = randSign()*rand(.4, .2);
+
+                // No jumping when searching
+                
+                // Move up/down in direction last player was seen
+                this.moveInput.y = clamp(this.sawPlayerPos.y - this.pos.y,.8,-.8);
+            }
+        }
+        else
+        {
+            // Always seek player, no idle behavior
+            // Try to find player by moving around
+            if (rand()<.01)
+                this.moveInput.x = randSign();
+            // No jumping
+        }
+
+        this.holdingShoot = 0; // No shooting for prosecutor (weapon handles it)
+        this.holdingJump = 0; // Prosecutor never jumps
+        this.pressedJumpTimer.unset(); // Always prevent jumping
+
+        // Call Character.update() directly (not Enemy.update() to avoid unwanted AI)
+        Character.prototype.update.call(this);
+        
+        // Override velocity clamping to allow slower movement
+        if (abs(this.velocity.x) > this.maxSpeed)
+            this.velocity.x = sign(this.velocity.x) * this.maxSpeed;
+
+        // override default mirror to face player
+        if (this.facePlayerTimer.active() && !this.dodgeTimer.active() && !this.reactionTimer.active())
+            this.mirror = this.sawPlayerPos.x < this.pos.x;
+    }
+
+    alert(playerPos, resetSawPlayer)
+    {
+        if (resetSawPlayer || !this.sawPlayerTimer.isSet())
+        {
+            if (!this.reactionTimer.isSet())
+            {
+                this.reactionTimer.set(rand(.2,.1)); // Very fast reaction
+                this.facePlayerTimer.set(rand(2,1));
+                // No jumping when alerted
+            }
+            this.sawPlayerPos = playerPos.copy();
+            this.sawPlayerTimer.set();
+        }
+    }
+    
+    render()
+    {
+        if (!isOverlapping(this.pos, this.size, cameraPos, renderWindowSize))
+            return;
+
+        // set tile to use
+        // For Prosecutor: tile 29 is standing/walking
+        // When on ground/walking: use bodyTile+1 (29) for standing/walking
+        this.tileIndex = this.isDead() ? this.bodyTile+1 : this.climbingLadder || this.groundTimer.active() ? (this.bodyTile+1) + this.walkCyclePercent|0 : this.bodyTile+1;
 
         let additive = this.additiveColor.add(this.extraAdditiveColor);
         if (this.isPlayer && !this.isDead() && this.dodgeRechargeTimer.elapsed() && this.dodgeRechargeTimer.get() < .2)
