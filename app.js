@@ -22,6 +22,16 @@ titleImage.onerror = function() {
 };
 titleImage.src = 'title.png';
 
+// Rat rainbow GIF for win screen
+const ratRainbowImage = new Image();
+ratRainbowImage.onload = function() {
+    // Image loaded successfully
+};
+ratRainbowImage.onerror = function() {
+    console.warn('Failed to load rat-rainbow.gif');
+};
+ratRainbowImage.src = 'rat-rainbow.gif';
+
 const team_none = 0;
 const team_player = 1;
 const team_enemy = 2;
@@ -545,6 +555,26 @@ engineInit(
         // game complete text
         const gameCompleteFade = min(gameCompleteTimer.get() / 1.5, 1); // fade in over 1.5 seconds
         const textAlpha = gameCompleteFade; // fade in text
+
+        // Draw rat rainbow GIF above the text
+        if (ratRainbowImage.complete && ratRainbowImage.width > 0 && ratRainbowImage.height > 0)
+        {
+            const gifScale = 0.4; // Scale the GIF to a reasonable size
+            const gifWidth = ratRainbowImage.width * gifScale;
+            const gifHeight = ratRainbowImage.height * gifScale;
+            const gifX = mainCanvas.width / 2;
+            const gifY = mainCanvas.height / 2 - 100; // Position above the text
+            
+            mainContext.globalAlpha = textAlpha;
+            mainContext.drawImage(
+                ratRainbowImage,
+                gifX - gifWidth/2,
+                gifY - gifHeight/2,
+                gifWidth,
+                gifHeight
+            );
+            mainContext.globalAlpha = 1; // Reset alpha
+        }
 
         mainContext.textAlign = 'center';
         mainContext.textBaseline = 'middle';
