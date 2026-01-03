@@ -119,8 +119,22 @@ function drawTile2(pos, size=vec2(1), tileIndex=-1, tileSize=defaultTileSize, co
                 const sY = (tileIndex/cols|0)*tileSize.y + tileBleedShrinkFix;
                 const sWidth  = tileSize.x - 2*tileBleedShrinkFix;
                 const sHeight = tileSize.y - 2*tileBleedShrinkFix;
+                
+                // Draw tile image with alpha
                 context.globalAlpha = color.a;
                 context.drawImage(tileImage2, sX, sY, sWidth, sHeight, -.5, -.5, 1, 1);
+                
+                // Apply RGB color tint only for computer tiles (13, 14, 15, 16)
+                const isComputerTile = (tileIndex >= 13 && tileIndex <= 16);
+                if (isComputerTile && (color.r < 1 || color.g < 1 || color.b < 1))
+                {
+                    context.globalAlpha = 1;
+                    context.globalCompositeOperation = 'multiply';
+                    context.fillStyle = `rgb(${Math.floor(color.r * 255)}, ${Math.floor(color.g * 255)}, ${Math.floor(color.b * 255)})`;
+                    context.fillRect(-.5, -.5, 1, 1);
+                    context.globalCompositeOperation = 'source-over';
+                }
+                context.globalAlpha = 1;
             });
         }
     }
@@ -143,8 +157,22 @@ function drawTile2(pos, size=vec2(1), tileIndex=-1, tileSize=defaultTileSize, co
                 const sY = (tileIndex/cols|0)*tileSize.y + tileBleedShrinkFix;
                 const sWidth  = tileSize.x - 2*tileBleedShrinkFix;
                 const sHeight = tileSize.y - 2*tileBleedShrinkFix;
-                context.globalAlpha = color.a; // only alpha is supported
+                
+                // Draw tile image with alpha
+                context.globalAlpha = color.a;
                 context.drawImage(tileImage2, sX, sY, sWidth, sHeight, -.5, -.5, 1, 1);
+                
+                // Apply RGB color tint only for computer tiles (13, 14, 15, 16)
+                const isComputerTile = (tileIndex >= 13 && tileIndex <= 16);
+                if (isComputerTile && (color.r < 1 || color.g < 1 || color.b < 1))
+                {
+                    context.globalAlpha = 1;
+                    context.globalCompositeOperation = 'multiply';
+                    context.fillStyle = `rgb(${Math.floor(color.r * 255)}, ${Math.floor(color.g * 255)}, ${Math.floor(color.b * 255)})`;
+                    context.fillRect(-.5, -.5, 1, 1);
+                    context.globalCompositeOperation = 'source-over';
+                }
+                context.globalAlpha = 1;
             }
         });
     }

@@ -3031,8 +3031,10 @@ class Computer extends GameObject
         this.tileStates = []; // Track if each tile is broken (true = broken)
         this.tileHealth = []; // Track health for each tile (2 health per tile)
         this.tileParticleEmitters = []; // Store particle emitters for each destroyed tile
+        this.tileBaseColors = []; // Store base color (green, red, or blue) for each tile
+        this.tileColorOffsets = []; // Store time offset for each tile's color animation
         
-        const computerTiles = [13, 14, 15, 16]; // Available tiles from tiles2.png
+        const computerTiles = [13, 15, 16]; // Available tiles from tiles2.png (exclude 14 - reserved for damaged tiles)
         const gridSize = 4;
         
         // Create 4x4 grid of tiles
@@ -3049,35 +3051,26 @@ class Computer extends GameObject
                 this.tileStates.push(false); // Not broken yet
                 this.tileHealth.push(2); // Each tile has 2 health
                 
+                // Assign random base color (green, red, or blue) for color animation
+                const colorChoice = rand(3)|0;
+                let baseColor;
+                if (colorChoice === 0)
+                    baseColor = new Color(0, 1, 0); // Green
+                else if (colorChoice === 1)
+                    baseColor = new Color(1, 0, 0); // Red
+                else
+                    baseColor = new Color(0, 0, 1); // Blue
+                this.tileBaseColors.push(baseColor);
+                
+                // Random time offset for each tile so they change at different rates
+                this.tileColorOffsets.push(rand(100));
+                
                 // Set collision data - use tileType_computer
                 setTileCollisionData(tilePos, tileType_computer);
                 
                 // Set background tile 14 behind computer (will be revealed when destroyed)
                 setTileBackgroundData(tilePos, tileType_dirt); // Use dirt as placeholder, will be replaced with tile 14 visual
             }
-        }
-        
-        // Create blinking light particle emitters (2-3 lights randomly placed)
-        this.lightEmitters = [];
-        const lightCount = rand(2) + 2; // 2-3 lights
-        for(let i = 0; i < lightCount; i++)
-        {
-            const lightX = rand(3) + 0.5; // Random X position within 4x4 grid (0.5 to 3.5)
-            const lightY = rand(3) + 0.5; // Random Y position within 4x4 grid
-            const lightPos = pos.int().add(vec2(lightX, lightY));
-            
-            // Create blinking light particle emitter
-            const emitter = new ParticleEmitter(
-                lightPos, 0.1, 0, 30, 0, // pos, emitSize, emitTime (0 = forever), emitRate, emitCone
-                0, undefined, // tileIndex, tileSize
-                new Color(0, 1, 1, 0.8), new Color(1, 0.5, 0, 0.8), // colorStartA, colorStartB (cyan to orange)
-                new Color(0, 1, 1, 0), new Color(1, 0.5, 0, 0), // colorEndA, colorEndB (fade out)
-                0.3, 0.05, 0.05, 0, 0, // particleTime, sizeStart, sizeEnd, particleSpeed, particleAngleSpeed
-                1, 1, 0, 0, 0.5, // damping, angleDamping, gravityScale, particleCone, fadeRate
-                0.3, 0, 1, 0, 1e9 // randomness, collide, additive, randomColorLinear, renderOrder
-            );
-            this.lightEmitters.push(emitter);
-            this.addChild(emitter);
         }
         
         // Add to global array
@@ -3111,12 +3104,6 @@ class Computer extends GameObject
     
     onTileDestroyed(tileIndex)
     {
-        if (this.computerDestroyed)
-            return;
-        
-        // Mark as destroyed
-        this.computerDestroyed = true;
-        
         const tilePos = this.tilePositions[tileIndex];
         const centerPos = tilePos.add(vec2(0.5));
         
@@ -3135,13 +3122,13 @@ class Computer extends GameObject
             0.5, 0, 1, 0, 1e9 // randomness, collide, additive, randomColorLinear, renderOrder
         );
         
-        // Create smoke particles
+        // Create smoke particles (increased: emitRate 100->250, emitTime 0.5->0.8, emitSize 0.5->0.8, sizeEnd 0.8->1.0)
         new ParticleEmitter(
-            centerPos, 0.5, 0.5, 100, PI, // pos, emitSize, emitTime, emitRate, emitCone
+            centerPos, 0.8, 0.8, 250, PI, // pos, emitSize, emitTime, emitRate, emitCone
             0, undefined, // tileIndex, tileSize
-            new Color(0.2, 0.2, 0.2, 0.8), new Color(0.1, 0.1, 0.1, 0.6), // colorStartA, colorStartB (dark gray)
+            new Color(0.2, 0.2, 0.2, 0.9), new Color(0.1, 0.1, 0.1, 0.7), // colorStartA, colorStartB (dark gray, increased opacity)
             new Color(0.2, 0.2, 0.2, 0), new Color(0.1, 0.1, 0.1, 0), // colorEndA, colorEndB (fade out)
-            1.5, 0.3, 0.8, 0.1, 0.02, // particleTime, sizeStart, sizeEnd, particleSpeed, particleAngleSpeed
+            2.0, 0.3, 1.0, 0.1, 0.02, // particleTime, sizeStart, sizeEnd, particleSpeed, particleAngleSpeed
             0.9, 1, -0.2, PI, 0.2, // damping, angleDamping, gravityScale (negative = rise), particleCone, fadeRate
             0.4, 0, 0, 0, 1e8 // randomness, collide, additive, randomColorLinear, renderOrder
         );
@@ -3157,13 +3144,13 @@ class Computer extends GameObject
             0.3, 0, 1, 0, 1e9
         );
         
-        // Create ongoing smoke emitter for revealed tile (continuous)
+        // Create ongoing smoke emitter for revealed tile (continuous) (increased: emitRate 8->20, emitSize 0.2->0.4, sizeEnd 0.6->0.8)
         const smokeEmitter = new ParticleEmitter(
-            centerPos, 0.2, 0, 8, PI * 0.5, // pos, emitSize, emitTime (0 = forever), emitRate, emitCone (upward)
+            centerPos, 0.4, 0, 20, PI * 0.5, // pos, emitSize, emitTime (0 = forever), emitRate, emitCone (upward)
             0, undefined,
-            new Color(0.3, 0.3, 0.3, 0.5), new Color(0.1, 0.1, 0.1, 0.3),
+            new Color(0.3, 0.3, 0.3, 0.6), new Color(0.1, 0.1, 0.1, 0.4), // increased opacity
             new Color(0.3, 0.3, 0.3, 0), new Color(0.1, 0.1, 0.1, 0),
-            1.2, 0.2, 0.6, 0.06, 0.01,
+            1.2, 0.2, 0.8, 0.06, 0.01, // sizeEnd increased from 0.6 to 0.8
             0.9, 1, -0.15, PI * 0.5, 0.2,
             0.3, 0, 0, 0, 1e8
         );
@@ -3171,11 +3158,21 @@ class Computer extends GameObject
         // Store emitters for this tile
         this.tileParticleEmitters[tileIndex] = [sparkEmitter, smokeEmitter];
         
-        // Stop blinking lights
-        for(const emitter of this.lightEmitters)
+        // Check if all tiles are now destroyed
+        let allDestroyed = true;
+        for(let i = 0; i < this.tileStates.length; i++)
         {
-            if (emitter && !emitter.destroyed)
-                emitter.emitRate = 0;
+            if (!this.tileStates[i])
+            {
+                allDestroyed = false;
+                break;
+            }
+        }
+        
+        // Only mark computer as destroyed when ALL tiles are destroyed
+        if (allDestroyed)
+        {
+            this.computerDestroyed = true;
         }
     }
     
@@ -3200,6 +3197,28 @@ class Computer extends GameObject
             {
                 // Damaged tile - slightly darker/reddish tint
                 tileColor = new Color(0.8, 0.7, 0.7); // Slight red tint when damaged
+            }
+            else
+            {
+                // Undamaged tile - slowly changing color animation (green, red, or blue)
+                const baseColor = this.tileBaseColors[i];
+                const colorOffset = this.tileColorOffsets[i];
+                
+                // Slow color change using sine waves for smooth transitions
+                const colorSpeed = 0.5; // How fast colors change
+                const colorVariation = 0.3; // How much the color varies (0-1)
+                
+                // Create pulsing/changing color effect
+                const r = baseColor.r + colorVariation * Math.sin((time + colorOffset) * colorSpeed);
+                const g = baseColor.g + colorVariation * Math.sin((time + colorOffset + 2) * colorSpeed);
+                const b = baseColor.b + colorVariation * Math.sin((time + colorOffset + 4) * colorSpeed);
+                
+                // Clamp values and ensure minimum brightness
+                tileColor = new Color(
+                    Math.max(0.4, Math.min(1.0, r)),
+                    Math.max(0.4, Math.min(1.0, g)),
+                    Math.max(0.4, Math.min(1.0, b))
+                );
             }
             
             // Draw tile using drawTile2 (tiles2.png)
@@ -3229,13 +3248,6 @@ class Computer extends GameObject
         const index = allComputers.indexOf(this);
         if (index >= 0)
             allComputers.splice(index, 1);
-        
-        // Destroy light emitters
-        for(const emitter of this.lightEmitters)
-        {
-            if (emitter && !emitter.destroyed)
-                emitter.destroy();
-        }
         
         // Destroy tile particle emitters
         for(const emitters of this.tileParticleEmitters)

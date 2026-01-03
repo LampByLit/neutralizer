@@ -203,8 +203,8 @@ class Character extends GameObject
         // check for fall damage after physics update (groundObject is now updated)
         if (!this.climbingLadder && (this.groundObject || this.climbingWall))
         {
-            // just landed - apply fall damage if falling fast enough
-            if (wasOnGroundBeforeUpdate == 0 && this.maxFallVelocity < 0)
+            // just landed - apply fall damage if falling fast enough (unless rolling)
+            if (wasOnGroundBeforeUpdate == 0 && this.maxFallVelocity < 0 && !this.dodgeTimer.active())
             {
                 // Calculate fall damage based on impact velocity
                 // Damage threshold: -0.6 (small falls don't hurt)
