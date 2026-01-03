@@ -744,7 +744,7 @@ class KeyItem extends GameObject
 ///////////////////////////////////////////////////////////////////////////////
 
 // Item type definitions
-// Order: Life (0), Health (1), Laser (2), Cannon (3), Jumper (4), Hammer (5), Radar (6), Smoker (7), Fang (8), Ladymaker (9)
+// Order: Life (0), Health (1), Laser (2), Cannon (3), Jumper (4), Hammer (5), Radar (6), Smoker (7), Fang (8), Ladymaker (9), Transporter (10)
 const itemType_life = 0;
 const itemType_health = 1;
 const itemType_laser = 2;
@@ -755,6 +755,7 @@ const itemType_radar = 6;
 const itemType_smoker = 7;
 const itemType_fang = 8;
 const itemType_ladymaker = 9;
+const itemType_transporter = 10;
 
 const itemType_consumable = 0;
 const itemType_equipable = 1;
@@ -811,6 +812,11 @@ const itemRegistry = {
         category: itemType_equipable, 
         tileIndex: 9, 
         weaponType: 'LadymakerWeapon' 
+    },
+    [itemType_transporter]: { 
+        category: itemType_equipable, 
+        tileIndex: 10, 
+        weaponType: 'TransporterWeapon' 
     }
 };
 
@@ -1947,6 +1953,185 @@ class LadymakerWeapon extends Weapon
             // Not pressing F, reset buffer and spawn flag
             this.girlSpawnTimeBuffer = min(this.girlSpawnTimeBuffer, 0);
             this.hasSpawnedThisPress = 0;
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class PearlProjectile extends GameObject
+{
+    constructor(pos, attacker) 
+    {
+        super(pos, vec2(.2), 5, vec2(8)); // Same size and sprite as hammer
+        this.tileIndex = 5; // Use hammer sprite
+
+        this.health = this.healthMax = 1e3;
+        this.attacker = attacker;
+        this.team = attacker.team;
+        this.elasticity = .3;
+        this.friction = .9;
+        this.angleDamping = .96;
+        this.renderOrder = 1e8;
+        this.gravityScale = 1; // Affected by gravity for ballistic trajectory
+        this.setCollision();
+        this.color = new Color(0, 0, 0, 1); // All black (hammer sprite)
+    }
+
+    update()
+    {
+        super.update();
+
+        // Check for any collision - teleport player immediately on contact
+        // Check tile collision
+        if (getTileCollisionData(this.pos) > 0 && getTileCollisionData(this.pos) != tileType_ladder)
+        {
+            this.teleportPlayer();
+            return;
+        }
+
+        // Check for ground contact
+        if (this.groundObject)
+        {
+            this.teleportPlayer();
+            return;
+        }
+
+        // Check for object collisions (but pass through enemies)
+        forEachObject(this.pos, this.size, (o)=>
+        {
+            if (o.isGameObject && !o.parent && o != this.attacker)
+            {
+                // Pass through enemies, but collide with other objects
+                if (!o.isCharacter || o.team == this.team)
+                {
+                    this.teleportPlayer();
+                    return;
+                }
+            }
+        });
+    }
+    
+    teleportPlayer()
+    {
+        if (this.destroyed || !this.attacker || !this.attacker.isPlayer)
+            return;
+        
+        // Teleport the player to pearl position
+        this.attacker.pos = this.pos.copy();
+        this.attacker.velocity = vec2(0, 0);
+        this.attacker.groundObject = 0; // Reset ground state
+        
+        // Play sound
+        playSound(sound_jump, this.pos);
+        
+        // Destroy the pearl
+        this.destroy();
+    }
+    
+    collideWithObject(o)
+    {
+        // Pass through enemies, but teleport on other collisions
+        if (o.isCharacter && o.team != this.team)
+        {
+            // Pass through enemies
+            return 0;
+        }
+        
+        // Teleport on other collisions
+        this.teleportPlayer();
+        return 1;
+    }
+    
+    collideWithTile(data, pos)
+    {
+        if (data <= 0 || data == tileType_ladder)
+            return 0;
+        
+        // Teleport immediately on tile collision
+        this.teleportPlayer();
+        return 1;
+    }
+       
+    render()
+    {
+        // Draw hammer sprite (tileIndex 5) with white glow
+        drawTile(this.pos, vec2(.5), this.tileIndex, this.tileSize, this.color, this.angle);
+
+        // White glow effect
+        setBlendMode(1);
+        drawTile(this.pos, vec2(.6), 0, vec2(16), new Color(1, 1, 1, .5), this.angle);
+        setBlendMode(0);
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class TransporterWeapon extends Weapon
+{
+    constructor(pos, parent)
+    {
+        super(pos, parent);
+        this.fireTimeBuffer = 0;
+        this.fireRate = 0.2; // 5 second cooldown (1/5 = 0.2)
+        this.hidden = 1; // Don't render the weapon sprite (helmet is rendered separately)
+    }
+    
+    update()
+    {
+        super.update();
+        
+        // Only handle pearl throwing for player
+        if (!this.parent.isPlayer)
+            return;
+        
+        this.fireTimeBuffer += timeDelta;
+        
+        // Check if F key is pressed (key code 70)
+        const fJustPressed = !this.parent.playerIndex && keyWasPressed(70);
+        
+        if (fJustPressed)
+        {
+            const rate = 1/this.fireRate; // 5 seconds
+            
+            // Check if cooldown is ready
+            if (this.fireTimeBuffer >= rate)
+            {
+                // Get base aim angle from parent
+                const baseAimAngle = this.parent.aimAngle || 0;
+                
+                // Calculate forward direction based on mirror state and aim angle
+                const forwardDirection = vec2(this.parent.getMirrorSign(1), 0).rotate(baseAimAngle);
+                
+                // Only fire forward (check if direction matches facing direction)
+                const isFiringForward = (this.parent.mirror == 0 && forwardDirection.x >= 0) || 
+                                         (this.parent.mirror == 1 && forwardDirection.x <= 0);
+                
+                if (isFiringForward)
+                {
+                    // Calculate weapon position (where pearl comes from)
+                    const sizeScale = this.parent.sizeScale || 1;
+                    const weaponPos = this.parent.pos.add(
+                        vec2(this.parent.getMirrorSign(.55), 0).scale(sizeScale)
+                    );
+                    
+                    // Create pearl projectile
+                    const pearl = new PearlProjectile(weaponPos, this.parent);
+                    
+                    // Use same throw trajectory as hammer (thrown far)
+                    pearl.velocity = this.parent.velocity.add(vec2(this.parent.getMirrorSign(), rand(.8,.7)).normalize(.25+rand(.02)));
+                    pearl.angleVelocity = this.parent.getMirrorSign() * rand(.8,.5);
+                    
+                    // Play sound
+                    playSound(sound_jump, weaponPos);
+                    
+                    // Alert enemies
+                    alertEnemies(weaponPos, weaponPos);
+                    
+                    // Reset cooldown
+                    this.fireTimeBuffer = 0;
+                }
+            }
         }
     }
 }

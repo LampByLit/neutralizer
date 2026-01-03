@@ -606,6 +606,8 @@ engineInit(
                     headwearTileIndex = 8; // itemType_fang tileIndex
                 else if (player.equippedWeaponType == 'LadymakerWeapon')
                     headwearTileIndex = 9; // itemType_ladymaker tileIndex
+                else if (player.equippedWeaponType == 'TransporterWeapon')
+                    headwearTileIndex = 10; // itemType_transporter tileIndex
                 
                 if (headwearTileIndex >= 0 && typeof drawTile2 === 'function')
                 {

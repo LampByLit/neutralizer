@@ -4070,6 +4070,8 @@ class Player extends Character
             newWeapon = new FangWeapon(this.pos, this);
         else if (weaponType == 'LadymakerWeapon')
             newWeapon = new LadymakerWeapon(this.pos, this);
+        else if (weaponType == 'TransporterWeapon')
+            newWeapon = new TransporterWeapon(this.pos, this);
         else
             newWeapon = new Weapon(this.pos, this);
         
