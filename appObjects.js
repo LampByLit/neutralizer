@@ -1897,7 +1897,7 @@ class LadymakerWeapon extends Weapon
     {
         super(pos, parent);
         this.girlSpawnTimeBuffer = 0; // Separate buffer for girl spawning (doesn't interfere with gun firing)
-        this.fireRate = 0.5; // Spawns 1 every 2 seconds (1/2 = 0.5)
+        this.fireRate = 0.2; // Spawns 1 every 5 seconds (1/5 = 0.2)
         this.hidden = 1; // Don't render the weapon sprite (helmet is rendered separately)
         this.hasSpawnedThisPress = 0; // Track if we've spawned on current F press
     }
@@ -1916,9 +1916,9 @@ class LadymakerWeapon extends Weapon
         if (pressingF)
         {
             this.girlSpawnTimeBuffer += timeDelta;
-            const rate = 1/this.fireRate; // 2 seconds
+            const rate = 1/this.fireRate; // 5 seconds
             
-            // Spawn immediately on first press, then every 2 seconds while holding
+            // Spawn immediately on first press, then every 5 seconds while holding
             const shouldSpawn = !this.hasSpawnedThisPress || this.girlSpawnTimeBuffer >= rate;
             
             if (shouldSpawn)
