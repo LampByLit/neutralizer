@@ -382,13 +382,19 @@ function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefact
                         spawnSpiderling = 1;
                 }
                 
-                // If not spawning spiderling, check for barrister (level 1)
-                if (!spawnSpiderling && level == 1 && totalBarristersSpawnedRef.value < levelMaxBarristers)
+                // If not spawning spiderling, check for barrister (all levels)
+                if (!spawnSpiderling && totalBarristersSpawnedRef.value < levelMaxBarristers)
                 {
-                    // Chance to spawn barrister on level 1
-                    let barristerChance = 0.5; // 50% chance on level 1
-                    if (randSeeded() < barristerChance)
-                        spawnBarrister = 1;
+                    // Guaranteed spawn if we haven't spawned one yet, otherwise use chance
+                    if (totalBarristersSpawnedRef.value == 0)
+                        spawnBarrister = 1; // Guaranteed first barrister
+                    else
+                    {
+                        // Small chance for additional barristers (shouldn't happen with limit of 1)
+                        let barristerChance = 0.1;
+                        if (randSeeded() < barristerChance)
+                            spawnBarrister = 1;
+                    }
                 }
                 
                 // If not spawning spiderling or barrister, check for bastard
@@ -1400,6 +1406,43 @@ function nextLevel()
             
             new Spider(spawnPos);
         }
+    }
+
+    // CRITICAL VERIFICATION: Ensure every level has exactly 1 barrister (guaranteed spawn)
+    let barristerCount = 0;
+    forEachObject(0, 0, (o)=>
+    {
+        // Check if it's a barrister: enemy character with type 11 (type_barrister) or sizeScale ~2.0
+        if (o.isCharacter && o.team == team_enemy && !o.destroyed)
+        {
+            // Barristers have type 11 and sizeScale of 2.0
+            if ((o.type === 11) || (o.sizeScale && abs(o.sizeScale - 2.0) < 0.1))
+                ++barristerCount;
+        }
+    }, 0); // Check all objects, not just collide objects
+
+    // If no barrister found, force spawn one with platform (guaranteed location)
+    if (barristerCount == 0 && levelMaxBarristers > 0)
+    {
+        // Create a spawn platform away from checkpoint
+        const platformX = checkpointPos.x + 30;
+        const platformTest = vec2(platformX, levelSize.y);
+        let raycastHit = tileCollisionRaycast(platformTest, vec2(platformX, 0));
+        
+        let spawnPos;
+        if (raycastHit)
+        {
+            const groundY = (raycastHit.y - 0.5) | 0;
+            spawnPos = createMalefactorSpawnPlatform(platformX, groundY, 10, 6);
+        }
+        else
+        {
+            // Use checkpoint ground level (checkpointPos is 1 tile above ground)
+            const checkpointGroundY = (checkpointPos.y - 1) | 0;
+            spawnPos = createMalefactorSpawnPlatform(checkpointPos.x + 30, checkpointGroundY, 10, 6);
+        }
+        
+        new Barrister(spawnPos);
     }
 
     // CRITICAL VERIFICATION: Ensure level 6 has at least 1 enemy (guaranteed spawn) - REMOVED
