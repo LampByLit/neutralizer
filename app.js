@@ -32,6 +32,43 @@ ratRainbowImage.onerror = function() {
 };
 ratRainbowImage.src = 'rat-rainbow.gif';
 
+// Day and night GIF backgrounds - use img elements to ensure animation
+const dayGifImage = document.createElement('img');
+dayGifImage.style.display = 'none';
+dayGifImage.style.position = 'absolute';
+dayGifImage.style.visibility = 'hidden';
+document.body.appendChild(dayGifImage);
+dayGifImage.onload = function() {
+    // Image loaded successfully
+};
+dayGifImage.onerror = function() {
+    console.warn('Failed to load day.gif');
+};
+dayGifImage.src = 'day.gif';
+
+const nightGifImage = document.createElement('img');
+nightGifImage.style.display = 'none';
+nightGifImage.style.position = 'absolute';
+nightGifImage.style.visibility = 'hidden';
+document.body.appendChild(nightGifImage);
+nightGifImage.onload = function() {
+    // Image loaded successfully
+};
+nightGifImage.onerror = function() {
+    console.warn('Failed to load night.gif');
+};
+nightGifImage.src = 'night.gif';
+
+// Silhouette image for parallax layer
+const silhouetteImage = new Image();
+silhouetteImage.onload = function() {
+    // Image loaded successfully
+};
+silhouetteImage.onerror = function() {
+    console.warn('Failed to load silhouette.png');
+};
+silhouetteImage.src = 'silhouette.png';
+
 const team_none = 0;
 const team_player = 1;
 const team_enemy = 2;
@@ -53,6 +90,10 @@ engineInit(
     gameState = 'title';
     cameraScale = startCameraScale;
     titleScreenReady = false;
+    
+    // Initialize parallax tracking
+    backgroundParallaxOffset = vec2();
+    previousCameraPos = cameraPos.copy();
     
     // Initialize title screen music
     titleMusic = new Audio('https://mp3.tom7.org/t7es/2016/superior-olive.mp3');
@@ -297,6 +338,12 @@ engineInit(
                 cameraPos.x = clamp(cameraPos.x, tileCollisionSize.x - w, w);
         }
 
+        // Update background parallax offset (10% of camera movement)
+        const parallaxSpeed = 0.1;
+        const cameraDelta = cameraPos.subtract(previousCameraPos);
+        backgroundParallaxOffset = backgroundParallaxOffset.add(cameraDelta.scale(parallaxSpeed));
+        previousCameraPos = cameraPos.copy();
+
         updateParallaxLayers();
 
         updateSky();
@@ -308,12 +355,62 @@ engineInit(
 {
     if (gameState === 'playing')
     {
-        const gradient = mainContext.createLinearGradient(0,0,0,mainCanvas.height);
-        gradient.addColorStop(0,levelSkyColor.rgba());
-        gradient.addColorStop(1,levelSkyHorizonColor.rgba());
-        mainContext.fillStyle = gradient;
-        //mainContext.fillStyle = levelSkyColor.rgba();
-        mainContext.fillRect(0,0,mainCanvas.width, mainCanvas.height);
+        // Draw animated GIF background (day or night) with parallax
+        if (levelBackgroundGif && levelBackgroundGif.complete && levelBackgroundGif.width > 0)
+        {
+            // Scale GIF to cover entire canvas while maintaining aspect ratio
+            const gifAspect = levelBackgroundGif.width / levelBackgroundGif.height;
+            const canvasAspect = mainCanvas.width / mainCanvas.height;
+            
+            // Calculate size needed to cover canvas, then add generous buffer for parallax
+            // Use the larger dimension to ensure full coverage
+            let drawWidth, drawHeight;
+            if (gifAspect > canvasAspect)
+            {
+                // GIF is wider - scale to cover width with extra buffer
+                drawWidth = mainCanvas.width * 2.0; // Large buffer to account for parallax
+                drawHeight = drawWidth / gifAspect;
+                // Make sure height also covers canvas
+                if (drawHeight < mainCanvas.height * 2.0)
+                {
+                    drawHeight = mainCanvas.height * 2.0;
+                    drawWidth = drawHeight * gifAspect;
+                }
+            }
+            else
+            {
+                // GIF is taller - scale to cover height with extra buffer
+                drawHeight = mainCanvas.height * 2.0; // Large buffer to account for parallax
+                drawWidth = drawHeight * gifAspect;
+                // Make sure width also covers canvas
+                if (drawWidth < mainCanvas.width * 2.0)
+                {
+                    drawWidth = mainCanvas.width * 2.0;
+                    drawHeight = drawWidth / gifAspect;
+                }
+            }
+            
+            // Apply parallax offset (convert world coordinates to screen pixels)
+            // Parallax offset is in world units, convert to screen pixels
+            const parallaxX = backgroundParallaxOffset.x * cameraScale;
+            const parallaxY = -backgroundParallaxOffset.y * cameraScale; // Negate Y because screen Y is inverted
+            
+            // Center the background and apply parallax
+            const drawX = (mainCanvas.width - drawWidth) / 2 + parallaxX;
+            const drawY = (mainCanvas.height - drawHeight) / 2 + parallaxY;
+            
+            // Draw the animated GIF (it will animate because it's an img element in the DOM)
+            mainContext.drawImage(levelBackgroundGif, drawX, drawY, drawWidth, drawHeight);
+        }
+        else
+        {
+            // Fallback to gradient if GIF not loaded
+            const gradient = mainContext.createLinearGradient(0,0,0,mainCanvas.height);
+            gradient.addColorStop(0,levelSkyColor.rgba());
+            gradient.addColorStop(1,levelSkyHorizonColor.rgba());
+            mainContext.fillStyle = gradient;
+            mainContext.fillRect(0,0,mainCanvas.width, mainCanvas.height);
+        }
 
         drawStars();
     }

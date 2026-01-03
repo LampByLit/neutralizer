@@ -513,50 +513,98 @@ function updateSky()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-let tileParallaxLayers = [];
+let silhouetteParallaxLayer = null;
 
-function generateParallaxLayers()
+// Silhouette parallax layer - renders between background and game
+class SilhouetteParallax extends EngineObject
 {
-    tileParallaxLayers = [];
-    for(let i=0; i<3; ++i)
+    constructor()
     {
-        const parallaxSize = vec2(600,300), startGroundLevel = rand(99,120)+i*30;
-        const tileParallaxLayer = tileParallaxLayers[i] = new TileLayer(vec2(), parallaxSize);
-        let groundLevel = startGroundLevel, groundSlope = rand(1,-1);
-        tileParallaxLayer.renderOrder = -3e3+i;
-        tileParallaxLayer.canvas.width = parallaxSize.x;
+        super(vec2(), vec2());
+        this.renderOrder = -2500; // Between background (-3e3) and tile background (-2e3)
+        this.parallaxSpeed = 0.3; // Slower than camera for depth effect
+        this.groundY = 100; // Ground level in world coordinates (below lowest ground at ~99)
+    }
 
-        const layerColor = levelColor.mutate(.2).lerp(levelSkyColor,.95-i*.15);
-        const gradient = tileParallaxLayer.context.fillStyle = tileParallaxLayer.context.createLinearGradient(0,0,0,tileParallaxLayer.canvas.height = parallaxSize.y);
-        gradient.addColorStop(0,layerColor.rgba());
-        gradient.addColorStop(1,layerColor.subtract(new Color(1,1,1,0)).mutate(.1).clamp().rgba());
+    update()
+    {
+        // Update position based on camera with parallax effect
+        const parallax = vec2(150, 30).scale(this.parallaxSpeed);
+        const cameraDeltaFromCenter = cameraPos.subtract(levelSize.scale(.5)).divide(levelSize.scale(-.5).divide(parallax));
+        
+        // Position silhouette with parallax scrolling
+        // The X position scrolls with parallax, Y is fixed at ground level
+        this.pos = vec2(
+            cameraPos.x + cameraDeltaFromCenter.x * this.parallaxSpeed,
+            this.groundY // This will be the bottom of the silhouette
+        );
+    }
 
-        // draw city buildings instead of mountains
-        let x = 0;
-        while(x < parallaxSize.x)
+    render()
+    {
+        // Check if silhouette image is available and loaded
+        if (typeof silhouetteImage === 'undefined' || !silhouetteImage || 
+            !silhouetteImage.complete || !silhouetteImage.width || !silhouetteImage.height)
+            return;
+
+        // Use a scale factor to convert image pixels to world units
+        // Tiles are typically 16x16 pixels, so we'll scale the silhouette similarly
+        // For a good visual size, let's make the silhouette height match roughly 100-150 world units
+        const targetHeightWorld = 120; // Height in world units (roughly from ground to top of screen)
+        const scaleFactor = targetHeightWorld / silhouetteImage.height;
+        const silhouetteWidthWorld = silhouetteImage.width * scaleFactor;
+        const silhouetteHeightWorld = silhouetteImage.height * scaleFactor;
+        
+        // Calculate screen bounds in world coordinates
+        const screenLeft = cameraPos.x - mainCanvas.width / (2 * cameraScale);
+        const screenRight = cameraPos.x + mainCanvas.width / (2 * cameraScale);
+        
+        // Calculate starting X position for tiling (leftmost visible tile)
+        // Align tiles so they start before the left edge
+        let startX = screenLeft - (screenLeft % silhouetteWidthWorld);
+        if (startX > screenLeft) startX -= silhouetteWidthWorld;
+        const endX = screenRight + silhouetteWidthWorld;
+        
+        // Draw tiled silhouette
+        for (let x = startX; x < endX; x += silhouetteWidthWorld)
         {
-            const buildingWidth = rand(15, 5) + i*5; // wider buildings in back layers
-            const buildingHeight = rand(parallaxSize.y - 40, 40); // random height from bottom
-            const buildingTop = parallaxSize.y - buildingHeight; // start from bottom
+            // Position: bottom of silhouette at groundY, so top is at groundY - height
+            const worldPos = vec2(x, this.groundY - silhouetteHeightWorld);
+            const screenPos = worldToScreen(worldPos);
             
-            tileParallaxLayer.context.fillRect(x, buildingTop, buildingWidth, buildingHeight);
+            // Draw at scaled size
+            const drawWidth = silhouetteWidthWorld * cameraScale;
+            const drawHeight = silhouetteHeightWorld * cameraScale;
             
-            x += buildingWidth + rand(8, 2); // spacing between buildings
+            // Only draw if on screen
+            if (screenPos.x + drawWidth > 0 && screenPos.x < mainCanvas.width &&
+                screenPos.y + drawHeight > 0 && screenPos.y < mainCanvas.height)
+            {
+                mainContext.drawImage(
+                    silhouetteImage,
+                    screenPos.x, screenPos.y,
+                    drawWidth, drawHeight
+                );
+            }
         }
     }
 }
 
+function generateParallaxLayers()
+{
+    // Destroy old silhouette layer if it exists
+    if (silhouetteParallaxLayer)
+    {
+        silhouetteParallaxLayer.destroy();
+        silhouetteParallaxLayer = null;
+    }
+    
+    // Create new silhouette parallax layer
+    silhouetteParallaxLayer = new SilhouetteParallax();
+}
+
 function updateParallaxLayers()
 {
-    tileParallaxLayers.forEach((tileParallaxLayer, i)=>
-    {
-        const distance = 4+i;
-        const parallax = vec2(150,30).scale((i*i+1));
-        const cameraDeltaFromCenter = cameraPos.subtract(levelSize.scale(.5)).divide(levelSize.scale(-.5).divide(parallax));
-        tileParallaxLayer.scale = vec2(distance/cameraScale);
-        tileParallaxLayer.pos = cameraPos
-            .subtract(tileParallaxLayer.size.multiply(tileParallaxLayer.scale).scale(.5))
-            .add(cameraDeltaFromCenter.scale(1/cameraScale))
-            .subtract(vec2(0,150/cameraScale))
-    });
+    // Silhouette layer updates itself in its update() method
+    // This function is kept for compatibility but does nothing now
 }

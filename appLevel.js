@@ -27,6 +27,9 @@ let playerEquippedWeapons = []; // Store equipped weapon type per player index (
 // level settings
 let levelSize, level, levelSeed, levelEnemyCount, levelWarmup;
 let levelColor, levelBackgroundColor, levelSkyColor, levelSkyHorizonColor, levelGroundColor;
+let levelBackgroundGif; // Selected background GIF (dayGifImage or nightGifImage)
+let backgroundParallaxOffset = vec2(); // Parallax offset for background
+let previousCameraPos = vec2(); // Track previous camera position for parallax
 let skyParticles, skyRain, skySoundTimer = new Timer;
 let gameTimer = new Timer, levelTimer = new Timer, levelEndTimer = new Timer, gameOverTimer = new Timer, gameCompleteTimer = new Timer;
 let gameState = 'title'; // game states: 'title', 'playing', 'gameOver', 'win'
@@ -1223,6 +1226,13 @@ function nextLevel()
     levelSkyColor = randColor(new Color(.5,.5,.5), new Color(.9,.9,.9));
     levelSkyHorizonColor = levelSkyColor.subtract(new Color(.05,.05,.05)).mutate(.3).clamp();
     levelGroundColor = levelColor.mutate().add(new Color(.3,.3,.3)).clamp();
+    
+    // Randomly select day or night background GIF
+    levelBackgroundGif = rand() < 0.5 ? dayGifImage : nightGifImage;
+    
+    // Reset parallax offset for new level
+    backgroundParallaxOffset = vec2();
+    previousCameraPos = cameraPos.copy();
 
     // keep trying until a valid level is generated
     for(;generateLevel(););
