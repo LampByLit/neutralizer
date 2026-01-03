@@ -232,7 +232,7 @@ engineInit(
     {
         const pressingCtrl = leftCtrlDown || rightCtrlDown || keyIsDown(17); // Check both Ctrl keys explicitly, fallback to keyCode
         const ctrlZoomSpeed = 0.05; // Smooth lerp factor for zoom transitions
-        const ctrlZoomFactor = 1.3; // Zoom out by 1.3x (a little bit)
+        const ctrlZoomFactor = 1.5; // Zoom out by 1.5x (a little bit)
         
         let targetZoom = defaultCameraScale;
         if (pressingCtrl)
