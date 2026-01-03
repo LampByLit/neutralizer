@@ -335,6 +335,7 @@ class Prop extends GameObject
 
 let checkpointPos, activeCheckpoint, checkpointTimer = new Timer;
 let allCheckpoints = []; // Track all checkpoints
+let allComputers = []; // Track all computers
 
 class Checkpoint extends GameObject 
 {
@@ -3009,5 +3010,246 @@ class VenomParticle extends EngineObject
         );
         drawTile(this.pos, this.size.scale(1.4), -1, undefined, glowColor);
         setBlendMode(0);
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class Computer extends GameObject
+{
+    constructor(pos)
+    {
+        // pos is the bottom-left corner of the 4x4 grid
+        super(pos.int().add(vec2(2, 2))); // Center position of 4x4 grid
+        this.isComputer = 1;
+        this.computerDestroyed = false; // Track if computer is destroyed (separate from EngineObject.destroyed)
+        this.renderOrder = tileRenderOrder;
+        
+        // Store tile positions (4x4 grid = 16 tiles)
+        this.tilePositions = [];
+        this.tileIndices = []; // Store which sprite (13, 14, 15, or 16) for each tile
+        this.tileStates = []; // Track if each tile is broken (true = broken)
+        this.tileHealth = []; // Track health for each tile (2 health per tile)
+        this.tileParticleEmitters = []; // Store particle emitters for each destroyed tile
+        
+        const computerTiles = [13, 14, 15, 16]; // Available tiles from tiles2.png
+        const gridSize = 4;
+        
+        // Create 4x4 grid of tiles
+        for(let x = 0; x < gridSize; x++)
+        {
+            for(let y = 0; y < gridSize; y++)
+            {
+                const tilePos = pos.int().add(vec2(x, y));
+                this.tilePositions.push(tilePos.copy());
+                
+                // Random tile from available computer tiles
+                const tileIndex = computerTiles[rand(computerTiles.length)|0];
+                this.tileIndices.push(tileIndex);
+                this.tileStates.push(false); // Not broken yet
+                this.tileHealth.push(2); // Each tile has 2 health
+                
+                // Set collision data - use tileType_computer
+                setTileCollisionData(tilePos, tileType_computer);
+                
+                // Set background tile 14 behind computer (will be revealed when destroyed)
+                setTileBackgroundData(tilePos, tileType_dirt); // Use dirt as placeholder, will be replaced with tile 14 visual
+            }
+        }
+        
+        // Create blinking light particle emitters (2-3 lights randomly placed)
+        this.lightEmitters = [];
+        const lightCount = rand(2) + 2; // 2-3 lights
+        for(let i = 0; i < lightCount; i++)
+        {
+            const lightX = rand(3) + 0.5; // Random X position within 4x4 grid (0.5 to 3.5)
+            const lightY = rand(3) + 0.5; // Random Y position within 4x4 grid
+            const lightPos = pos.int().add(vec2(lightX, lightY));
+            
+            // Create blinking light particle emitter
+            const emitter = new ParticleEmitter(
+                lightPos, 0.1, 0, 30, 0, // pos, emitSize, emitTime (0 = forever), emitRate, emitCone
+                0, undefined, // tileIndex, tileSize
+                new Color(0, 1, 1, 0.8), new Color(1, 0.5, 0, 0.8), // colorStartA, colorStartB (cyan to orange)
+                new Color(0, 1, 1, 0), new Color(1, 0.5, 0, 0), // colorEndA, colorEndB (fade out)
+                0.3, 0.05, 0.05, 0, 0, // particleTime, sizeStart, sizeEnd, particleSpeed, particleAngleSpeed
+                1, 1, 0, 0, 0.5, // damping, angleDamping, gravityScale, particleCone, fadeRate
+                0.3, 0, 1, 0, 1e9 // randomness, collide, additive, randomColorLinear, renderOrder
+            );
+            this.lightEmitters.push(emitter);
+            this.addChild(emitter);
+        }
+        
+        // Add to global array
+        allComputers.push(this);
+    }
+    
+    update()
+    {
+        super.update();
+        
+        // Check if any tile is broken
+        if (!this.computerDestroyed)
+        {
+            for(let i = 0; i < this.tilePositions.length; i++)
+            {
+                if (this.tileStates[i])
+                    continue; // Already destroyed
+                    
+                const tilePos = this.tilePositions[i];
+                const tileData = getTileCollisionData(tilePos);
+                
+                // If tile is no longer computer type, it's been destroyed
+                if (tileData != tileType_computer)
+                {
+                    this.tileStates[i] = true;
+                    this.onTileDestroyed(i);
+                }
+            }
+        }
+    }
+    
+    onTileDestroyed(tileIndex)
+    {
+        if (this.computerDestroyed)
+            return;
+        
+        // Mark as destroyed
+        this.computerDestroyed = true;
+        
+        const tilePos = this.tilePositions[tileIndex];
+        const centerPos = tilePos.add(vec2(0.5));
+        
+        // Reveal tile 14 in background layer
+        // We need to set the background tile data and update the background layer
+        setTileBackgroundData(tilePos, tileType_dirt); // Use dirt type, but render as tile 14
+        
+        // Create spark particles
+        new ParticleEmitter(
+            centerPos, 0.3, 0.3, 200, PI, // pos, emitSize, emitTime, emitRate, emitCone
+            0, undefined, // tileIndex, tileSize
+            new Color(1, 1, 0.5, 0.9), new Color(1, 0.5, 0, 0.9), // colorStartA, colorStartB (yellow to orange)
+            new Color(1, 1, 0.5, 0), new Color(1, 0.5, 0, 0), // colorEndA, colorEndB (fade out)
+            0.5, 0.1, 0.05, 0.3, 0.1, // particleTime, sizeStart, sizeEnd, particleSpeed, particleAngleSpeed
+            0.95, 1, 0.2, PI, 0.3, // damping, angleDamping, gravityScale, particleCone, fadeRate
+            0.5, 0, 1, 0, 1e9 // randomness, collide, additive, randomColorLinear, renderOrder
+        );
+        
+        // Create smoke particles
+        new ParticleEmitter(
+            centerPos, 0.5, 0.5, 100, PI, // pos, emitSize, emitTime, emitRate, emitCone
+            0, undefined, // tileIndex, tileSize
+            new Color(0.2, 0.2, 0.2, 0.8), new Color(0.1, 0.1, 0.1, 0.6), // colorStartA, colorStartB (dark gray)
+            new Color(0.2, 0.2, 0.2, 0), new Color(0.1, 0.1, 0.1, 0), // colorEndA, colorEndB (fade out)
+            1.5, 0.3, 0.8, 0.1, 0.02, // particleTime, sizeStart, sizeEnd, particleSpeed, particleAngleSpeed
+            0.9, 1, -0.2, PI, 0.2, // damping, angleDamping, gravityScale (negative = rise), particleCone, fadeRate
+            0.4, 0, 0, 0, 1e8 // randomness, collide, additive, randomColorLinear, renderOrder
+        );
+        
+        // Create ongoing spark emitter for revealed tile (continuous)
+        const sparkEmitter = new ParticleEmitter(
+            centerPos, 0.1, 0, 10, PI * 0.5, // pos, emitSize, emitTime (0 = forever), emitRate, emitCone (upward)
+            0, undefined,
+            new Color(1, 1, 0.5, 0.6), new Color(1, 0.5, 0, 0.6),
+            new Color(1, 1, 0.5, 0), new Color(1, 0.5, 0, 0),
+            0.4, 0.05, 0.02, 0.15, 0.03,
+            0.95, 1, 0.1, PI * 0.5, 0.3,
+            0.3, 0, 1, 0, 1e9
+        );
+        
+        // Create ongoing smoke emitter for revealed tile (continuous)
+        const smokeEmitter = new ParticleEmitter(
+            centerPos, 0.2, 0, 8, PI * 0.5, // pos, emitSize, emitTime (0 = forever), emitRate, emitCone (upward)
+            0, undefined,
+            new Color(0.3, 0.3, 0.3, 0.5), new Color(0.1, 0.1, 0.1, 0.3),
+            new Color(0.3, 0.3, 0.3, 0), new Color(0.1, 0.1, 0.1, 0),
+            1.2, 0.2, 0.6, 0.06, 0.01,
+            0.9, 1, -0.15, PI * 0.5, 0.2,
+            0.3, 0, 0, 0, 1e8
+        );
+        
+        // Store emitters for this tile
+        this.tileParticleEmitters[tileIndex] = [sparkEmitter, smokeEmitter];
+        
+        // Stop blinking lights
+        for(const emitter of this.lightEmitters)
+        {
+            if (emitter && !emitter.destroyed)
+                emitter.emitRate = 0;
+        }
+    }
+    
+    render()
+    {
+        if (this.destroyed)
+            return;
+        
+        // Render each tile in the 4x4 grid
+        for(let i = 0; i < this.tilePositions.length; i++)
+        {
+            if (this.tileStates[i])
+                continue; // Skip broken tiles
+            
+            const tilePos = this.tilePositions[i];
+            const centerPos = tilePos.add(vec2(0.5));
+            const tileIndex = this.tileIndices[i];
+            
+            // Visual feedback for damaged tiles (health = 1)
+            let tileColor = new Color();
+            if (this.tileHealth[i] < 2)
+            {
+                // Damaged tile - slightly darker/reddish tint
+                tileColor = new Color(0.8, 0.7, 0.7); // Slight red tint when damaged
+            }
+            
+            // Draw tile using drawTile2 (tiles2.png)
+            drawTile2(centerPos, vec2(1), tileIndex, vec2(16), tileColor, 0, 0);
+        }
+        
+        // Render revealed background tiles (tile 14) for destroyed computer tiles
+        for(let i = 0; i < this.tilePositions.length; i++)
+        {
+            if (!this.tileStates[i])
+                continue; // Only show background for broken tiles
+            
+            const tilePos = this.tilePositions[i];
+            const centerPos = tilePos.add(vec2(0.5));
+            
+            // Draw tile 14 from tiles2.png in background
+            drawTile2(centerPos, vec2(1), 14, vec2(16), new Color(), 0, 0);
+        }
+    }
+    
+    destroy()
+    {
+        if (this.destroyed)
+            return;
+        
+        // Remove from global array
+        const index = allComputers.indexOf(this);
+        if (index >= 0)
+            allComputers.splice(index, 1);
+        
+        // Destroy light emitters
+        for(const emitter of this.lightEmitters)
+        {
+            if (emitter && !emitter.destroyed)
+                emitter.destroy();
+        }
+        
+        // Destroy tile particle emitters
+        for(const emitters of this.tileParticleEmitters)
+        {
+            if (emitters)
+            {
+                for(const emitter of emitters)
+                {
+                    if (emitter && !emitter.destroyed)
+                        emitter.destroy();
+                }
+            }
+        }
+        
+        super.destroy();
     }
 }

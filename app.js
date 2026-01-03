@@ -661,8 +661,22 @@ engineInit(
             }
         }
 
-        // Level completion requires: all enemies dead AND all checkpoints secured
-        if (!enemiesCount && totalCheckpoints > 0 && securedCheckpoints >= totalCheckpoints && !levelEndTimer.isSet())
+        // Count destroyed computers
+        let destroyedComputers = 0;
+        let totalComputers = 0;
+        for (const computer of allComputers)
+        {
+            if (computer && !computer.destroyed)
+            {
+                ++totalComputers;
+                if (computer.computerDestroyed)
+                    ++destroyedComputers;
+            }
+        }
+
+        // Level completion requires: all enemies dead AND all checkpoints secured AND all computers destroyed
+        if (!enemiesCount && totalCheckpoints > 0 && securedCheckpoints >= totalCheckpoints && 
+            totalComputers > 0 && destroyedComputers >= totalComputers && !levelEndTimer.isSet())
             levelEndTimer.set();
 
         mainContext.fillStyle = new Color(1,1,1).rgba();
@@ -676,10 +690,11 @@ engineInit(
         mainContext.fillText('LIVES ' + playerLives, hudX, hudY + lineHeight);
         mainContext.fillText('ENEMIES ' + enemiesCount, hudX, hudY + lineHeight * 2);
         mainContext.fillText('CHECKPOINTS ' + securedCheckpoints + '/' + totalCheckpoints, hudX, hudY + lineHeight * 3);
+        mainContext.fillText('COMPUTERS ' + destroyedComputers + '/' + totalComputers, hudX, hudY + lineHeight * 4);
         
         // Clean up and count living girls
         cleanupSurvivingGirls();
-        mainContext.fillText('GIRLS ' + survivingGirls.length, hudX, hudY + lineHeight * 4);
+        mainContext.fillText('GIRLS ' + survivingGirls.length, hudX, hudY + lineHeight * 5);
 
         // fade in level transition
         const fade = levelEndTimer.isSet() ? percent(levelEndTimer.get(), 3, 1) : percent(levelTimer.get(), .5, 2);

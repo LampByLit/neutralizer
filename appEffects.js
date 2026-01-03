@@ -407,6 +407,60 @@ function destroyTile(pos, makeSound = 1, cleanNeighbors = 1, maxCascadeChance = 
     if (!tileType) return 1;                  // empty
     if (tileType == tileType_solid) return 0; // indestructable
 
+    // Check if this is a computer tile
+    const isComputerTile = (tileType == tileType_computer);
+    
+    // Handle computer tiles specially - they have health
+    if (isComputerTile)
+    {
+        // Find the computer that contains this tile
+        for(const computer of allComputers)
+        {
+            if (computer && !computer.destroyed)
+            {
+                for(let i = 0; i < computer.tilePositions.length; i++)
+                {
+                    const tilePos = computer.tilePositions[i];
+                    if (tilePos.x == pos.x && tilePos.y == pos.y)
+                    {
+                        // This tile belongs to this computer
+                        // Reduce health instead of destroying immediately
+                        if (computer.tileHealth[i] > 0)
+                        {
+                            computer.tileHealth[i]--;
+                            
+                            // Visual feedback for damage
+                            const centerPos = pos.add(vec2(.5));
+                            makeDebris(centerPos, new Color(1, 1, 0.5).mutate());
+                            makeSound && playSound(sound_destroyTile, centerPos);
+                            
+                            // Only destroy if health reaches 0
+                            if (computer.tileHealth[i] <= 0)
+                            {
+                                // Actually destroy the tile
+                                setTileCollisionData(pos, tileType_empty);
+                                if (tileLayer)
+                                {
+                                    const layerData = tileLayer.getData(pos);
+                                    if (layerData)
+                                    {
+                                        tileLayer.setData(pos, new TileLayerData, 1); // set and clear tile
+                                    }
+                                }
+                                
+                                computer.tileStates[i] = true;
+                                computer.onTileDestroyed(i);
+                            }
+                        }
+                        return 1; // Return success (handled)
+                    }
+                }
+            }
+        }
+        // If we get here, it's a computer tile but we couldn't find the computer
+        // Fall through to normal destruction
+    }
+    
     const centerPos = pos.add(vec2(.5));
     const layerData = tileLayer.getData(pos);
     if (layerData)
@@ -436,7 +490,7 @@ function destroyTile(pos, makeSound = 1, cleanNeighbors = 1, maxCascadeChance = 
                 if (getTileCollisionData(pos.add(vec2(0,-1))) == tileType)
                     new TileCascadeDestroy(pos.add(vec2(0,-1)), 1, 1, cascadeDepth + 1);
             }
-            else if (tileType != tileType_dirt)
+            else if (tileType != tileType_dirt && tileType != tileType_computer)
                 maxCascadeChance = 0;
 
             if (rand() < maxCascadeChance && getTileCollisionData(pos.add(vec2(0,1))) == tileType)

@@ -16,6 +16,7 @@ const tileType_pipeV   = 5;
 const tileType_glass   = 6;
 const tileType_baseBack= 7;
 const tileType_window  = 8;
+const tileType_computer = 9;
 
 const tileRenderOrder = -1e3;
 const tileBackgroundRenderOrder = -2e3;
@@ -1195,6 +1196,94 @@ function generateLevel()
         }
     }
     
+    // spawn computer on opposite side from player, as far as possible
+    let computerSpawned = false;
+    for(let tries = 199; !computerSpawned && tries--;)
+    {
+        // Calculate position on opposite side from player
+        // Player is at checkpointPos.x, so computer should be on the other side
+        const playerX = checkpointPos.x;
+        const levelCenterX = levelSize.x / 2;
+        
+        // Spawn on opposite side - if player is left of center, spawn right, and vice versa
+        let computerX;
+        if (playerX < levelCenterX)
+        {
+            // Player is on left, spawn computer on right side
+            computerX = randSeeded(levelSize.x - 30, levelSize.x - 80); // Far right side
+        }
+        else
+        {
+            // Player is on right, spawn computer on left side
+            computerX = randSeeded(80, 30); // Far left side
+        }
+        
+        // Find ground level at computer position
+        const testPos = vec2(computerX, levelSize.y);
+        raycastHit = tileCollisionRaycast(testPos, vec2(computerX, 0));
+        
+        if (raycastHit)
+        {
+            // Make sure it's far enough from player (at least 40 tiles, reduced from 50)
+            const distanceFromPlayer = abs(raycastHit.x - checkpointPos.x);
+            if (distanceFromPlayer > 40)
+            {
+                // Create a platform for the computer (similar to malefactor platform)
+                const platformX = raycastHit.x;
+                const groundY = (raycastHit.y - 0.5)|0; // Top of ground tile
+                const platformWidth = 8; // Platform wider than computer (4 tiles) for safety
+                
+                // Create platform - clear area above and create floor
+                const halfWidth = platformWidth / 2;
+                for(let px = platformX - halfWidth; px <= platformX + halfWidth; px++)
+                {
+                    const platformPos = vec2(px, groundY);
+                    if (platformPos.x >= 0 && platformPos.x < levelSize.x && 
+                        platformPos.y >= 0 && platformPos.y < levelSize.y)
+                    {
+                        // Clear area above platform (for computer to sit)
+                        for(let clearY = groundY - 1; clearY >= groundY - 4; clearY--)
+                        {
+                            const clearPos = vec2(px, clearY);
+                            if (clearPos.y >= 0 && clearPos.y < levelSize.y)
+                                setTileCollisionData(clearPos, tileType_empty);
+                        }
+                        // Create platform floor
+                        setTileCollisionData(platformPos, tileType_dirt);
+                    }
+                }
+                
+                // Spawn computer - bottom-left corner of 4x4 grid
+                // Computer sits on top of the platform (one tile above platform)
+                const computerBottomY = groundY - 1; // One tile above platform
+                const computerBottomLeft = vec2((platformX - 2)|0, computerBottomY);
+                
+                // Verify space is clear (should be after platform creation)
+                let hasSpace = true;
+                for(let x = 0; x < 4 && hasSpace; x++)
+                {
+                    for(let y = 0; y < 4 && hasSpace; y++)
+                    {
+                        const checkPos = computerBottomLeft.add(vec2(x, y));
+                        // Check if position is valid
+                        if (checkPos.x < 0 || checkPos.x >= levelSize.x || 
+                            checkPos.y < 0 || checkPos.y >= levelSize.y)
+                        {
+                            hasSpace = false;
+                            break;
+                        }
+                    }
+                }
+                
+                if (hasSpace)
+                {
+                    new Computer(computerBottomLeft);
+                    computerSpawned = true;
+                }
+            }
+        }
+    }
+    
     // clear edge tiles so players can jump off the sides (do this last after all generation)
     clearEdgeTiles(levelSize, 20);
 }
@@ -1370,6 +1459,7 @@ function nextLevel()
     
     // Clear checkpoint tracking for new level
     allCheckpoints = [];
+    allComputers = []; // Clear computers for new level
     
     // set level limits
     const limits = levelLimits[level] || levelLimits[5]; // use level 5 limits for levels beyond 5
