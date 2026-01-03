@@ -323,7 +323,7 @@ class Character extends GameObject
         if (this.isDead() && !this.persistent)
         {
             this.overkill += damage;
-            if (this.overkill > 5)
+            if (this.overkill > 20)
             {
                 makeBlood(this.pos, 300);
                 this.destroy();
