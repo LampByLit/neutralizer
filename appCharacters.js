@@ -1273,7 +1273,7 @@ class Barrister extends Enemy
         
         // Barrister is 2x normal size
         this.size = this.size.scale(this.sizeScale = 2.0);
-        this.health = this.healthMax = 2;
+        this.health = this.healthMax = 50; // Same health as spider
         this.maxSpeed = maxCharacterSpeed * 3.5; // Very fast - 3.5x faster than normal
         
         // Unique sprite - use tile 24 from tiles2.png (16x16 pixels)
@@ -1387,7 +1387,7 @@ class Barrister extends Enemy
             }
             else if (timeSinceSawPlayer < 5)
             {
-                debugAI && debugRect(this.pos, this.size, '#f00');
+                debugAI && debugRect(this.pos, this.size, '#00f');
                     
                 if (!this.dodgeTimer.active())
                 {
@@ -1416,7 +1416,7 @@ class Barrister extends Enemy
             else
             {
                 // was fighting but lost player - still aggressive
-                debugAI && debugRect(this.pos, this.size, '#ff0');
+                debugAI && debugRect(this.pos, this.size, '#00f');
 
                 if (rand()<.04)
                     this.facePlayerTimer.set(rand(2,.5));
@@ -1538,9 +1538,10 @@ class Barrister extends Enemy
             p.px = p.x;
             p.py = p.y;
             
-            // Update position
-            p.x += p.vx;
-            p.y += p.vy;
+            // Update position - scale down velocity to make particles slower
+            const speedScale = 0.5; // Make particles move at half speed
+            p.x += p.vx * speedScale;
+            p.y += p.vy * speedScale;
             
             // Particle interactions - find nearby particles
             let force = 0;
