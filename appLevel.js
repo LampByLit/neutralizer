@@ -34,17 +34,17 @@ let skyParticles, skyRain, skySoundTimer = new Timer;
 let gameTimer = new Timer, levelTimer = new Timer, levelEndTimer = new Timer, gameOverTimer = new Timer, gameCompleteTimer = new Timer;
 let gameState = 'title'; // game states: 'title', 'playing', 'gameOver', 'win'
 
-// level enemy limits: [maxEnemies, maxSlimes, maxBastards, maxMalefactors, maxFoes, maxSpiders, maxSpiderlings]
+// level enemy limits: [maxEnemies, maxSlimes, maxBastards, maxMalefactors, maxFoes, maxSpiders, maxSpiderlings, maxBarristers]
 const levelLimits = {
-    1: [20, 1, 0, 0, 0, 1, 0],  // Level 1: 1 spider boss
-    2: [40, 3, 0, 0, 0, 0, 3],  // Level 2: max 3 spiderlings
-    3: [50, 10, 15, 0, 0, 0, 5],  // Level 3: max 5 spiderlings
-    4: [30, 0, 28, 1, 0, 1, 0],  // Level 4: 30 total (1 malefactor, 1 spider, 28 bastards)
-    5: [60, 20, 15, 10, 1, 0, 8],  // Level 5: 60 enemies total, including 10 malefactors, 1 foe, and 8 spiderlings
+    1: [20, 1, 0, 0, 0, 1, 0, 10],  // Level 1: 1 spider boss, 10 barristers
+    2: [40, 3, 0, 0, 0, 0, 3, 0],  // Level 2: max 3 spiderlings
+    3: [50, 10, 15, 0, 0, 0, 5, 0],  // Level 3: max 5 spiderlings
+    4: [30, 0, 28, 1, 0, 1, 0, 0],  // Level 4: 30 total (1 malefactor, 1 spider, 28 bastards)
+    5: [60, 20, 15, 10, 1, 0, 8, 0],  // Level 5: 60 enemies total, including 10 malefactors, 1 foe, and 8 spiderlings
     // 6: [1, 0, 0, 0, 0]  // Level 6: Flat level with 1 weak enemy and many crates - REMOVED
 };
-let levelMaxEnemies, levelMaxSlimes, levelMaxBastards, levelMaxMalefactors, levelMaxFoes, levelMaxSpiders, levelMaxSpiderlings;
-let totalEnemiesSpawned, totalSlimesSpawned, totalBastardsSpawned, totalMalefactorsSpawned, totalFoesSpawned, totalSpidersSpawned, totalSpiderlingsSpawned;
+let levelMaxEnemies, levelMaxSlimes, levelMaxBastards, levelMaxMalefactors, levelMaxFoes, levelMaxSpiders, levelMaxSpiderlings, levelMaxBarristers;
+let totalEnemiesSpawned, totalSlimesSpawned, totalBastardsSpawned, totalMalefactorsSpawned, totalFoesSpawned, totalSpidersSpawned, totalSpiderlingsSpawned, totalBarristersSpawned;
 
 let tileBackground, keyItemSpawned;
 const setTileBackgroundData = (pos, data=0)=>
@@ -233,7 +233,7 @@ function spawnProps(pos)
     }
 }
 
-function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefactorsSpawnedRef, totalEnemiesSpawnedRef, totalSpiderlingsSpawnedRef)
+function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefactorsSpawnedRef, totalEnemiesSpawnedRef, totalSpiderlingsSpawnedRef, totalBarristersSpawnedRef)
 {
     // check if we've hit limits
     if (totalEnemiesSpawnedRef.value >= levelMaxEnemies)
@@ -367,10 +367,11 @@ function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefact
                 
                 const pos = floorBottomCenterPos.add(vec2(randSeeded( floorWidth-1,-floorWidth+1),.7));
                 
-                // decide what to spawn: slime, bastard, spiderling, or regular enemy
+                // decide what to spawn: slime, bastard, spiderling, barrister, or regular enemy
                 let spawnSlime = 0;
                 let spawnBastard = 0;
                 let spawnSpiderling = 0;
+                let spawnBarrister = 0;
                 
                 // Check for spiderling first (levels 2, 3, and 5)
                 if ((level == 2 || level == 3 || level == 5) && totalSpiderlingsSpawnedRef.value < levelMaxSpiderlings)
@@ -381,8 +382,17 @@ function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefact
                         spawnSpiderling = 1;
                 }
                 
-                // If not spawning spiderling, check for bastard
-                if (!spawnSpiderling && level >= 3 && totalBastardsSpawnedRef.value < levelMaxBastards)
+                // If not spawning spiderling, check for barrister (level 1)
+                if (!spawnSpiderling && level == 1 && totalBarristersSpawnedRef.value < levelMaxBarristers)
+                {
+                    // Chance to spawn barrister on level 1
+                    let barristerChance = 0.5; // 50% chance on level 1
+                    if (randSeeded() < barristerChance)
+                        spawnBarrister = 1;
+                }
+                
+                // If not spawning spiderling or barrister, check for bastard
+                if (!spawnSpiderling && !spawnBarrister && level >= 3 && totalBastardsSpawnedRef.value < levelMaxBastards)
                 {
                     // Chance to spawn bastard based on level
                     let bastardChance = level == 3 ? 0.4 : (level == 4 ? 0.25 : 0.2); // 40% level 3, 25% level 4, 20% level 5
@@ -390,8 +400,8 @@ function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefact
                         spawnBastard = 1;
                 }
                 
-                // If not spawning spiderling or bastard, check for slime
-                if (!spawnSpiderling && !spawnBastard && totalSlimesSpawnedRef.value < levelMaxSlimes)
+                // If not spawning spiderling, barrister, or bastard, check for slime
+                if (!spawnSpiderling && !spawnBarrister && !spawnBastard && totalSlimesSpawnedRef.value < levelMaxSlimes)
                 {
                     // we can still spawn slimes, use chance-based logic
                     if (level == 1)
@@ -409,6 +419,12 @@ function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefact
                 {
                     new Spiderling(pos);
                     ++totalSpiderlingsSpawnedRef.value;
+                    ++totalEnemiesSpawnedRef.value;
+                }
+                else if (spawnBarrister)
+                {
+                    new Barrister(pos);
+                    ++totalBarristersSpawnedRef.value;
                     ++totalEnemiesSpawnedRef.value;
                 }
                 else if (spawnBastard)

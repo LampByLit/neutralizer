@@ -227,17 +227,17 @@ engineInit(
             nextLevel();
     }
 
-    // Ctrl key zoom out (both left and right Ctrl keys)
+    // X key zoom out
     if (gameState === 'playing')
     {
-        const pressingCtrl = leftCtrlDown || rightCtrlDown || keyIsDown(17); // Check both Ctrl keys explicitly, fallback to keyCode
+        const pressingX = keyIsDown(88); // X key (keyCode 88)
         const ctrlZoomSpeed = 0.05; // Smooth lerp factor for zoom transitions
         const ctrlZoomFactor = 1.5; // Zoom out by 1.5x (a little bit)
         
         let targetZoom = defaultCameraScale;
-        if (pressingCtrl)
+        if (pressingX)
         {
-            // Ctrl is held - zoom out a little bit
+            // X is held - zoom out a little bit
             targetZoom = defaultCameraScale / ctrlZoomFactor;
         }
         
