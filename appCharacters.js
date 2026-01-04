@@ -521,6 +521,10 @@ class Character extends GameObject
         if (o.isKeyItem)
             return super.collideWithObject(o);
 
+        // Grenades are harmless - don't cause damage on collision
+        if (o.isGrenade)
+            return super.collideWithObject(o);
+
         if (o.velocity.lengthSquared() > .04)
         {
             const v = o.velocity.subtract(this.velocity);
