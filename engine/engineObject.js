@@ -59,9 +59,72 @@ class EngineObject
     {
         if (this.parent)
         {
+            // Store previous position for collision detection
+            const oldPos = this.pos.copy();
+            
             // copy parent pos/angle
             this.pos = this.localPos.multiply(vec2(this.getMirrorSign(),1)).rotate(-this.parent.angle).add(this.parent.pos);
             this.angle = this.getMirrorSign()*this.localAngle + this.parent.angle;
+            
+            // Check if this is a carried object (child of a player who is carrying it)
+            const isCarriedObject = this.parent.isPlayer && this.parent.isCarrying && this.parent.carriedObject == this;
+            
+            if (isCarriedObject && this.mass)
+            {
+                // Check for tile collisions even though collideTiles is disabled
+                if (tileCollisionTest(this.pos, this.size, this))
+                {
+                    // Test which side we hit (or both if a corner)
+                    const isBlockedY = tileCollisionTest(new Vector2(oldPos.x, this.pos.y), this.size, this);
+                    const isBlockedX = tileCollisionTest(new Vector2(this.pos.x, oldPos.y), this.size, this);
+                    
+                    if (isBlockedY || !isBlockedX)
+                    {
+                        // Push out of collision on Y axis
+                        this.pos.y = oldPos.y;
+                    }
+                    if (isBlockedX || !isBlockedY)
+                    {
+                        // Push out of collision on X axis
+                        this.pos.x = oldPos.x;
+                    }
+                }
+                
+                // Check for object collisions (even though parent check normally skips this)
+                const epsilon = 1e-3;
+                for(const o of engineCollideObjects)
+                {
+                    // Skip if not solid, destroyed, or is the parent
+                    if (!this.isSolid & !o.isSolid || o.destroyed || o == this.parent || o == this)
+                        continue;
+                    
+                    // Check collision
+                    if (!isOverlapping(this.pos, this.size, o.pos, o.size))
+                        continue;
+                    
+                    // Pass collision to objects
+                    if (!this.collideWithObject(o) | !o.collideWithObject(this))
+                        continue;
+                    
+                    // Resolve collision by pushing away
+                    const sx = this.size.x + o.size.x;
+                    const sy = this.size.y + o.size.y;
+                    const isBlockedX = abs(oldPos.y - o.pos.y)*2 < sy;
+                    const isBlockedY = abs(oldPos.x - o.pos.x)*2 < sx;
+                    
+                    if (isBlockedY || !isBlockedX) // resolve y collision
+                    {
+                        // Push outside object collision
+                        this.pos.y = o.pos.y + (sy*.5 + epsilon) * sign(oldPos.y - o.pos.y);
+                    }
+                    if (isBlockedX || !isBlockedY) // resolve x collision
+                    {
+                        // Push outside collision
+                        this.pos.x = o.pos.x + (sx*.5 + epsilon) * sign(oldPos.x - o.pos.x);
+                    }
+                }
+            }
+            
             return;
         }
 

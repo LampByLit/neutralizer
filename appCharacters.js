@@ -4168,12 +4168,23 @@ class Player extends Character
         // Update carried object position if carrying (in case it needs adjustment)
         if (this.isCarrying && this.carriedObject && !this.carriedObject.destroyed)
         {
-            // Ensure object stays attached (parent-child system handles this, but verify)
-            if (this.carriedObject.parent != this)
+            // Check if object is too far away (more than 3 tiles)
+            const maxCarryDistance = 3.0;
+            const distance = this.pos.distance(this.carriedObject.pos);
+            if (distance > maxCarryDistance)
             {
-                // Object lost parent somehow, reattach
-                const frontOffset = vec2(this.getMirrorSign(0.8), 0);
-                this.addChild(this.carriedObject, frontOffset, 0);
+                // Object is too far away, drop it
+                this.dropCarriedObject();
+            }
+            else
+            {
+                // Ensure object stays attached (parent-child system handles this, but verify)
+                if (this.carriedObject.parent != this)
+                {
+                    // Object lost parent somehow, reattach
+                    const frontOffset = vec2(this.getMirrorSign(0.8), 0);
+                    this.addChild(this.carriedObject, frontOffset, 0);
+                }
             }
         }
 
