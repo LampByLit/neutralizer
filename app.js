@@ -123,11 +123,13 @@ function playRandomTitleMusic()
         playRandomTitleMusic();
     };
     
+    // Set playing flag immediately to prevent lag
+    titleMusicPlaying = true;
+    
     // Start playing
-    titleMusic.play().then(function() {
-        titleMusicPlaying = true;
-    }).catch(function(error) {
+    titleMusic.play().catch(function(error) {
         console.warn('Could not play title music:', error);
+        titleMusicPlaying = false;
         // Try playing another song if playback fails
         playRandomTitleMusic();
     });
@@ -185,11 +187,8 @@ engineInit(
             if (anyKeyPressed)
             {
                 titleScreenReady = true;
-                // Start playing random title music
-                if (!titleMusicPlaying)
-                {
-                    playRandomTitleMusic();
-                }
+                // Start playing random title music immediately
+                playRandomTitleMusic();
             }
         }
 
@@ -315,6 +314,16 @@ engineInit(
     // only run gameplay logic when in playing state
     if (gameState === 'playing')
     {
+        // Ensure title music is stopped as soon as game begins
+        if (titleMusic && titleMusicPlaying)
+        {
+            titleMusic.pause();
+            titleMusic.currentTime = 0;
+            titleMusic.onended = null;
+            titleMusic = null;
+            titleMusicPlaying = false;
+        }
+        
         // restart if no lives left
         let minDeadTime = 1e3;
         let allPlayersDead = players.length > 0;
