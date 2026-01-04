@@ -1093,6 +1093,7 @@ class Item extends GameObject
             else if (this.itemData.effect == 'heal')
             {
                 player.heal(this.itemData.amount || 1);
+                ++playerLives; // Health item also gives an extra life
                 
                 // Confetti effect since health does pretty much nothing
                 // Create multiple colorful particle emitters for confetti effect

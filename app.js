@@ -433,11 +433,8 @@ engineInit(
                 cameraPos.x = clamp(cameraPos.x, tileCollisionSize.x - w, w);
         }
 
-        // Update background parallax offset (10% of camera movement)
-        const parallaxSpeed = 0.1;
-        const cameraDelta = cameraPos.subtract(previousCameraPos);
-        backgroundParallaxOffset = backgroundParallaxOffset.add(cameraDelta.scale(parallaxSpeed));
-        previousCameraPos = cameraPos.copy();
+        // Parallax is now calculated fresh each frame in render function
+        // No accumulation needed - keeps background centered
 
         updateParallaxLayers();
 
@@ -488,19 +485,22 @@ engineInit(
                 }
             }
             
-            // Center background on screen (camera view)
+            // Center background on MAP CENTER, not camera position
+            // This ensures background is always centered on the map regardless of where player spawns
             const screenCenterX = mainCanvas.width / 2;
             const screenCenterY = mainCanvas.height / 2;
+            const mapCenter = vec2(levelSize.x / 2, levelSize.y / 2);
             
-            // Apply parallax offset (convert world coordinates to screen pixels)
-            // Parallax offset accumulates at 10% of camera movement, creating parallax effect
-            const parallaxX = backgroundParallaxOffset.x * cameraScale;
-            const parallaxY = -backgroundParallaxOffset.y * cameraScale; // Negate Y because screen Y is inverted
+            // Parallax effect: background moves slower than camera (10% speed)
+            // Position background so map center aligns with screen center, with parallax offset
+            const parallaxSpeed = 0.1;
+            const mapCenterToScreenX = (mapCenter.x - cameraPos.x) * cameraScale * parallaxSpeed;
+            const mapCenterToScreenY = -(mapCenter.y - cameraPos.y) * cameraScale * parallaxSpeed; // Negate Y because screen Y is inverted
             
-            // Position background centered on screen with parallax offset
-            // 20% buffer ensures background always covers canvas even with parallax movement
-            const drawX = screenCenterX - drawWidth / 2 + parallaxX;
-            const drawY = screenCenterY - drawHeight / 2 + parallaxY;
+            // Position background centered on map center (with parallax effect)
+            // 20% buffer ensures background always covers canvas
+            const drawX = screenCenterX - drawWidth / 2 + mapCenterToScreenX;
+            const drawY = screenCenterY - drawHeight / 2 + mapCenterToScreenY;
             
             // Draw the animated GIF (it will animate because it's an img element in the DOM)
             mainContext.drawImage(levelBackgroundGif, drawX, drawY, drawWidth, drawHeight);
