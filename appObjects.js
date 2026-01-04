@@ -180,7 +180,8 @@ const propType_rock_lava            = 8;
 const propType_rock_jackrock        = 9;
 const propType_terminal             = 10;
 const propType_rock_pussybomb       = 11;
-const propType_count                = 12;
+const propType_modem                = 12;
+const propType_count                = 13;
 
 class Prop extends GameObject 
 {
@@ -307,6 +308,19 @@ class Prop extends GameObject
             // Add to global array
             allPussybombs.push(this);
         }
+        else if (this.type == propType_modem)
+        {
+            this.tileIndex = 31; // Tile index 31 from tiles.png
+            this.tileSize = vec2(16); // tiles.png uses 16x16 tiles
+            this.color = new Color(1,1,1); // White/default color
+            health = 50;
+            // Nuke countdown properties (identical to terminal)
+            this.isNuking = false;
+            this.nukeTimer = new Timer(5); // 5 second countdown
+            this.beepTimer = new Timer(1); // Beep every 1 second
+            this.nukeStartTime = 0; // Track when countdown started
+            // Normal size, pushable, no special properties
+        }
 
         // randomly angle and flip axis (90 degree rotation)
         this.angle = (rand(4)|0)*PI/2;
@@ -327,8 +341,8 @@ class Prop extends GameObject
         const deltaSpeedSquared = this.velocity.subtract(oldVelocity).lengthSquared();
         deltaSpeedSquared > .05 && this.damage(2*deltaSpeedSquared);
 
-        // Terminal nuke countdown
-        if (this.type == propType_terminal && this.isNuking && !this.destroyed)
+        // Terminal and modem nuke countdown
+        if ((this.type == propType_terminal || this.type == propType_modem) && this.isNuking && !this.destroyed)
         {
             // Check if countdown has elapsed (5 seconds)
             const elapsed = time - this.nukeStartTime;
@@ -389,8 +403,8 @@ class Prop extends GameObject
 
     damage(damage, damagingObject)
     {
-        // Terminal: detect player melee attacks (damage = 1, from player character)
-        if (this.type == propType_terminal && !this.isNuking && !this.destroyed)
+        // Terminal and modem: detect player melee attacks (damage = 1, from player character)
+        if ((this.type == propType_terminal || this.type == propType_modem) && !this.isNuking && !this.destroyed)
         {
             // Check if this is a player melee attack (damage = 1, from player character)
             if (damagingObject && damagingObject.isPlayer && damage == 1)
@@ -429,12 +443,29 @@ class Prop extends GameObject
 
     render()
     {
-        // Terminal uses drawTile2 (tiles2.png), all other props use drawTile (tiles.png)
+        // Terminal uses drawTile2 (tiles2.png), modem uses drawTile (tiles.png)
         if (this.type == propType_terminal && typeof drawTile2 === 'function')
         {
             drawTile2(this.pos, this.size, this.tileIndex, this.tileSize, this.color.scale(this.burnColorPercent(),1), this.angle, this.mirror, this.additiveColor);
             
             // Visual feedback during nuke countdown (similar to grenade)
+            if (this.isNuking && !this.destroyed)
+            {
+                const elapsed = time - this.nukeStartTime;
+                const a = elapsed; // Use elapsed time for pulsing
+                setBlendMode(1);
+                drawTile(this.pos, vec2(2), 0, vec2(16), new Color(1,0,0,.2-.2*Math.cos(a*2*PI)));
+                drawTile(this.pos, vec2(1), 0, vec2(16), new Color(1,0,0,.2-.2*Math.cos(a*2*PI)));
+                drawTile(this.pos, vec2(.5), 0, vec2(16), new Color(1,1,1,.2-.2*Math.cos(a*2*PI)));
+                setBlendMode(0);
+            }
+        }
+        else if (this.type == propType_modem)
+        {
+            // Modem uses drawTile (tiles.png) with tile index 31
+            drawTile(this.pos, this.size, this.tileIndex, this.tileSize, this.color.scale(this.burnColorPercent(),1), this.angle, this.mirror, this.additiveColor);
+            
+            // Visual feedback during nuke countdown (identical to terminal)
             if (this.isNuking && !this.destroyed)
             {
                 const elapsed = time - this.nukeStartTime;
@@ -949,7 +980,7 @@ class KeyItem extends GameObject
 ///////////////////////////////////////////////////////////////////////////////
 
 // Item type definitions
-// Order: Life (0), Health (1), Laser (2), Cannon (3), Jumper (4), Hammer (5), Radar (6), Smoker (7), Fang (8), Ladymaker (9), Transporter (10), Wardrobe (11)
+// Order: Life (0), Health (1), Laser (2), Cannon (3), Jumper (4), Hammer (5), Radar (6), Smoker (7), Fang (8), Ladymaker (9), Transporter (10), Wardrobe (11), Wardrobe 2 (12)
 const itemType_life = 0;
 const itemType_health = 1;
 const itemType_laser = 2;
@@ -962,6 +993,7 @@ const itemType_fang = 8;
 const itemType_ladymaker = 9;
 const itemType_transporter = 10;
 const itemType_wardrobe = 11;
+const itemType_wardrobe2 = 12;
 
 const itemType_consumable = 0;
 const itemType_equipable = 1;
@@ -1028,11 +1060,16 @@ const itemRegistry = {
         category: itemType_equipable, 
         tileIndex: 11, 
         weaponType: 'WardrobeWeapon' 
+    },
+    [itemType_wardrobe2]: { 
+        category: itemType_equipable, 
+        tileIndex: 12, 
+        weaponType: 'Wardrobe2Weapon' 
     }
 };
 
 // Get all available item types for random selection
-const getAllItemTypes = ()=> [itemType_life, itemType_health, itemType_laser, itemType_cannon, itemType_jumper, itemType_hammer, itemType_radar, itemType_smoker, itemType_fang, itemType_ladymaker, itemType_transporter, itemType_wardrobe];
+const getAllItemTypes = ()=> [itemType_life, itemType_health, itemType_laser, itemType_cannon, itemType_jumper, itemType_hammer, itemType_radar, itemType_smoker, itemType_fang, itemType_ladymaker, itemType_transporter, itemType_wardrobe, itemType_wardrobe2];
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -2546,6 +2583,98 @@ class WardrobeWeapon extends Weapon
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class Wardrobe2Weapon extends Weapon
+{
+    constructor(pos, parent)
+    {
+        super(pos, parent);
+        this.hidden = 1; // Don't render the weapon sprite (helmet is rendered separately)
+        
+        // Wardrobe sound effects - array of 10 different sounds
+        this.wardrobeSounds = [
+            [,,16,,.48,.17,2,2.8,,,-62,.11,,,,,,.56,.25],
+            [1.4,,406,.37,.36,.001,,2.8,,,136,.05,.16,,,.1,.05,.85,.03,.01],
+            [.5,,103,.02,.13,.01,5,.8954348352102028,,,37,.02,,,,,,.5,.17,,-1435],
+            [.5,,103,.02,.13,.01,5,.8954348696969698,,,37,.02,,,,,,.5,.17,,-1435],
+            [.5,,103,.02,.13,.02,3,1.1,,,137,.03,,,,,,.3,.17,,-1437],
+            [.5,,103,.02,.13,.02,3,1.1,,,137,.03,,,,,,.3,.18,,-1437],
+            [2.3,,684,.07,.17,.38,5,1.0535271613990804,,,,,,,,.1,,.63,.26,,-905],
+            [1.1,0,261.6256,.07,.91,.05,2,.1,1,,,,,,,,.16,.31,.01,,-1492],
+            [,,97,.05,.2,.003,2,1.4,,-1,74,.09,.05,,,,,.82,.17,.07], // Random 393
+            [,,470,.41,,.22,5,1.6,24,-0.1,-255,,.15,-0.1,156,,,.85,.07,.02]
+        ];
+        
+        // Track if F was pressed last frame
+        this.wasPressingF = 0;
+        
+        // Available suit pairs: [standingIndex, jumpingIndex, name]
+        const suitPairs = [
+            [8, 9, 'bruce'],     // bruce
+            [10, 11, 'gavin'],   // gavin
+            [18, 19, 'butch'],   // butch
+            [20, 21, 'pinstripe'] // pinstripe
+        ];
+        
+        // Randomly select a suit pair
+        const selectedPair = suitPairs[rand(suitPairs.length)|0];
+        this.standingTileIndex = selectedPair[0];
+        this.jumpingTileIndex = selectedPair[1];
+        this.suitName = selectedPair[2];
+        
+        // Store suit in player's wardrobe suits array for persistence
+        // Only set suit if player doesn't already have one (one suit per level)
+        if (this.parent.isPlayer && typeof playerWardrobeSuits !== 'undefined')
+        {
+            // Check if player already has a suit set for this level
+            const existingSuit = playerWardrobeSuits[this.parent.playerIndex];
+            if (existingSuit)
+            {
+                // Use the existing suit indices instead of the new random selection
+                this.standingTileIndex = existingSuit.standing;
+                this.jumpingTileIndex = existingSuit.jumping;
+                this.suitName = existingSuit.name || 'unknown';
+            }
+            else
+            {
+                // First time equipping wardrobe this level - set the suit
+                playerWardrobeSuits[this.parent.playerIndex] = {
+                    standing: this.standingTileIndex,
+                    jumping: this.jumpingTileIndex,
+                    name: this.suitName
+                };
+            }
+        }
+    }
+    
+    update()
+    {
+        super.update();
+        
+        // Double fire rate boost: accumulate fireTimeBuffer again for 2x gun fire rate
+        this.fireTimeBuffer += timeDelta;
+        
+        // Only handle wardrobe for player
+        if (!this.parent.isPlayer)
+            return;
+        
+        // Check if F key is pressed (key code 70)
+        const pressingF = !this.parent.playerIndex && keyIsDown(70);
+        const fJustPressed = !this.parent.playerIndex && keyWasPressed(70);
+        const fJustPressedThisFrame = pressingF && !this.wasPressingF; // Detect F press even if keyWasPressed missed it
+        
+        this.wasPressingF = pressingF;
+        
+        // If F was just pressed, play a random sound
+        if (fJustPressed || fJustPressedThisFrame)
+        {
+            const randomSound = this.wardrobeSounds[rand(this.wardrobeSounds.length)|0];
+            playSound(randomSound, this.parent.pos);
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 class SlimeWeapon extends EngineObject 
 {
     constructor(pos, parent) 
@@ -3660,10 +3789,10 @@ class Computer extends GameObject
                 }
             }
             
-            // Check all terminals (including those being carried)
+            // Check all terminals and modems (including those being carried)
             for (const obj of engineObjects)
             {
-                if (obj && obj.type == propType_terminal && !obj.destroyed && !obj.transmuted)
+                if (obj && (obj.type == propType_terminal || obj.type == propType_modem) && !obj.destroyed && !obj.transmuted)
                 {
                     // Check if terminal is being carried by a player
                     let terminalPos = obj.pos.copy();
@@ -3680,14 +3809,14 @@ class Computer extends GameObject
                     const distSq = this.pos.distanceSquared(terminalPos);
                     if (distSq <= transmuteRangeSquared)
                     {
-                        // If terminal is being carried, drop it first
+                        // If terminal/modem is being carried, drop it first
                         if (isCarried && carryingPlayer)
                         {
                             carryingPlayer.dropCarriedObject();
                             terminalPos = obj.pos.copy(); // Update position after drop
                         }
                         
-                        // Transform terminal to boy
+                        // Transform terminal/modem to boy
                         const transformPos = terminalPos.copy();
                         
                         // Create confetti effect (same as health boost)
@@ -3739,7 +3868,7 @@ class Computer extends GameObject
                             }
                         }
                         
-                        // Destroy the terminal
+                        // Destroy the terminal/modem
                         obj.destroy();
                     }
                 }

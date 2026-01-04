@@ -197,13 +197,13 @@ class Character extends GameObject
                 }
             });
             
-            // Also check for terminals (props with type propType_terminal) - check all objects, not just collide objects
+            // Also check for terminals and modems (props with type propType_terminal or propType_modem) - check all objects, not just collide objects
             if (this.isPlayer)
             {
                 forEachObject(this.pos, meleeRange, (o)=>
                 {
-                    // Check for terminals (props with type propType_terminal)
-                    if (o.type == propType_terminal && !o.destroyed && o.health > 0)
+                    // Check for terminals and modems
+                    if ((o.type == propType_terminal || o.type == propType_modem) && !o.destroyed && o.health > 0)
                     {
                         o.damage(1, this); // this = player character
                     }
@@ -4309,6 +4309,8 @@ class Player extends Character
             newWeapon = new TransporterWeapon(this.pos, this);
         else if (weaponType == 'WardrobeWeapon')
             newWeapon = new WardrobeWeapon(this.pos, this);
+        else if (weaponType == 'Wardrobe2Weapon')
+            newWeapon = new Wardrobe2Weapon(this.pos, this);
         else
             newWeapon = new Weapon(this.pos, this);
         
@@ -4349,6 +4351,8 @@ class Player extends Character
                 itemType = typeof itemType_transporter !== 'undefined' ? itemType_transporter : 10;
             else if (currentWeaponType == 'WardrobeWeapon')
                 itemType = typeof itemType_wardrobe !== 'undefined' ? itemType_wardrobe : 11;
+            else if (currentWeaponType == 'Wardrobe2Weapon')
+                itemType = typeof itemType_wardrobe2 !== 'undefined' ? itemType_wardrobe2 : 12;
             
             // Create item slightly away from player so it doesn't immediately get collected
             if (itemType >= 0)

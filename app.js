@@ -830,6 +830,8 @@ engineInit(
                     headwearTileIndex = 10; // itemType_transporter tileIndex
                 else if (player.equippedWeaponType == 'WardrobeWeapon')
                     headwearTileIndex = 11; // itemType_wardrobe tileIndex
+                else if (player.equippedWeaponType == 'Wardrobe2Weapon')
+                    headwearTileIndex = 12; // itemType_wardrobe2 tileIndex
                 
                 if (headwearTileIndex >= 0 && typeof drawTile2 === 'function')
                 {
