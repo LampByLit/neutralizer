@@ -222,25 +222,11 @@ class Girl extends Character
         }
         // else: She's at a good distance, just stay put
         
-        // Ladder detection and climbing
-        // Check if we're near a ladder (same logic as Character class)
-        let touchingLadder = 0;
-        for(let y=2;y--;)
+        // Vertical movement for ladder climbing - always set when player is above/below (like enemies do)
+        // This allows approaching ladders, and Character.update() will handle ladder detection
+        if (abs(toPlayer.y) > 3)
         {
-            const testPos = this.pos.add(vec2(0, y - this.size.y*.5));
-            const collisionData = getTileCollisionData(testPos);
-            touchingLadder |= collisionData == tileType_ladder;
-        }
-        
-        // If player is significantly above or below and we're near a ladder, set vertical movement to climb
-        if (abs(toPlayer.y) > 3 && touchingLadder)
-        {
-            this.moveInput.y = sign(toPlayer.y) * 0.5;
-        }
-        // Continue climbing if already on ladder
-        else if (abs(toPlayer.y) > 3 && this.climbingLadder)
-        {
-            this.moveInput.y = sign(toPlayer.y) * 0.5;
+            this.moveInput.y = clamp(toPlayer.y, 0.5, -0.5);
         }
 
         // ========== OBSTACLE DETECTION & JUMPING ==========
