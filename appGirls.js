@@ -67,9 +67,6 @@ class Girl extends Character
         this.color = new Color(1, 0.6, 0.8); // Pinkish color
         this.sizeScale = 0.7;
         
-        // Points system - track if girl has been redeemed
-        this.redeemed = false;
-        
         // Weapon - ensure it never takes damage or fall damage
         createProtectedWeapon(this);
         
@@ -520,21 +517,8 @@ class Girl extends Character
                          this.bodyTile + 1);
 
         const sizeScale = this.sizeScale;
-        
-        // Apply yellow color and glow if redeemed (dead and redeemed)
-        let color = this.color.scale(this.burnColorPercent(), 1);
-        let additive = this.additiveColor.add(this.extraAdditiveColor);
-        
-        if (this.redeemed && this.isDead())
-        {
-            // Yellow color for redeemed corpse
-            color = new Color(1, 1, 0).scale(this.burnColorPercent(), 1);
-            
-            // Pulsing yellow glow effect
-            const glowIntensity = 0.5 + 0.3 * Math.sin(time * 4); // Pulsing glow
-            const yellowGlow = new Color(1, 1, 0, glowIntensity * 0.4);
-            additive = additive.add(yellowGlow).clamp();
-        }
+        const color = this.color.scale(this.burnColorPercent(), 1);
+        const additive = this.additiveColor.add(this.extraAdditiveColor);
 
         // Draw body using drawTile2 from tiles2.png (no head, no eyes)
         const bodyPos = this.pos.add(vec2(0, -0.1 + 0.06*Math.sin(this.walkCyclePercent*PI)).scale(sizeScale));
