@@ -59,15 +59,12 @@ nightGifImage.onerror = function() {
 };
 nightGifImage.src = 'night.gif';
 
-// Silhouette image removed - not needed
-
 const team_none = 0;
 const team_player = 1;
 const team_enemy = 2;
 
 let updateWindowSize, renderWindowSize, gameplayWindowSize;
-// let selectedLevel = 1; // Level selector for testing (1-5) - COMMENTED OUT
-let selectedLevel = 1; // Keep default to 1 for normal gameplay
+let selectedLevel = 1; // Default level to start at
 
 // Title screen music
 let titleMusic = null;
@@ -250,16 +247,6 @@ engineInit(
             }
         }
 
-        // Level selector (number keys 1-6) - COMMENTED OUT
-        // for(let i = 1; i <= 6; i++)
-        // {
-        //     const keyCode = 48 + i; // 49 = '1', 50 = '2', etc.
-        //     if (keyWasPressed(keyCode))
-        //     {
-        //         selectedLevel = i;
-        //     }
-        // }
-
         // Start game with Enter key (key code 13) or gamepad button
         if (titleScreenReady && (keyWasPressed(13) || gamepadWasPressed(0)))
         {
@@ -279,58 +266,7 @@ engineInit(
 
     if (debug)
     {
-        randSeeded(randSeeded(randSeeded(randSeed = Date.now()))); // set random seed for debug mode stuf
-        // if (keyWasPressed(188)) // Comma key
-        //     new Malefactor(mousePosWorld);
-
-        // if (keyWasPressed(84))
-        // {
-        //     //for(let i=30;i--;)
-        //         new Prop(mousePosWorld);
-        // }
-
-        // if (keyWasPressed(190))
-        //     explosion(mousePosWorld);
-
-        // if (keyIsDown(89))
-        // {
-        //     let e = new ParticleEmitter(mousePosWorld);
-
-        //     // test
-        //     e.collideTiles = 1;
-        //     //e.tileIndex=7;
-        //     e.emitSize = 2;
-        //     e.colorStartA = new Color(1,1,1,1);
-        //     e.colorStartB = new Color(0,1,1,1);
-        //     e.colorEndA = new Color(0,0,1,0);
-        //     e.colorEndB = new Color(0,.5,1,0);
-        //     e.emitConeAngle = .1;
-        //     e.particleTime = 1
-        //     e.speed = .3
-        //     e.elasticity = .1
-        //     e.gravityScale = 1;
-        //     //e.additive = 1;
-        //     e.angle = -PI;
-        // }
-
-        // if (mouseWheel) // mouse zoom
-        //     cameraScale = clamp(cameraScale*(1-mouseWheel/10), defaultTileSize.x*16, defaultTileSize.x/16);
-
-        //if (keyWasPressed(77))
-        //    playSong([[[,0,219,,,,,1.1,,-.1,-50,-.05,-.01,1],[2,0,84,,,.1,,.7,,,,.5,,6.7,1,.05]],[[[0,-1,1,0,5,0],[1,1,8,8,0,3]]],[0,0,0,0],90]) // music test
-
-        // if (keyWasPressed(77))
-        //     players[0].pos = mousePosWorld;
-
-        /*if (keyWasPressed(32))
-        {
-            skyParticles && skyParticles.destroy();
-            tileLayer.destroy();
-            tileBackgroundLayer.destroy();
-            tileParallaxLayers.forEach((tileParallaxLayer)=>tileParallaxLayer.destroy());
-            randomizeLevelParams();
-            applyArtToLevel();
-        }*/
+        randSeeded(randSeeded(randSeeded(randSeed = Date.now()))); // set random seed for debug mode
         if (keyWasPressed(78))
             nextLevel();
     }
@@ -694,24 +630,6 @@ engineInit(
             }
         }
 
-        // Level selector - COMMENTED OUT
-        // mainContext.textAlign = 'center';
-        // mainContext.fillStyle = new Color(1,1,1).rgba();
-        // mainContext.font = 'bold 24px JetBrains Mono';
-        // mainContext.fillText('Select Level (Press 1-6):', mainCanvas.width/2, mainCanvas.height/2 + 20);
-        //
-        // // Highlight selected level
-        // const levelY = mainCanvas.height/2 + 55;
-        // for(let i = 1; i <= 6; i++)
-        // {
-        //     const x = mainCanvas.width/2 - 100 + (i - 1) * 33;
-        //     const color = i === selectedLevel ? new Color(1,1,0) : new Color(0.7,0.7,0.7);
-        //     mainContext.fillStyle = color.rgba();
-        //     mainContext.font = 'bold 36px JetBrains Mono';
-        //     mainContext.textAlign = 'center';
-        //     mainContext.fillText(i.toString(), x, levelY);
-        // }
-
         // Press to start text - show different message based on state
         mainContext.textAlign = 'center';
         mainContext.fillStyle = new Color(1,1,1).rgba();
@@ -987,19 +905,6 @@ engineInit(
         const hudX = 20;
         const hudY = 30;
         const lineHeight = 20;
-
-        // TEST MODE: Display "TEST MODE" at top center if enabled
-        // REMOVE THIS SECTION FOR PRODUCTION
-        if (typeof testModeEnabled !== 'undefined' && testModeEnabled)
-        {
-            mainContext.textAlign = 'center';
-            mainContext.fillStyle = new Color(1, 1, 0).rgba(); // Yellow color for visibility
-            mainContext.font = 'bold 24px JetBrains Mono';
-            mainContext.fillText('TEST MODE', mainCanvas.width / 2, 30);
-            mainContext.textAlign = 'left'; // Reset to left for HUD
-            mainContext.fillStyle = new Color(1, 1, 1).rgba(); // Reset to white for HUD
-        }
-        // END TEST MODE SECTION
 
         mainContext.fillText('LEVEL ' + level, hudX, hudY);
         mainContext.fillText('LIVES ' + playerLives, hudX, hudY + lineHeight);

@@ -28,7 +28,7 @@ let playerWardrobeSuits = []; // Store wardrobe suit indices per player index (p
 
 // level settings
 let levelSize, level, levelSeed, levelEnemyCount, levelWarmup;
-let levelColor, levelBackgroundColor, levelSkyColor, levelSkyHorizonColor, levelGroundColor;
+let levelColor, levelSkyColor, levelSkyHorizonColor, levelGroundColor;
 let levelBackgroundGif; // Selected background GIF (dayGifImage or nightGifImage)
 let backgroundParallaxOffset = vec2(); // Parallax offset for background
 let previousCameraPos = vec2(); // Track previous camera position for parallax
@@ -43,7 +43,6 @@ const levelLimits = {
     3: [50, 10, 15, 0, 0, 0, 5, 1, 1, 1],  // Level 3: max 5 spiderlings, 1 barrister, 1 solicitor, 1 prosecutor
     4: [30, 0, 28, 1, 0, 1, 0, 1, 1, 1],  // Level 4: 30 total (1 malefactor, 1 spider, 28 bastards), 1 barrister, 1 solicitor, 1 prosecutor
     5: [60, 20, 15, 10, 1, 0, 8, 1, 1, 1],  // Level 5: 60 enemies total, including 10 malefactors, 1 foe, and 8 spiderlings, 1 barrister, 1 solicitor, 1 prosecutor
-    // 6: [1, 0, 0, 0, 0]  // Level 6: Flat level with 1 weak enemy and many crates - REMOVED
 };
 let levelMaxEnemies, levelMaxSlimes, levelMaxBastards, levelMaxMalefactors, levelMaxFoes, levelMaxSpiders, levelMaxSpiderlings, levelMaxBarristers, levelMaxSolicitors, levelMaxProsecutors;
 let totalEnemiesSpawned, totalSlimesSpawned, totalBastardsSpawned, totalMalefactorsSpawned, totalFoesSpawned, totalSpidersSpawned, totalSpiderlingsSpawned, totalBarristersSpawned, totalSolicitorsSpawned, totalProsecutorsSpawned;
@@ -74,31 +73,7 @@ function buildTerrain(size)
     tileBackground = [];
     initTileCollision(size);
     
-    // Level 6: Flat terrain - REMOVED
-    // if (level == 6)
-    // {
-    //     const flatGroundLevel = 50; // Fixed ground level for flat terrain
-    //     for(let x=0; x < size.x; x++)
-    //     {
-    //         for(let y=0; y < size.y; y++)
-    //         {
-    //             const pos = vec2(x,y);
-    //             let frontTile = tileType_empty;
-    //             if (y < flatGroundLevel)
-    //                 frontTile = tileType_dirt;
-    //             
-    //             let backTile = tileType_empty;
-    //             if (y < flatGroundLevel)
-    //                 backTile = tileType_dirt;
-    //             
-    //             setTileCollisionData(pos, frontTile);
-    //             setTileBackgroundData(pos, backTile);
-    //         }
-    //     }
-    //     return; // Early return for level 6
-    // }
-    
-    // Normal terrain generation for other levels
+    // Normal terrain generation
     let startGroundLevel = rand(40, 60);
     let groundLevel = startGroundLevel;
     let groundSlope = rand(.5,-.5);
@@ -561,7 +536,6 @@ function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefact
         previousFloorHeight = floorHeight;
     }
 
-    //checkpointPos = floorBottomCenterPos.copy(); // start player on base for testing
 
         // spawn random enemies and props (level 4 skips this, it only has malefactors)
     if (level != 4)
@@ -624,14 +598,11 @@ function generateLevel()
 
     // remove all objects that are not persistnt or are descendants of something persitant
     // But preserve surviving girls, boys and their children (weapons)
-    const girlsToPreserve = [];
     const objectsToPreserve = [];
     for(const o of engineObjects)
     {
         if ((o.isGirl || o.isBoy) && !o.destroyed && !o.isDead())
         {
-            if (o.isGirl)
-                girlsToPreserve.push(o);
             objectsToPreserve.push(o);
             // Also preserve children (weapons)
             for(const child of o.children || [])
@@ -703,92 +674,6 @@ function generateLevel()
     const totalProsecutorsSpawnedRef = { value: 0 };
     const totalEnemiesSpawnedRef = { value: 0 };
     
-    // Level 6: Special generation - flat level with many crates and 1 weak enemy - REMOVED
-    // if (level == 6)
-    // {
-    //     // Spawn many many many wooden crates across the level
-    //     const crateCount = 200; // Many crates!
-    //     const groundY = 50; // Flat ground level
-    //     for(let i = crateCount; i--;)
-    //     {
-    //         const x = randSeeded(levelSize.x - 10, 5);
-    //         const y = groundY + 0.5; // On top of ground
-    //         const pos = vec2(x, y);
-    //         // Only spawn if not too close to checkpoint
-    //         if (abs(checkpointPos.x - x) > 10)
-    //         {
-    //             new Prop(pos, propType_crate_wood);
-    //         }
-    //     }
-    //     
-    //     // Spawn 1 weak enemy (guaranteed - if random attempts fail, use fallback)
-    //     let enemySpawned = 0;
-    //     for(let attempts = 50; !enemySpawned && attempts--;)
-    //     {
-    //         const x = randSeeded(levelSize.x - 20, 10);
-    //         const y = groundY + 0.5;
-    //         const pos = vec2(x, y);
-    //         // Spawn away from checkpoint
-    //         if (abs(checkpointPos.x - x) > 20)
-    //         {
-    //             const enemy = new Enemy(pos);
-    //             // Force weak enemy type and properties
-    //             enemy.type = type_weak;
-    //             enemy.health = enemy.healthMax = 1;
-    //             enemy.color = new Color(0,1,0);
-    //             // Reset size to base and scale for weak enemy
-    //             enemy.size = vec2(.6,.95).scale(.9);
-    //             enemy.sizeScale = .9;
-    //             ++totalEnemiesSpawnedRef.value;
-    //             enemySpawned = 1;
-    //         }
-    //     }
-    //     
-    //     // Fallback: if random spawning failed, spawn at a guaranteed location
-    //     if (!enemySpawned)
-    //     {
-    //         // Spawn away from checkpoint, ensuring at least 30 units away
-    //         let spawnX = checkpointPos.x + (checkpointPos.x < levelSize.x/2 ? 40 : -40);
-    //         spawnX = clamp(spawnX, 20, levelSize.x - 20); // Keep within level bounds
-    //         const spawnPos = vec2(spawnX, groundY + 0.5);
-    //         
-    //         const enemy = new Enemy(spawnPos);
-    //         // Force weak enemy type and properties
-    //         enemy.type = type_weak;
-    //         enemy.health = enemy.healthMax = 1;
-    //         enemy.color = new Color(0,1,0);
-    //         // Reset size to base and scale for weak enemy
-    //         enemy.size = vec2(.6,.95).scale(.9);
-    //         enemy.sizeScale = .9;
-    //         ++totalEnemiesSpawnedRef.value;
-    //     }
-    //     
-    //     // Skip normal base generation and enemy spawning for level 6
-    //     // Sync the refs back to globals
-    //     totalEnemiesSpawned = totalEnemiesSpawnedRef.value;
-    //     totalSlimesSpawned = totalSlimesSpawnedRef.value;
-    //     totalBastardsSpawned = totalBastardsSpawnedRef.value;
-    //     totalMalefactorsSpawned = totalMalefactorsSpawnedRef.value;
-    //     totalFoesSpawned = totalFoesSpawnedRef.value;
-    //     
-    //     // Build checkpoints for level 6
-    //     for(let x=0; x<levelSize.x-9; )
-    //     {
-    //         x += rand(100,70);
-    //         const pos = vec2(x, levelSize.y);
-    //         raycastHit = tileCollisionRaycast(pos, vec2(pos.x, 0));
-    //         if (raycastHit && abs(checkpointPos.x-pos.x) > 50)
-    //         {
-    //             const pos = raycastHit.add(vec2(0,1));
-    //             new Checkpoint(pos);
-    //         }
-    //     }
-    //     
-    //     // Clear edge tiles
-    //     clearEdgeTiles(levelSize, 20);
-    //     return; // Early return - level 6 is done
-    // }
-
     // Spawn malefactors directly on levels 4 and 5 (before base generation)
     if (level == 4 || level == 5)
     {
@@ -1848,7 +1733,6 @@ function nextLevel()
     // spawn player
     players = [];
     new Player(checkpointPos);
-    //new Enemy(checkpointPos.add(vec2(3))); // test enemy
     
     // spawn girls (surviving girls from previous level + 1 new one)
     respawnSurvivingGirls(checkpointPos);
@@ -1856,7 +1740,6 @@ function nextLevel()
     
     // spawn boys (surviving boys from previous level only - no new spawns at level start)
     respawnSurvivingBoys(checkpointPos);
-    // spawnBoys(checkpointPos); // Removed - boys now only spawn during transmutation
     
     // CRITICAL VERIFICATION: Ensure level 4 has at least 1 girl (guaranteed spawn)
     if (level == 4)

@@ -492,21 +492,14 @@ class Prop extends GameObject
             makeWater(this.pos);
 
         // Drop item from all crates and barrels
-        // TEST MODE: 100% chance for test item | NORMAL: 20% chance for random item
+        // 20% chance for random item
         if (this.type < propType_rock)
         {
             let shouldDropItem = false;
             let itemTypeToDrop = null;
             
-            if (typeof testModeEnabled !== 'undefined' && testModeEnabled)
             {
-                // TEST MODE: Always drop the test item
-                shouldDropItem = true;
-                itemTypeToDrop = typeof testModeItemType !== 'undefined' ? testModeItemType : itemType_laser;
-            }
-            else
-            {
-                // NORMAL MODE: 20% chance for random item
+                // 20% chance for random item
                 if (rand() < .2)
                 {
                     shouldDropItem = true;
@@ -1037,15 +1030,6 @@ const itemRegistry = {
 
 // Get all available item types for random selection
 const getAllItemTypes = ()=> [itemType_life, itemType_health, itemType_laser, itemType_cannon, itemType_jumper, itemType_hammer, itemType_radar, itemType_smoker, itemType_fang, itemType_ladymaker];
-
-///////////////////////////////////////////////////////////////////////////////
-// TEST MODE - REMOVE THIS ENTIRE SECTION FOR PRODUCTION
-///////////////////////////////////////////////////////////////////////////////
-const testModeEnabled = false; // Set to false to disable test mode
-const testModeItemType = itemType_wardrobe; // Change this to test different items (e.g., itemType_laser, itemType_hammer, etc.)
-// Available item types: itemType_life, itemType_health, itemType_laser, itemType_cannon, itemType_jumper, 
-// itemType_hammer, itemType_radar, itemType_smoker, itemType_fang, itemType_ladymaker, itemType_transporter, itemType_wardrobe
-///////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////
 

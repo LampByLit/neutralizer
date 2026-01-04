@@ -577,8 +577,6 @@ function updateSky()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// Silhouette parallax layer removed - not needed
-
 function generateParallaxLayers()
 {
     // No parallax layers needed
