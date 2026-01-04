@@ -603,7 +603,7 @@ class Grenade extends GameObject
         this.friction   = .9;
         this.angleDamping = .96;
         this.renderOrder = 1e8;
-        this.setCollision();
+        this.setCollision(1, 1);
     }
 
     update()
