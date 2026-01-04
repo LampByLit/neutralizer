@@ -153,7 +153,7 @@ function makeWater(pos, amount=400)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-function explosion(pos, radius=2)
+function explosion(pos, radius=2, applyForce=true, forceMultiplier=1)
 {
     ASSERT(radius > 0);
     if (levelWarmup)
@@ -193,11 +193,14 @@ function explosion(pos, radius=2)
         }
 
         // push
-        const p = percent(d, radius, 2*radius);
-        const force = o.pos.subtract(pos).normalize(p*radius*.2);
-        o.applyForce && o.applyForce(force);
-        if (o.isDead && o.isDead())
-            o.angleVelocity += randSign()*rand(p*radius/4,.3);
+        if (applyForce)
+        {
+            const p = percent(d, radius, 2*radius);
+            const force = o.pos.subtract(pos).normalize(p*radius*.2*forceMultiplier);
+            o.applyForce && o.applyForce(force);
+            if (o.isDead && o.isDead())
+                o.angleVelocity += randSign()*rand(p*radius/4,.3);
+        }
     });
 
     playSound(sound_explosion, pos);

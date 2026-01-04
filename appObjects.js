@@ -179,7 +179,8 @@ const propType_rock                 = 7;
 const propType_rock_lava            = 8;
 const propType_rock_jackrock        = 9;
 const propType_terminal             = 10;
-const propType_count                = 11;
+const propType_rock_pussybomb       = 11;
+const propType_count                = 12;
 
 class Prop extends GameObject 
 {
@@ -285,6 +286,27 @@ class Prop extends GameObject
             this.nukeStartTime = 0; // Track when countdown started
             // Normal size, pushable, no special properties
         }
+        else if (this.type == propType_rock_pussybomb)
+        {
+            this.tileIndex = 18; // Same tile as jackrock
+            this.baseColor = new Color(1, .2, .8); // Pink
+            this.color = this.baseColor.copy();
+            health = 50; // 50 health
+            this.mass *= 32; // 32x heavy like jackrock
+            this.size = this.size.scale(4); // Very large like jackrock
+            this.pos.y += 1; // Adjust position for larger size
+            this.isCrushing = 1;
+            // No explosionSize - only explodes via countdown, not on death
+            // Countdown properties
+            this.isDetonating = false;
+            this.countdownTimer = new Timer(10); // 10 second countdown
+            this.beepTimer = new Timer(1); // Beep every 1 second
+            this.countdownStartTime = 0; // Track when countdown started
+            this.countdownSeconds = 10; // Track remaining seconds for beeping
+            this.pussybombDestroyed = false; // Track if pussybomb has been destroyed
+            // Add to global array
+            allPussybombs.push(this);
+        }
 
         // randomly angle and flip axis (90 degree rotation)
         this.angle = (rand(4)|0)*PI/2;
@@ -326,6 +348,35 @@ class Prop extends GameObject
             }
         }
 
+        // Pussybomb countdown
+        if (this.type == propType_rock_pussybomb && this.isDetonating && !this.destroyed)
+        {
+            // Check if countdown has elapsed (10 seconds)
+            const elapsed = time - this.countdownStartTime;
+            if (elapsed >= 10 || this.countdownTimer.elapsed())
+            {
+                // Mark as destroyed for level completion
+                this.pussybombDestroyed = true;
+                // Explode! (weaker force pushback)
+                explosion(this.pos, 35, true, 0.3); // Massive explosion radius, 35% force strength
+                this.destroy();
+                return;
+            }
+
+            // Beep every second, counting down from 10
+            if (this.beepTimer.elapsed())
+            {
+                const remainingSeconds = 10 - Math.floor(elapsed);
+                if (remainingSeconds != this.countdownSeconds)
+                {
+                    // New second - beep
+                    playSound(sound_grenade, this.pos);
+                    this.countdownSeconds = remainingSeconds;
+                }
+                this.beepTimer.set(1);
+            }
+        }
+
         // Darken jackrock color based on health percentage
         if (this.type == propType_rock_jackrock && this.baseColor)
         {
@@ -352,6 +403,26 @@ class Prop extends GameObject
             }
         }
         
+        // Pussybomb: detect bullet hits (any bullet, any damage) - triggers 10 second countdown
+        if (this.type == propType_rock_pussybomb && !this.isDetonating && !this.destroyed)
+        {
+            // Check if hit by a bullet (Bullet class has attacker and damage properties, and is not a Character)
+            // Bullets extend EngineObject and have: this.attacker, this.damage, and are not Characters
+            if (damagingObject && 
+                !damagingObject.isCharacter && 
+                !damagingObject.isGameObject && 
+                damagingObject.attacker !== undefined && 
+                damagingObject.damage !== undefined)
+            {
+                // Hit by a bullet - start countdown (only once, continue if already started)
+                this.isDetonating = true;
+                this.countdownTimer.set(10); // 10 second countdown
+                this.beepTimer.set(1); // Start beeping immediately
+                this.countdownStartTime = time;
+                this.countdownSeconds = 10; // Initialize countdown
+            }
+        }
+        
         (this.explosionSize || this.type == propType_crate_wood && rand() < .1) && this.burn();
         super.damage(damage, damagingObject);
     }
@@ -375,6 +446,32 @@ class Prop extends GameObject
                 setBlendMode(0);
             }
         }
+        else if (this.type == propType_rock_pussybomb)
+        {
+            // Render the rock itself
+            super.render();
+            
+            // Constant glow - pink when not detonating, red when detonating
+            if (!this.destroyed)
+            {
+                setBlendMode(1);
+                if (this.isDetonating)
+                {
+                    // Red glow during countdown (constant, no pulse)
+                    drawTile(this.pos, vec2(2.5), 0, vec2(16), new Color(1,0,0,.4));
+                    drawTile(this.pos, vec2(1.5), 0, vec2(16), new Color(1,0,0,.3));
+                    drawTile(this.pos, vec2(1), 0, vec2(16), new Color(1,0,0,.2));
+                }
+                else
+                {
+                    // Bright pink glow when not detonating (constant, no pulse)
+                    drawTile(this.pos, vec2(2.5), 0, vec2(16), new Color(1,.2,.8,.4));
+                    drawTile(this.pos, vec2(1.5), 0, vec2(16), new Color(1,.2,.8,.3));
+                    drawTile(this.pos, vec2(1), 0, vec2(16), new Color(1,.2,.8,.2));
+                }
+                setBlendMode(0);
+            }
+        }
         else
         {
             super.render();
@@ -384,6 +481,12 @@ class Prop extends GameObject
     kill()
     {
         if (this.destroyed) return;
+
+        // Mark pussybomb as destroyed if destroyed by other means (not countdown)
+        if (this.type == propType_rock_pussybomb && !this.pussybombDestroyed)
+        {
+            this.pussybombDestroyed = true;
+        }
 
         if (this.type == propType_barrel_water)
             makeWater(this.pos);
@@ -432,6 +535,7 @@ class Prop extends GameObject
 let checkpointPos, activeCheckpoint, checkpointTimer = new Timer;
 let allCheckpoints = []; // Track all checkpoints
 let allComputers = []; // Track all computers
+let allPussybombs = []; // Track all pussybombs
 
 class Checkpoint extends GameObject 
 {
@@ -2384,17 +2488,12 @@ class WardrobeWeapon extends Weapon
         
         // Store suit in player's wardrobe suits array for persistence
         // Only set suit if player doesn't already have one (one suit per level)
-        console.log('[Wardrobe] ===== WARDROBE EQUIPPED =====');
-        console.log('[Wardrobe] Constructor - parent.isPlayer:', this.parent.isPlayer, 'parent.playerIndex:', this.parent.playerIndex);
-        console.log('[Wardrobe] Selected suit pair - standing:', this.standingTileIndex, 'jumping:', this.jumpingTileIndex);
         if (this.parent.isPlayer && typeof playerWardrobeSuits !== 'undefined')
         {
             // Check if player already has a suit set for this level
             const existingSuit = playerWardrobeSuits[this.parent.playerIndex];
             if (existingSuit)
             {
-                console.log('[Wardrobe] ⚠ Suit already exists for player', this.parent.playerIndex, '- keeping existing suit "' + (existingSuit.name || 'unknown') + '":', JSON.stringify(existingSuit));
-                console.log('[Wardrobe] New suit selection ignored (one suit per level)');
                 // Use the existing suit indices instead of the new random selection
                 this.standingTileIndex = existingSuit.standing;
                 this.jumpingTileIndex = existingSuit.jumping;
@@ -2408,13 +2507,7 @@ class WardrobeWeapon extends Weapon
                     jumping: this.jumpingTileIndex,
                     name: this.suitName
                 };
-                console.log('[Wardrobe] ✓ Stored NEW suit "' + this.suitName + '" in playerWardrobeSuits[' + this.parent.playerIndex + ']:', JSON.stringify(playerWardrobeSuits[this.parent.playerIndex]));
-                console.log('[Wardrobe] Full playerWardrobeSuits array:', JSON.stringify(playerWardrobeSuits));
             }
-        }
-        else
-        {
-            console.log('[Wardrobe] ✗ WARNING - Not storing suit. isPlayer:', this.parent.isPlayer, 'playerWardrobeSuits defined:', typeof playerWardrobeSuits !== 'undefined');
         }
     }
     

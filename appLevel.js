@@ -1182,6 +1182,86 @@ function generateLevel()
         }
     }
 
+    // spawn pussybomb - one per level, in sky platform at top of map with double ladder
+    const platformX = levelSize.x / 2; // Middle of map
+    const platformY = 10; // 10 tiles from top (Y increases downward, so 10 is near top)
+    
+    // Find surface at middle X position for ladder
+    const surfaceTest = vec2(platformX, levelSize.y);
+    raycastHit = tileCollisionRaycast(surfaceTest, vec2(platformX, 0));
+    
+    if (raycastHit)
+    {
+        const surfaceY = raycastHit.y; // Surface Y coordinate
+        // Ladder should go up to just below platform floor (platformY - 1) so players can climb onto platform
+        const ladderTopY = platformY - 1; // One tile above platform floor
+        
+        // Create double ladder from surface up to platform (2 tiles wide)
+        // Clear ladder path first to protect from terrain generation
+        for(let x = platformX; x <= platformX + 1; ++x)
+        {
+            for(let y = surfaceY; y >= ladderTopY; --y)
+            {
+                const pos = vec2(x, y);
+                if (pos.x >= 0 && pos.x < levelSize.x && pos.y >= 0 && pos.y < levelSize.y)
+                {
+                    // Clear tiles in ladder path (protect from terrain)
+                    setTileCollisionData(pos, tileType_empty);
+                    setTileBackgroundData(pos, tileType_empty);
+                }
+            }
+        }
+        
+        // Place ladder tiles (double ladder, 2 tiles wide)
+        for(let x = platformX; x <= platformX + 1; ++x)
+        {
+            for(let y = surfaceY; y >= ladderTopY; --y)
+            {
+                const pos = vec2(x, y);
+                if (pos.x >= 0 && pos.x < levelSize.x && pos.y >= 0 && pos.y < levelSize.y)
+                {
+                    setTileCollisionData(pos, tileType_ladder);
+                }
+            }
+        }
+        
+        // Create sky platform for the pussybomb
+        // Platform needs to be wide enough for the 4x rock
+        const platformWidth = 8; // 8 tiles wide platform
+        const platformHeight = 6; // 6 tiles tall clearance
+        const halfWidth = platformWidth / 2;
+        const platformTop = platformY - platformHeight;
+        
+        // Clear the area above the platform (air space for the rock)
+        for(let x = platformX - halfWidth; x <= platformX + halfWidth; ++x)
+        {
+            for(let y = platformTop; y < platformY; ++y)
+            {
+                const pos = vec2(x, y);
+                if (pos.x >= 0 && pos.x < levelSize.x && pos.y >= 0 && pos.y < levelSize.y)
+                {
+                    setTileCollisionData(pos, tileType_empty);
+                    setTileBackgroundData(pos, tileType_empty);
+                }
+            }
+        }
+        
+        // Create the platform floor (solid ground)
+        for(let x = platformX - halfWidth; x <= platformX + halfWidth; ++x)
+        {
+            const pos = vec2(x, platformY);
+            if (pos.x >= 0 && pos.x < levelSize.x && pos.y >= 0 && pos.y < levelSize.y)
+            {
+                setTileCollisionData(pos, tileType_dirt);
+                setTileBackgroundData(pos, tileType_dirt);
+            }
+        }
+        
+        // Spawn the pussybomb on top of the platform (one tile above platform floor)
+        const pussybombPos = vec2(platformX, platformY - 1);
+        new Prop(pussybombPos, propType_rock_pussybomb);
+    }
+
     // build checkpoints
     for(let x=0; x<levelSize.x-9; )
     {
@@ -1461,6 +1541,7 @@ function nextLevel()
     // Clear checkpoint tracking for new level
     allCheckpoints = [];
     allComputers = []; // Clear computers for new level
+    allPussybombs = []; // Clear pussybombs for new level
     playerWardrobeSuits = []; // Clear wardrobe suits for new level (one suit per level)
     
     // set level limits

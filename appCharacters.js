@@ -122,13 +122,15 @@ class Character extends GameObject
                     && !this.preventJumpTimer.active())
                 {
                     // start jump
+                    // Limit jump height when carrying (2.5 tiles high instead of ~4 tiles)
+                    const jumpHeightMultiplier = (this.isCarrying && this.isPlayer) ? 0.625 : 1.0; // 62.5% = 2.5/4 tiles
                     if (this.climbingWall)
                     {
-                        this.velocity.y = .25;
+                        this.velocity.y = .25 * jumpHeightMultiplier;
                     }
                     else
                     {
-                        this.velocity.y = .15;
+                        this.velocity.y = .15 * jumpHeightMultiplier;
                         this.jumpTimer.set(.2);
                     }
                     this.preventJumpTimer.set(.5);
@@ -141,7 +143,11 @@ class Character extends GameObject
                 // update variable height jump
                 this.groundTimer.unset();
                 if (this.holdingJump && this.velocity.y > 0 && this.jumpTimer.active())
-                    this.velocity.y += .017;
+                {
+                    // Reduce jump continuation when carrying
+                    const jumpContinuation = (this.isCarrying && this.isPlayer) ? .01 : .017;
+                    this.velocity.y += jumpContinuation;
+                }
             }
 
             if (!this.groundObject)
@@ -199,14 +205,18 @@ class Character extends GameObject
                     // Check for terminals (props with type propType_terminal)
                     if (o.type == propType_terminal && !o.destroyed && o.health > 0)
                     {
-                        o.damage(1, this);
+                        o.damage(1, this); // this = player character
                     }
                 }, 0); // 0 = check all objects, not just collide objects
             }
         }
 
         // apply movement acceleration and clamp
-        this.velocity.x = clamp(this.velocity.x + moveInput.x * .042, maxCharacterSpeed, -maxCharacterSpeed);
+        // Reduce speed when carrying an object
+        const speedMultiplier = (this.isCarrying && this.isPlayer) ? 0.3 : 1.0; // 30% speed when carrying
+        const effectiveMaxSpeed = maxCharacterSpeed * speedMultiplier;
+        const effectiveAccel = .042 * speedMultiplier;
+        this.velocity.x = clamp(this.velocity.x + moveInput.x * effectiveAccel, effectiveMaxSpeed, -effectiveMaxSpeed);
 
         // call parent, update physics
         const oldVelocity = this.velocity.copy();
@@ -301,18 +311,6 @@ class Character extends GameObject
         if (this.isPlayer && typeof playerWardrobeSuits !== 'undefined' && playerWardrobeSuits[this.playerIndex])
         {
             wardrobeSuit = playerWardrobeSuits[this.playerIndex];
-            // Debug logging (only log occasionally to avoid spam)
-            if (Math.random() < 0.01) // Log ~1% of frames
-            {
-                console.log('[Wardrobe] Render - ✓ Found suit for player', this.playerIndex, ':', JSON.stringify(wardrobeSuit));
-            }
-        }
-        else if (this.isPlayer && Math.random() < 0.01) // Debug when suit not found
-        {
-            console.log('[Wardrobe] Render - ✗ No suit found. isPlayer:', this.isPlayer, 'playerIndex:', this.playerIndex, 
-                       'playerWardrobeSuits defined:', typeof playerWardrobeSuits !== 'undefined',
-                       'playerWardrobeSuits[' + this.playerIndex + ']:', playerWardrobeSuits ? playerWardrobeSuits[this.playerIndex] : 'N/A',
-                       'Full array:', JSON.stringify(playerWardrobeSuits));
         }
 
         // set tile to use
@@ -354,29 +352,10 @@ class Character extends GameObject
         // Draw body sprite - use drawTile2 for wardrobe suits, drawTile for default
         if (wardrobeSuit && typeof drawTile2 === 'function')
         {
-            // Debug logging (only log occasionally to avoid spam)
-            if (Math.random() < 0.01) // Log ~1% of frames
-            {
-                console.log('[Wardrobe] Drawing suit - bodyTileIndex:', bodyTileIndex, 'drawTile2 available:', typeof drawTile2 === 'function');
-                // Check if tiles2.png is loaded
-                if (typeof tileImage2 !== 'undefined')
-                {
-                    const isLoaded = tileImage2 ? (tileImage2.complete && tileImage2.width > 0) : false;
-                    console.log('[Wardrobe] tileImage2 loaded:', isLoaded, 'complete:', tileImage2?.complete, 'width:', tileImage2?.width);
-                }
-                else
-                {
-                    console.log('[Wardrobe] tileImage2 is undefined');
-                }
-            }
             drawTile2(bodyPos, vec2(sizeScale), bodyTileIndex, vec2(16), color, this.angle, this.mirror, additive);
         }
         else
         {
-            if (wardrobeSuit && Math.random() < 0.01) // Debug when drawTile2 not available
-            {
-                console.log('[Wardrobe] ✗ WARNING - Suit found but drawTile2 not available. drawTile2 type:', typeof drawTile2);
-            }
             drawTile(bodyPos, vec2(sizeScale), bodyTileIndex, this.tileSize, color, this.angle, this.mirror, additive);
         }
         
@@ -2602,18 +2581,6 @@ class Malefactor extends Enemy
         if (this.isPlayer && typeof playerWardrobeSuits !== 'undefined' && playerWardrobeSuits[this.playerIndex])
         {
             wardrobeSuit = playerWardrobeSuits[this.playerIndex];
-            // Debug logging (only log occasionally to avoid spam)
-            if (Math.random() < 0.01) // Log ~1% of frames
-            {
-                console.log('[Wardrobe] Render - ✓ Found suit for player', this.playerIndex, ':', JSON.stringify(wardrobeSuit));
-            }
-        }
-        else if (this.isPlayer && Math.random() < 0.01) // Debug when suit not found
-        {
-            console.log('[Wardrobe] Render - ✗ No suit found. isPlayer:', this.isPlayer, 'playerIndex:', this.playerIndex, 
-                       'playerWardrobeSuits defined:', typeof playerWardrobeSuits !== 'undefined',
-                       'playerWardrobeSuits[' + this.playerIndex + ']:', playerWardrobeSuits ? playerWardrobeSuits[this.playerIndex] : 'N/A',
-                       'Full array:', JSON.stringify(playerWardrobeSuits));
         }
 
         // set tile to use
@@ -2654,29 +2621,10 @@ class Malefactor extends Enemy
         // Draw body sprite - use drawTile2 for wardrobe suits, drawTile for default
         if (wardrobeSuit && typeof drawTile2 === 'function')
         {
-            // Debug logging (only log occasionally to avoid spam)
-            if (Math.random() < 0.01) // Log ~1% of frames
-            {
-                console.log('[Wardrobe] Drawing suit - bodyTileIndex:', bodyTileIndex, 'drawTile2 available:', typeof drawTile2 === 'function');
-                // Check if tiles2.png is loaded
-                if (typeof tileImage2 !== 'undefined')
-                {
-                    const isLoaded = tileImage2 ? (tileImage2.complete && tileImage2.width > 0) : false;
-                    console.log('[Wardrobe] tileImage2 loaded:', isLoaded, 'complete:', tileImage2?.complete, 'width:', tileImage2?.width);
-                }
-                else
-                {
-                    console.log('[Wardrobe] tileImage2 is undefined');
-                }
-            }
             drawTile2(bodyPos, vec2(sizeScale), bodyTileIndex, vec2(16), color, this.angle, this.mirror, additive);
         }
         else
         {
-            if (wardrobeSuit && Math.random() < 0.01) // Debug when drawTile2 not available
-            {
-                console.log('[Wardrobe] ✗ WARNING - Suit found but drawTile2 not available. drawTile2 type:', typeof drawTile2);
-            }
             drawTile(bodyPos, vec2(sizeScale), bodyTileIndex, this.tileSize, color, this.angle, this.mirror, additive);
         }
         drawTile(this.pos.add(vec2(this.getMirrorSign(.05) + meleeHeadOffset * this.getMirrorSign(),.46).scale(sizeScale).rotate(-this.angle)),vec2(sizeScale/2),this.headTile,vec2(8), headColor,this.angle,this.mirror, additive);
@@ -4008,6 +3956,10 @@ class Player extends Character
         this.persistent = this.wasHoldingJump = this.canBlink = this.isPlayer = 1;
         this.team = team_player;
         
+        // lift mechanic state
+        this.carriedObject = null;
+        this.isCarrying = 0;
+        
         // Initialize or restore equipped weapon
         this.equippedWeaponType = playerEquippedWeapons[playerIndex] || 'Weapon';
         this.equipWeapon(this.equippedWeaponType);
@@ -4096,11 +4048,13 @@ class Player extends Character
         this.wasHoldingJump = this.holdingJump;
 
         // controls
-        this.holdingShoot  = !this.playerIndex && (mouseIsDown(0) || keyIsDown(90) || keyIsDown(32)) || gamepadIsDown(2, this.playerIndex);
+        this.holdingShoot  = !this.playerIndex && (mouseIsDown(0) || keyIsDown(32)) || gamepadIsDown(2, this.playerIndex); // Space or mouse for shoot (removed Z)
         this.pressingThrow = !this.playerIndex && (mouseIsDown(2) || keyIsDown(67)) || gamepadIsDown(1, this.playerIndex);
-        this.pressedDodge  = !this.playerIndex && (mouseIsDown(1) || keyIsDown(16)) || gamepadIsDown(3, this.playerIndex); // Shift key for roll
+        // Disable dodge/roll while carrying an object
+        this.pressedDodge  = (!this.isCarrying) && (!this.playerIndex && (mouseIsDown(1) || keyIsDown(16)) || gamepadIsDown(3, this.playerIndex)); // Shift key for roll
         this.pressedMelee  = !this.playerIndex && keyWasPressed(69) || gamepadWasPressed(4, this.playerIndex); // E key for melee
         this.pressedUnequip = !this.playerIndex && keyWasPressed(81) || gamepadWasPressed(5, this.playerIndex); // Q key for unequip
+        this.pressedLift = (!this.playerIndex && keyWasPressed(90)) || gamepadWasPressed(6, this.playerIndex); // Z key for lift
 
         // aiming with arrow keys - Up/Down for vertical aim
         if (!this.playerIndex)
@@ -4136,6 +4090,39 @@ class Player extends Character
             {
                 this.unequipWeapon();
             }
+        }
+
+        // Handle lift mechanic (Z key)
+        if (this.pressedLift)
+        {
+            if (this.isCarrying && this.carriedObject)
+            {
+                // Drop the object
+                this.dropCarriedObject();
+            }
+            else if (!this.isCarrying)
+            {
+                // Try to lift an object
+                this.tryLiftObject();
+            }
+        }
+        
+        // Update carried object position if carrying (in case it needs adjustment)
+        if (this.isCarrying && this.carriedObject && !this.carriedObject.destroyed)
+        {
+            // Ensure object stays attached (parent-child system handles this, but verify)
+            if (this.carriedObject.parent != this)
+            {
+                // Object lost parent somehow, reattach
+                const frontOffset = vec2(this.getMirrorSign(0.8), 0);
+                this.addChild(this.carriedObject, frontOffset, 0);
+            }
+        }
+
+        // Check if carried object was destroyed
+        if (this.isCarrying && this.carriedObject && (this.carriedObject.destroyed || !this.carriedObject))
+        {
+            this.dropCarriedObject();
         }
 
         super.update();
@@ -4177,6 +4164,12 @@ class Player extends Character
     
     kill(damagingObject)
     {
+        // Drop carried object if player dies
+        if (this.isCarrying && this.carriedObject)
+        {
+            this.dropCarriedObject();
+        }
+        
         // Call parent kill method (destroys weapon, etc.)
         super.kill(damagingObject);
         
@@ -4272,5 +4265,95 @@ class Player extends Character
                 droppedItem.velocity = vec2(this.getMirrorSign(.15), -.1);
             }
         }
+    }
+    
+    tryLiftObject()
+    {
+        // Find nearby objects that can be lifted
+        const liftRange = 1.5; // Check within 1.5 tiles
+        let closestObject = null;
+        let closestDist = liftRange * liftRange;
+        
+        // Check all objects, not just collide objects (0 = all objects)
+        forEachObject(this.pos, liftRange, (o)=>
+        {
+            // Skip if object is destroyed, already has a parent, or is the player
+            if (o.destroyed || o.parent || o == this)
+                return;
+            
+            // Only lift Prop objects (check if it has a prop type)
+            // Props have a type property that's a number < propType_count
+            if (!o.isGameObject || o.isCharacter || o.isItem || o.isWeapon)
+                return;
+            
+            // Check if it's a Prop by checking if type is a valid prop type
+            // propType_count is 12 (0-11 are valid prop types)
+            const propTypeMax = typeof propType_count !== 'undefined' ? propType_count : 12;
+            if (typeof o.type !== 'number' || o.type < 0 || o.type >= propTypeMax)
+                return;
+            
+            // Check if object has weight <= 4 (mass <= 4)
+            // Default mass is 1, so most props should be liftable
+            if (!o.mass || o.mass > 4)
+                return;
+            
+            // Check if player is facing the object
+            const playerFacingRight = !this.mirror; // mirror 0 = facing right, 1 = facing left
+            const objectToRight = o.pos.x > this.pos.x;
+            const isFacingObject = (playerFacingRight && objectToRight) || (!playerFacingRight && !objectToRight);
+            
+            if (!isFacingObject)
+                return;
+            
+            // Check if touching (overlapping) - use a slightly larger check for easier grabbing
+            const overlapMargin = 0.1; // Small margin for easier grabbing
+            const checkSize = this.size.add(vec2(overlapMargin));
+            const checkObjSize = o.size.add(vec2(overlapMargin));
+            if (!isOverlapping(this.pos, checkSize, o.pos, checkObjSize))
+                return;
+            
+            // Found a valid object to lift
+            const distSq = this.pos.distanceSquared(o.pos);
+            if (distSq < closestDist)
+            {
+                closestDist = distSq;
+                closestObject = o;
+            }
+        }, 0); // 0 = check all objects, not just collide objects
+        
+        if (closestObject)
+        {
+            // Lift the object
+            this.carriedObject = closestObject;
+            this.isCarrying = 1;
+            
+            // Disable object's gravity and tile collision while carrying (but keep object collisions)
+            closestObject.gravityScale = 0;
+            closestObject.collideTiles = 0;
+            closestObject.velocity = vec2(); // Stop any existing velocity
+            
+            // Attach object to player's front
+            const frontOffset = vec2(this.getMirrorSign(0.8), 0); // Slightly in front
+            this.addChild(closestObject, frontOffset, 0);
+        }
+    }
+    
+    dropCarriedObject()
+    {
+        if (this.carriedObject && !this.carriedObject.destroyed)
+        {
+            // Remove from parent-child relationship
+            this.removeChild(this.carriedObject);
+            
+            // Restore object's physics properties
+            this.carriedObject.gravityScale = 1;
+            this.carriedObject.collideTiles = 1;
+            
+            // Give object a small velocity in the direction player is facing
+            this.carriedObject.velocity = this.velocity.add(vec2(this.getMirrorSign(0.1), 0.05));
+        }
+        
+        this.carriedObject = null;
+        this.isCarrying = 0;
     }
 }

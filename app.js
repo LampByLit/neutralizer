@@ -728,9 +728,24 @@ engineInit(
             }
         }
 
-        // Level completion requires: all enemies dead AND all checkpoints secured AND all computers destroyed
+        // Count destroyed pussybombs
+        let destroyedPussybombs = 0;
+        let totalPussybombs = 0;
+        for (const pussybomb of allPussybombs)
+        {
+            if (pussybomb)
+            {
+                ++totalPussybombs;
+                // Count as destroyed if marked as destroyed OR if object is destroyed
+                if (pussybomb.pussybombDestroyed || (pussybomb.destroyed !== undefined && pussybomb.destroyed))
+                    ++destroyedPussybombs;
+            }
+        }
+
+        // Level completion requires: all enemies dead AND all checkpoints secured AND all computers destroyed AND pussybomb destroyed
         if (!enemiesCount && totalCheckpoints > 0 && securedCheckpoints >= totalCheckpoints && 
-            totalComputers > 0 && destroyedComputers >= totalComputers && !levelEndTimer.isSet())
+            totalComputers > 0 && destroyedComputers >= totalComputers && 
+            totalPussybombs > 0 && destroyedPussybombs >= totalPussybombs && !levelEndTimer.isSet())
             levelEndTimer.set();
 
         mainContext.fillStyle = new Color(1,1,1).rgba();
@@ -755,13 +770,14 @@ engineInit(
 
         mainContext.fillText('LEVEL ' + level, hudX, hudY);
         mainContext.fillText('LIVES ' + playerLives, hudX, hudY + lineHeight);
-        mainContext.fillText('ENEMIES ' + enemiesCount, hudX, hudY + lineHeight * 2);
-        mainContext.fillText('CHECKPOINTS ' + securedCheckpoints + '/' + totalCheckpoints, hudX, hudY + lineHeight * 3);
-        mainContext.fillText('COMPUTERS ' + destroyedComputers + '/' + totalComputers, hudX, hudY + lineHeight * 4);
+        mainContext.fillText('MALEFACTORS ' + enemiesCount, hudX, hudY + lineHeight * 2);
+        mainContext.fillText('LOGINS ' + securedCheckpoints + '/' + totalCheckpoints, hudX, hudY + lineHeight * 3);
+        mainContext.fillText('CALCULATORS ' + destroyedComputers + '/' + totalComputers, hudX, hudY + lineHeight * 4);
+        mainContext.fillText('PUSSYBOMB ' + destroyedPussybombs + '/1', hudX, hudY + lineHeight * 5);
         
         // Clean up and count living girls
         cleanupSurvivingGirls();
-        mainContext.fillText('GIRLS ' + survivingGirls.length, hudX, hudY + lineHeight * 5);
+        mainContext.fillText('GREENHORNS ' + survivingGirls.length, hudX, hudY + lineHeight * 6);
 
         // fade in level transition
         const fade = levelEndTimer.isSet() ? percent(levelEndTimer.get(), 3, 1) : percent(levelTimer.get(), .5, 2);
