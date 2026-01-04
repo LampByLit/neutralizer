@@ -513,7 +513,7 @@ engineInit(
             drawY = Math.max(minY, Math.min(maxY, drawY));
             
             // Draw the animated GIF (it will animate because it's an img element in the DOM)
-            mainContext.drawImage(levelBackgroundGif, clampedX, clampedY, drawWidth, drawHeight);
+            mainContext.drawImage(levelBackgroundGif, drawX, drawY, drawWidth, drawHeight);
         }
         else
         {
