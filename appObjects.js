@@ -266,7 +266,7 @@ class Prop extends GameObject
             this.baseColor = new Color(.2, 1, .2); // Bright green
             this.color = this.baseColor.copy();
             health = 10;
-            this.mass *= 8;
+            this.mass *= 32;
             this.size = this.size.scale(4); // Very large
             this.pos.y += 1; // Adjust position for larger size
             this.isCrushing = 1;
