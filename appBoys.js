@@ -48,6 +48,8 @@ class Boy extends Character
         this.stuckTimer = new Timer; // Track if stuck on obstacle
         this.wallJumpTimer = new Timer; // Cooldown for wall jumps
         this.pathfindTimer = new Timer; // For pathfinding checks
+        this.tileShootTimer = new Timer; // Cooldown for shooting at tiles
+        this.targetTile = null; // Tile position to shoot at
         
         // Vision and behavior
         this.maxVisionRange = 20; // Much better vision than enemies (12-15)
@@ -73,6 +75,7 @@ class Boy extends Character
         
         // Initialize timers that need starting values
         this.pathfindTimer.set(0); // Start immediately
+        this.tileShootTimer.set(0); // Ready to shoot at tiles immediately
     }
     
     update()
@@ -296,10 +299,76 @@ class Boy extends Character
         if (this.wantsToJump)
             this.holdJumpTimer.set(0.25); // Decent jump height
         
-        // ========== COMBAT - AGGRESSIVE SHOOTING ==========
+        // ========== PATH CLEARING - SHOOT AT BLOCKING TILES ==========
+        // Check if boy is blocked by tiles and needs to clear a path
+        this.targetTile = null;
         this.holdingShoot = false;
         
-        if (this.targetEnemy && !this.targetEnemy.isDead())
+        if (player && distToPlayer > 2.0 && abs(this.moveInput.x) > 0.1)
+        {
+            // Check if there's a clear path to player
+            const rayHit = tileCollisionRaycast(this.pos, player.pos);
+            if (rayHit)
+            {
+                // Path is blocked - find the blocking tile
+                // Cast ray in steps to find first blocking tile
+                const toPlayerDir = toPlayer.normalize();
+                const stepSize = 0.5;
+                let checkPos = this.pos.copy();
+                let foundBlockingTile = false;
+                
+                for (let i = 0; i < distToPlayer; i += stepSize)
+                {
+                    checkPos = this.pos.add(toPlayerDir.scale(i));
+                    const tileData = getTileCollisionData(checkPos);
+                    if (tileData > 0 && tileData != tileType_ladder && tileData != tileType_solid)
+                    {
+                        // Found a destructible blocking tile
+                        this.targetTile = checkPos.int().add(vec2(0.5)); // Center of tile
+                        foundBlockingTile = true;
+                        break;
+                    }
+                }
+                
+                // If no blocking tile found in raycast, check directly ahead
+                if (!foundBlockingTile && isBlockedByWall)
+                {
+                    const aheadPos = feetPos.add(vec2(lookAhead * 1.0, 0));
+                    const tileData = getTileCollisionData(aheadPos);
+                    if (tileData > 0 && tileData != tileType_ladder && tileData != tileType_solid)
+                    {
+                        this.targetTile = aheadPos.int().add(vec2(0.5)); // Center of tile
+                    }
+                }
+            }
+        }
+        
+        // Priority 1: Shoot at blocking tiles to clear path
+        if (this.targetTile && this.tileShootTimer.elapsed())
+        {
+            const toTile = this.targetTile.subtract(this.pos);
+            const tileDist = toTile.length();
+            
+            // Face the tile
+            if (!this.dodgeTimer.active())
+                this.mirror = toTile.x < 0;
+            
+            // Aim at tile
+            if (this.weapon && tileDist > 0.1)
+            {
+                const aimAngle = Math.atan2(toTile.y, abs(toTile.x));
+                this.weapon.localAngle = -aimAngle * this.getMirrorSign();
+            }
+            
+            // Shoot at tile
+            this.holdingShoot = true;
+            this.tileShootTimer.set(0.15); // Brief cooldown between shots at tiles
+            
+            // Alert enemies
+            alertEnemies(this.pos, this.pos);
+        }
+        // Priority 2: Shoot at enemies
+        else if (this.targetEnemy && !this.targetEnemy.isDead())
         {
             const enemy = this.targetEnemy;
             const toEnemy = enemy.pos.subtract(this.pos);
