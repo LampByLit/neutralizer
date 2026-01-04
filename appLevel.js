@@ -1773,6 +1773,10 @@ function nextLevel()
     // CRITICAL VERIFICATION: Ensure level 4 has at least 1 girl (guaranteed spawn)
     if (level == 4)
     {
+        // Clean up dead girls first to get accurate count
+        if (typeof cleanupSurvivingGirls === 'function')
+            cleanupSurvivingGirls();
+        
         let girlCount = 0;
         forEachObject(0, 0, (o)=>
         {
@@ -1784,8 +1788,9 @@ function nextLevel()
             }
         }, 0); // Check all objects, not just collide objects
         
-        // If no girl found, force spawn one (guaranteed location)
-        if (girlCount == 0)
+        // If no girl found, force spawn one (guaranteed location) - but respect max limit
+        const MAX_GIRLS = 50;
+        if (girlCount == 0 && (typeof survivingGirls === 'undefined' || survivingGirls.length < MAX_GIRLS))
         {
             const girlSpawnPos = checkpointPos.add(vec2(1.5, 0));
             const newGirl = new Girl(girlSpawnPos);

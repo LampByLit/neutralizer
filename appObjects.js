@@ -1961,6 +1961,15 @@ class LadymakerWeapon extends Weapon
             
             if (shouldSpawn)
             {
+                // Clean up dead girls first to get accurate count
+                if (typeof cleanupSurvivingGirls === 'function')
+                    cleanupSurvivingGirls();
+                
+                // Check if we're at the maximum limit (50 girls)
+                const MAX_GIRLS = 50;
+                if (typeof survivingGirls !== 'undefined' && survivingGirls.length >= MAX_GIRLS)
+                    return;
+                
                 // Calculate spawn position - throw girl out in front of player
                 const sizeScale = this.parent.sizeScale || 1;
                 const forwardOffset = vec2(this.parent.getMirrorSign(0.8), 0).scale(sizeScale);

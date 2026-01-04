@@ -8,6 +8,9 @@
 // Global array to track surviving girls across levels
 let survivingGirls = [];
 
+// Maximum number of girls allowed
+const MAX_GIRLS = 50;
+
 // Helper function to create and protect a weapon for a girl
 function createProtectedWeapon(girl)
 {
@@ -533,6 +536,13 @@ Girl.prototype.isGirl = 1;
 // Function to spawn girls at level start
 function spawnGirls(spawnPos)
 {
+    // Clean up dead girls first to get accurate count
+    cleanupSurvivingGirls();
+    
+    // Check if we're at the maximum limit
+    if (survivingGirls.length >= MAX_GIRLS)
+        return;
+    
     // Always spawn 1 new girl at the beginning of every level
     // Spawn beside player (to the right side) to avoid collision
     // Use a spacing that accounts for existing girls to prevent overlap
