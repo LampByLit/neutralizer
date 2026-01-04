@@ -424,6 +424,35 @@ engineInit(
                 cameraPos.x = clamp(cameraPos.x, tileCollisionSize.x - w, w);
         }
 
+        // Check for girls near computers to redeem for points
+        const redemptionDistance = 10; // 10 tiles
+        const redemptionDistanceSq = redemptionDistance * redemptionDistance;
+        
+        // Iterate through all objects to find dead girls
+        for (const obj of engineObjects)
+        {
+            // Check if this is a dead girl that hasn't been redeemed yet
+            if (obj.isGirl && obj.isDead() && !obj.redeemed && !obj.destroyed)
+            {
+                // Check distance to all computers
+                for (const computer of allComputers)
+                {
+                    if (computer && !computer.destroyed)
+                    {
+                        const distSq = obj.pos.distanceSquared(computer.pos);
+                        if (distSq <= redemptionDistanceSq)
+                        {
+                            // Girl is within range - redeem her!
+                            obj.redeemed = true;
+                            ++playerPoints;
+                            playSound(sound_checkpoint, obj.pos);
+                            break; // Only redeem once, even if near multiple computers
+                        }
+                    }
+                }
+            }
+        }
+
         // Update background parallax offset (10% of camera movement)
         const parallaxSpeed = 0.1;
         const cameraDelta = cameraPos.subtract(previousCameraPos);
@@ -779,7 +808,8 @@ engineInit(
 
         mainContext.fillText('LEVEL ' + level, hudX, hudY);
         mainContext.fillText('LIVES ' + playerLives, hudX, hudY + lineHeight);
-        mainContext.fillText('MALEFACTORS ' + enemiesCount, hudX, hudY + lineHeight * 2);
+        mainContext.fillText('POINTS ' + playerPoints, hudX, hudY + lineHeight * 2);
+        mainContext.fillText('MALEFACTORS ' + enemiesCount, hudX, hudY + lineHeight * 3);
         
         // Clean up and count living girls
         cleanupSurvivingGirls();
