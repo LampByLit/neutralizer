@@ -492,15 +492,13 @@ engineInit(
             const screenCenterX = mainCanvas.width / 2;
             const screenCenterY = mainCanvas.height / 2;
             
-            // Apply clamped parallax offset (convert world coordinates to screen pixels)
-            // Clamp parallax to ensure background never moves outside visible bounds
-            // Max parallax is limited to a small percentage of canvas size
-            const maxParallaxPixels = Math.min(mainCanvas.width, mainCanvas.height) * 0.15; // Max 15% of smaller dimension
-            const parallaxX = Math.max(-maxParallaxPixels, Math.min(maxParallaxPixels, backgroundParallaxOffset.x * cameraScale));
-            const parallaxY = Math.max(-maxParallaxPixels, Math.min(maxParallaxPixels, -backgroundParallaxOffset.y * cameraScale)); // Negate Y because screen Y is inverted
+            // Apply parallax offset (convert world coordinates to screen pixels)
+            // Parallax offset accumulates at 10% of camera movement, creating parallax effect
+            const parallaxX = backgroundParallaxOffset.x * cameraScale;
+            const parallaxY = -backgroundParallaxOffset.y * cameraScale; // Negate Y because screen Y is inverted
             
             // Position background centered on screen with parallax offset
-            // No position clamping needed - 20% buffer + 15% max parallax ensures full coverage
+            // 20% buffer ensures background always covers canvas even with parallax movement
             const drawX = screenCenterX - drawWidth / 2 + parallaxX;
             const drawY = screenCenterY - drawHeight / 2 + parallaxY;
             
