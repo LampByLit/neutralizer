@@ -58,8 +58,8 @@ class Boy extends Character
         
         // Appearance - using tiles2.png, no head/eyes
         // Use a full character sprite from tiles2.png (full tile, not small item)
-        // Using tile 24 as a full character sprite (next after girls at 23)
-        this.bodyTile = 24; // Full character sprite from tiles2.png
+        // Using tile 22 as a full character sprite (8px by 8px tile index)
+        this.bodyTile = 22; // Full character sprite from tiles2.png
         this.tileSize = vec2(8); // Full character tile size (8x8 pixels, same as other characters)
         this.color = new Color(1, 1, 1); // No tint - white/default color
         this.sizeScale = 0.7;
@@ -146,8 +146,9 @@ class Boy extends Character
         }
         
         // Cap upward velocity to prevent flying into sky
-        if (this.velocity.y > 0.25)
-            this.velocity.y = 0.25;
+        // Boys can jump higher, so allow higher upward velocity (0.35)
+        if (this.velocity.y > 0.35)
+            this.velocity.y = 0.35;
 
         // ========== ENEMY DETECTION ==========
         const sightCheckFrames = 9;
@@ -356,21 +357,21 @@ class Boy extends Character
 
         // ========== SILENT JUMP (after super.update) ==========
         // Handle jump manually to avoid jump sound
-        // Boys jump 1.5x higher than girls
+        // Boys jump 2x higher than girls
         if (this.wantsToJump && wasOnGround && !this.jumpTimer.active())
         {
-            // 1.5x jump height: 0.15 * 1.5 = 0.225
-            this.velocity.y = 0.225;
-            this.jumpTimer.set(0.2);
+            // 2x jump height: 0.15 * 2 = 0.3
+            this.velocity.y = 0.3;
+            this.jumpTimer.set(0.4); // Longer timer for 2x jump height (2x of 0.2)
             this.preventJumpTimer.set(0.4); // Reasonable cooldown
             this.groundTimer.unset();
         }
         
-        // Jump continuation for holding jump - also 1.5x
+        // Jump continuation for holding jump - also 2x
         if (this.jumpTimer.active() && this.holdingJump && this.velocity.y > 0)
         {
-            // 1.5x jump continuation: 0.015 * 1.5 = 0.0225
-            this.velocity.y += 0.0225;
+            // 2x jump continuation: 0.015 * 2 = 0.03
+            this.velocity.y += 0.03;
         }
         
         // Ensure weapon protection
@@ -480,11 +481,8 @@ class Boy extends Character
         if (!isOverlapping(this.pos, this.size, cameraPos, renderWindowSize))
             return;
 
-        // Set tile to use (walking animation)
-        this.tileIndex = this.isDead() ? this.bodyTile : 
-                        (this.climbingLadder || this.groundTimer.active() ? 
-                         this.bodyTile + 2*(this.walkCyclePercent|0) : 
-                         this.bodyTile + 1);
+        // Always use original sprite for all states (walking, jumping, climbing)
+        this.tileIndex = this.bodyTile;
 
         const sizeScale = this.sizeScale;
         // No color tint - use white/default color
@@ -516,10 +514,17 @@ function spawnBoys(spawnPos)
     
     // Always spawn 1 new boy at the beginning of every level
     // Spawn beside player (to the right side) to avoid collision
-    // Use a spacing that accounts for existing boys to prevent overlap
+    // Offset boys to spawn after girls to prevent visual overlap
     const spacing = 2.0; // Space between boys (2 units apart)
     const baseOffset = 1.5; // Base offset from checkpoint (to the right)
-    const offsetX = baseOffset + survivingBoys.length * spacing; // Spread out based on existing boys
+    // Calculate how many girls exist to offset boys after them
+    let girlCount = 0;
+    if (typeof survivingGirls !== 'undefined' && typeof cleanupSurvivingGirls === 'function')
+    {
+        cleanupSurvivingGirls();
+        girlCount = survivingGirls.length;
+    }
+    const offsetX = baseOffset + girlCount * spacing + survivingBoys.length * spacing; // Spawn after all girls
     const offset = vec2(offsetX, 0);
     const boy = new Boy(spawnPos.add(offset));
     survivingBoys.push(boy);
@@ -546,9 +551,16 @@ function respawnSurvivingBoys(spawnPos)
     cleanupSurvivingBoys();
     
     // Respawn surviving boys beside checkpoint (to avoid collision with player)
-    // Spread them out horizontally so they don't overlap
+    // Offset boys to spawn after girls to prevent visual overlap
     const spacing = 2.0; // Space between boys (2 units apart)
     const baseOffset = 1.5; // Base offset from checkpoint (to the right)
+    // Calculate how many girls exist to offset boys after them
+    let girlCount = 0;
+    if (typeof survivingGirls !== 'undefined' && typeof cleanupSurvivingGirls === 'function')
+    {
+        cleanupSurvivingGirls();
+        girlCount = survivingGirls.length;
+    }
     
     let index = 0;
     for(const boy of survivingBoys)
@@ -556,8 +568,8 @@ function respawnSurvivingBoys(spawnPos)
         if (!boy || boy.destroyed || boy.isDead())
             continue;
             
-        // Reset position beside checkpoint, spread out horizontally
-        const offsetX = baseOffset + index * spacing;
+        // Reset position beside checkpoint, spread out horizontally after girls
+        const offsetX = baseOffset + girlCount * spacing + index * spacing;
         boy.pos = spawnPos.add(vec2(offsetX, 0));
         boy.velocity = vec2(0, 0);
         boy.health = boy.healthMax;

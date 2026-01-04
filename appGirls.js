@@ -514,11 +514,8 @@ class Girl extends Character
         if (!isOverlapping(this.pos, this.size, cameraPos, renderWindowSize))
             return;
 
-        // Set tile to use (walking animation)
-        this.tileIndex = this.isDead() ? this.bodyTile : 
-                        (this.climbingLadder || this.groundTimer.active() ? 
-                         this.bodyTile + 2*(this.walkCyclePercent|0) : 
-                         this.bodyTile + 1);
+        // Always use original sprite for all states (walking, jumping, climbing)
+        this.tileIndex = this.bodyTile;
 
         const sizeScale = this.sizeScale;
         const color = this.color.scale(this.burnColorPercent(), 1);
