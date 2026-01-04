@@ -371,14 +371,18 @@ class Girl extends Character
         if (this.randomNoiseTimer.elapsed())
         {
             // Pick a random noise and play it very quietly
-            const noiseType = rand(3) | 0;
+            const noiseType = rand(5) | 0;
             const vol = 0.08; // Very quiet
             if (noiseType == 0)
                 zzfx(...[vol,0,130.8128,.11,.19,.3,5,.4245983405873669,,,,,,.3,,,,.83,.03,,-854]);
             else if (noiseType == 1)
                 zzfx(...[vol,,172,.37,,.21,5,.8,,11,39,.05,.03,.6,,,.08,.97,,,-851]);
-            else
+            else if (noiseType == 2)
                 zzfx(...[vol,,770,.12,.01,.11,1,.7,-9,79,,,.07,.3,,.1,,.95,.33,,-1444]);
+            else if (noiseType == 3)
+                zzfx(...[vol,,340,.22,,.03,5,.17255411146649635,,,-19,.14,.04,.4,,,,.52,.14,.14,580]);
+            else
+                zzfx(...[vol,,700,.15,.09,.04,5,1.7,-10,90,-323,.54,,.3,,,,.58,.32,.05,-976]);
             
             this.randomNoiseTimer.set(rand(45, 20)); // Next noise in 20-45 seconds
         }
