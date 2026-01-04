@@ -779,8 +779,7 @@ engineInit(
 
         mainContext.fillText('LEVEL ' + level, hudX, hudY);
         mainContext.fillText('LIVES ' + playerLives, hudX, hudY + lineHeight);
-        mainContext.fillText('POINTS ' + playerPoints, hudX, hudY + lineHeight * 2);
-        mainContext.fillText('MALEFACTORS ' + enemiesCount, hudX, hudY + lineHeight * 3);
+        mainContext.fillText('MALEFACTORS ' + enemiesCount, hudX, hudY + lineHeight * 2);
         
         // Clean up and count living girls
         cleanupSurvivingGirls();

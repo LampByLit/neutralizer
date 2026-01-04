@@ -22,7 +22,7 @@ const tileRenderOrder = -1e3;
 const tileBackgroundRenderOrder = -2e3;
 
 // level objects
-let players=[], playerLives, playerPoints, tileLayer, tileBackgroundLayer, totalKills;
+let players=[], playerLives, tileLayer, tileBackgroundLayer, totalKills;
 let playerEquippedWeapons = []; // Store equipped weapon type per player index (persists through respawn)
 let playerWardrobeSuits = []; // Store wardrobe suit indices per player index (persists through respawn and unequip)
 
@@ -1536,7 +1536,6 @@ function applyArtToLevel()
 function nextLevel()
 {
     playerLives = level == 0 ? 3 : playerLives + 4; // start with 3 lives, then add 4 for beating a level plus 1 for respawning
-    if (level == 0) playerPoints = 0; // initialize points at game start
     ++level;
     
     // Clear checkpoint tracking for new level

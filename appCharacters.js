@@ -315,9 +315,36 @@ class Character extends GameObject
 
         // set tile to use
         let bodyTileIndex;
-        if (wardrobeSuit)
+        let useDrawTile2 = false; // Track if we should use drawTile2 (wardrobe suits) or drawTile (default/climbing)
+        
+        // Check for wall climbing (only for players)
+        if (this.isPlayer && this.climbingWall)
+        {
+            // Use wall climbing sprites from tiles.png
+            if (wardrobeSuit)
+            {
+                // Use suit-specific climbing tiles
+                const suitName = wardrobeSuit.name;
+                if (suitName === 'gavin')
+                    bodyTileIndex = 9;
+                else if (suitName === 'pinstripe')
+                    bodyTileIndex = 23;
+                else if (suitName === 'butch')
+                    bodyTileIndex = 26;
+                else // bruce or unknown
+                    bodyTileIndex = 7;
+            }
+            else
+            {
+                // No wardrobe suit - use standard climbing tile
+                bodyTileIndex = 7;
+            }
+            useDrawTile2 = false; // Climbing tiles are from tiles.png
+        }
+        else if (wardrobeSuit)
         {
             // Use wardrobe suit tiles from tiles2.png with multi-frame walking animation
+            useDrawTile2 = true;
             if (this.isDead())
                 bodyTileIndex = wardrobeSuit.standing; // Use standing sprite when dead
             else if (this.climbingLadder || this.groundObject)
@@ -330,6 +357,7 @@ class Character extends GameObject
             // Use default body tiles
             this.tileIndex = this.isDead() ? this.bodyTile : this.climbingLadder || this.groundTimer.active() ? this.bodyTile + 2*this.walkCyclePercent|0 : this.bodyTile+1;
             bodyTileIndex = this.tileIndex;
+            useDrawTile2 = false; // Default tiles are from tiles.png
         }
 
         let additive = this.additiveColor.add(this.extraAdditiveColor);
@@ -349,14 +377,15 @@ class Character extends GameObject
 
         const bodyPos = this.pos.add(vec2(0,-.1+.06*Math.sin(this.walkCyclePercent*PI)).scale(sizeScale));
         
-        // Draw body sprite - use drawTile2 for wardrobe suits, drawTile for default
-        if (wardrobeSuit && typeof drawTile2 === 'function')
+        // Draw body sprite - use drawTile2 for wardrobe suits (non-climbing), drawTile for default and climbing
+        if (useDrawTile2 && typeof drawTile2 === 'function')
         {
             drawTile2(bodyPos, vec2(sizeScale), bodyTileIndex, vec2(16), color, this.angle, this.mirror, additive);
         }
         else
         {
-            drawTile(bodyPos, vec2(sizeScale), bodyTileIndex, this.tileSize, color, this.angle, this.mirror, additive);
+            // Use defaultTileSize for tiles.png (climbing sprites and default body tiles)
+            drawTile(bodyPos, vec2(sizeScale), bodyTileIndex, defaultTileSize, color, this.angle, this.mirror, additive);
         }
         
         drawTile(this.pos.add(vec2(this.getMirrorSign(.05) + meleeHeadOffset * this.getMirrorSign(),.46).scale(sizeScale).rotate(-this.angle)),vec2(sizeScale/2),this.headTile,vec2(8), headColor,this.angle,this.mirror, additive);
@@ -2585,9 +2614,36 @@ class Malefactor extends Enemy
 
         // set tile to use
         let bodyTileIndex;
-        if (wardrobeSuit)
+        let useDrawTile2 = false; // Track if we should use drawTile2 (wardrobe suits) or drawTile (default/climbing)
+        
+        // Check for wall climbing (only for players)
+        if (this.isPlayer && this.climbingWall)
+        {
+            // Use wall climbing sprites from tiles.png
+            if (wardrobeSuit)
+            {
+                // Use suit-specific climbing tiles
+                const suitName = wardrobeSuit.name;
+                if (suitName === 'gavin')
+                    bodyTileIndex = 9;
+                else if (suitName === 'pinstripe')
+                    bodyTileIndex = 23;
+                else if (suitName === 'butch')
+                    bodyTileIndex = 26;
+                else // bruce or unknown
+                    bodyTileIndex = 7;
+            }
+            else
+            {
+                // No wardrobe suit - use standard climbing tile
+                bodyTileIndex = 7;
+            }
+            useDrawTile2 = false; // Climbing tiles are from tiles.png
+        }
+        else if (wardrobeSuit)
         {
             // Use wardrobe suit tiles from tiles2.png with multi-frame walking animation
+            useDrawTile2 = true;
             if (this.isDead())
                 bodyTileIndex = wardrobeSuit.standing; // Use standing sprite when dead
             else if (this.climbingLadder || this.groundObject)
@@ -2600,6 +2656,7 @@ class Malefactor extends Enemy
             // Use default body tiles
             this.tileIndex = this.isDead() ? this.bodyTile : this.climbingLadder || this.groundTimer.active() ? this.bodyTile + 2*this.walkCyclePercent|0 : this.bodyTile+1;
             bodyTileIndex = this.tileIndex;
+            useDrawTile2 = false; // Default tiles are from tiles.png
         }
 
         let additive = this.additiveColor.add(this.extraAdditiveColor);
@@ -2618,14 +2675,15 @@ class Malefactor extends Enemy
 
         const bodyPos = this.pos.add(vec2(0,-.1+.06*Math.sin(this.walkCyclePercent*PI)).scale(sizeScale));
         
-        // Draw body sprite - use drawTile2 for wardrobe suits, drawTile for default
-        if (wardrobeSuit && typeof drawTile2 === 'function')
+        // Draw body sprite - use drawTile2 for wardrobe suits (non-climbing), drawTile for default and climbing
+        if (useDrawTile2 && typeof drawTile2 === 'function')
         {
             drawTile2(bodyPos, vec2(sizeScale), bodyTileIndex, vec2(16), color, this.angle, this.mirror, additive);
         }
         else
         {
-            drawTile(bodyPos, vec2(sizeScale), bodyTileIndex, this.tileSize, color, this.angle, this.mirror, additive);
+            // Use defaultTileSize for tiles.png (climbing sprites and default body tiles)
+            drawTile(bodyPos, vec2(sizeScale), bodyTileIndex, defaultTileSize, color, this.angle, this.mirror, additive);
         }
         drawTile(this.pos.add(vec2(this.getMirrorSign(.05) + meleeHeadOffset * this.getMirrorSign(),.46).scale(sizeScale).rotate(-this.angle)),vec2(sizeScale/2),this.headTile,vec2(8), headColor,this.angle,this.mirror, additive);
 
