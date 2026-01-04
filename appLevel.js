@@ -1506,6 +1506,7 @@ function nextLevel()
     const firstCheckpoint = new Checkpoint(checkpointPos);
     firstCheckpoint.setActive();
     firstCheckpoint.secured = true; // First checkpoint is already secured
+    firstCheckpoint.isFirstCheckpoint = true; // Mark as first checkpoint (no terminal on this one)
 
     applyArtToLevel();
 

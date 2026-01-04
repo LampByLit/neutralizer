@@ -178,7 +178,8 @@ const propType_barrel_highExplosive = 6;
 const propType_rock                 = 7;
 const propType_rock_lava            = 8;
 const propType_rock_jackrock        = 9;
-const propType_count                = 10;
+const propType_terminal             = 10;
+const propType_count                = 11;
 
 class Prop extends GameObject 
 {
@@ -271,6 +272,19 @@ class Prop extends GameObject
             this.isCrushing = 1;
             this.explosionSize = 10; // Enormous explosion - biggest in the game
         }
+        else if (this.type == propType_terminal)
+        {
+            this.tileIndex = 17; // Tile index 17 from tiles2.png
+            this.tileSize = vec2(16); // tiles2.png uses 16x16 tiles
+            this.color = new Color(1,1,1); // White/default color
+            health = 50;
+            // Nuke countdown properties
+            this.isNuking = false;
+            this.nukeTimer = new Timer(5); // 5 second countdown
+            this.beepTimer = new Timer(1); // Beep every 1 second
+            this.nukeStartTime = 0; // Track when countdown started
+            // Normal size, pushable, no special properties
+        }
 
         // randomly angle and flip axis (90 degree rotation)
         this.angle = (rand(4)|0)*PI/2;
@@ -291,6 +305,27 @@ class Prop extends GameObject
         const deltaSpeedSquared = this.velocity.subtract(oldVelocity).lengthSquared();
         deltaSpeedSquared > .05 && this.damage(2*deltaSpeedSquared);
 
+        // Terminal nuke countdown
+        if (this.type == propType_terminal && this.isNuking && !this.destroyed)
+        {
+            // Check if countdown has elapsed (5 seconds)
+            const elapsed = time - this.nukeStartTime;
+            if (elapsed >= 5 || this.nukeTimer.elapsed())
+            {
+                // Nuke time!
+                nukeExplosion(this.pos, 15); // Default nuke radius
+                this.destroy();
+                return;
+            }
+
+            // Beep every second
+            if (this.beepTimer.elapsed())
+            {
+                playSound(sound_grenade, this.pos);
+                this.beepTimer.set(1);
+            }
+        }
+
         // Darken jackrock color based on health percentage
         if (this.type == propType_rock_jackrock && this.baseColor)
         {
@@ -303,8 +338,47 @@ class Prop extends GameObject
 
     damage(damage, damagingObject)
     {
+        // Terminal: detect player melee attacks (damage = 1, from player character)
+        if (this.type == propType_terminal && !this.isNuking && !this.destroyed)
+        {
+            // Check if this is a player melee attack (damage = 1, from player character)
+            if (damagingObject && damagingObject.isPlayer && damage == 1)
+            {
+                // Start nuke countdown (only once, continue if already started)
+                this.isNuking = true;
+                this.nukeTimer.set(5); // 5 second countdown
+                this.beepTimer.set(1); // Start beeping immediately
+                this.nukeStartTime = time;
+            }
+        }
+        
         (this.explosionSize || this.type == propType_crate_wood && rand() < .1) && this.burn();
         super.damage(damage, damagingObject);
+    }
+
+    render()
+    {
+        // Terminal uses drawTile2 (tiles2.png), all other props use drawTile (tiles.png)
+        if (this.type == propType_terminal && typeof drawTile2 === 'function')
+        {
+            drawTile2(this.pos, this.size, this.tileIndex, this.tileSize, this.color.scale(this.burnColorPercent(),1), this.angle, this.mirror, this.additiveColor);
+            
+            // Visual feedback during nuke countdown (similar to grenade)
+            if (this.isNuking && !this.destroyed)
+            {
+                const elapsed = time - this.nukeStartTime;
+                const a = elapsed; // Use elapsed time for pulsing
+                setBlendMode(1);
+                drawTile(this.pos, vec2(2), 0, vec2(16), new Color(1,0,0,.2-.2*Math.cos(a*2*PI)));
+                drawTile(this.pos, vec2(1), 0, vec2(16), new Color(1,0,0,.2-.2*Math.cos(a*2*PI)));
+                drawTile(this.pos, vec2(.5), 0, vec2(16), new Color(1,1,1,.2-.2*Math.cos(a*2*PI)));
+                setBlendMode(0);
+            }
+        }
+        else
+        {
+            super.render();
+        }
     }
 
     kill()
@@ -371,10 +445,26 @@ class Checkpoint extends GameObject
         for(let x=3;x--;)
         for(let y=6;y--;)
             setTileCollisionData(pos.subtract(vec2(x-1,1-y)), y ? tileType_empty : tileType_solid);
+        
+        // Spawn terminal at checkpoint (except first checkpoint)
+        // We'll check isFirstCheckpoint after it's set in appLevel.js
+        // Use a small delay to check the property after construction
+        this.terminalSpawned = false;
     }
 
     update()
     {
+        // Spawn terminal on first update if not first checkpoint
+        if (!this.terminalSpawned && !this.isFirstCheckpoint)
+        {
+            // Spawn terminal prop at checkpoint position
+            const terminal = new Prop(this.pos, propType_terminal);
+            // Reset random rotation/mirroring for checkpoint terminals (keep them upright)
+            terminal.angle = 0;
+            terminal.mirror = 0;
+            this.terminalSpawned = true;
+        }
+        
         if (!this.inUpdateWindow())
             return; // ignore offscreen objects
 
@@ -397,16 +487,8 @@ class Checkpoint extends GameObject
 
     render()
     {
-        // draw flag
-        const height = 4;
-        const a = Math.sin(time*4+this.pos.x);
-        // Draw flag when secured
-        if (this.secured)
-        {
-            const color = new Color(0,0,0); // Black when secured
-            drawTile(this.pos.add(vec2(.5,height-.3-.5-.03*a)), vec2(1,.6), 14, undefined, color, a*.06);  
-        }
-        drawRect(this.pos.add(vec2(0,height/2-.5)), vec2(.1,height), new Color(.9,.9,.9));
+        // Checkpoints no longer render anything (terminal is a physical prop)
+        // First checkpoint has no terminal, other checkpoints have terminal props spawned
     }
 }
 

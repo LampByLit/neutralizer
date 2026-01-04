@@ -190,6 +190,19 @@ class Character extends GameObject
                     o.applyForce(direction.scale(.05));
                 }
             });
+            
+            // Also check for terminals (props with type propType_terminal) - check all objects, not just collide objects
+            if (this.isPlayer)
+            {
+                forEachObject(this.pos, meleeRange, (o)=>
+                {
+                    // Check for terminals (props with type propType_terminal)
+                    if (o.type == propType_terminal && !o.destroyed && o.health > 0)
+                    {
+                        o.damage(1, this);
+                    }
+                }, 0); // 0 = check all objects, not just collide objects
+            }
         }
 
         // apply movement acceleration and clamp

@@ -74,6 +74,65 @@ let titleMusic = null;
 let titleMusicPlaying = false;
 let titleScreenReady = false; // Track if user has pressed any key to start music
 
+// Array of all intro song URLs
+const introSongs = [
+    'https://mp3.tom7.org/t7es/2016/superior-olive.mp3',
+    'https://mp3.tom7.org/t7es/2010/olimex.mp3',
+    'https://mp3.tom7.org/t7es/2011/t7es-i-have-a-dram.mp3',
+    'https://mp3.tom7.org/t7es/2011/dil-pe-mat-le-yaars-revenge.mp3',
+    'https://mp3.tom7.org/t7es/2004/unauthorized.mp3',
+    'https://mp3.tom7.org/t7es/2013/beverage-voucher.mp3',
+    'https://mp3.tom7.org/t7es/2016/wires-comin-out.mp3',
+    'https://mp3.tom7.org/t7es/2016/mushroom-forest.mp3',
+    'https://mp3.tom7.org/t7es/2012/t7es-large-dark.mp3',
+    'https://mp3.tom7.org/t7es/2012/new-four-song-t7es-ep.mp3',
+    'https://mp3.tom7.org/t7es/2012/this-is-the-title-of-the-ep.mp3',
+    'https://mp3.tom7.org/t7es/2004/haskell.mp3'
+];
+
+// Function to play a random intro song
+function playRandomTitleMusic()
+{
+    // Stop and clean up previous song if it exists
+    if (titleMusic)
+    {
+        titleMusic.pause();
+        titleMusic.currentTime = 0;
+        titleMusic.onended = null; // Remove event listener
+        titleMusic = null;
+    }
+    
+    // Pick a random song from the array
+    const randomIndex = rand(introSongs.length) | 0;
+    const selectedSong = introSongs[randomIndex];
+    
+    // Create new Audio object for the selected song
+    titleMusic = new Audio(selectedSong);
+    titleMusic.loop = false; // Don't loop - we'll play next song when this ends
+    titleMusic.volume = 0.5;
+    
+    // Set up event listener to play next random song when current one ends
+    titleMusic.onended = function() {
+        playRandomTitleMusic(); // Play another random song
+    };
+    
+    // Handle errors
+    titleMusic.onerror = function() {
+        console.warn('Failed to load title music:', selectedSong);
+        // Try playing another song if this one fails
+        playRandomTitleMusic();
+    };
+    
+    // Start playing
+    titleMusic.play().then(function() {
+        titleMusicPlaying = true;
+    }).catch(function(error) {
+        console.warn('Could not play title music:', error);
+        // Try playing another song if playback fails
+        playRandomTitleMusic();
+    });
+}
+
 engineInit(
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -87,13 +146,7 @@ engineInit(
     backgroundParallaxOffset = vec2();
     previousCameraPos = cameraPos.copy();
     
-    // Initialize title screen music
-    titleMusic = new Audio('https://mp3.tom7.org/t7es/2016/superior-olive.mp3');
-    titleMusic.loop = true;
-    titleMusic.volume = 0.5;
-    titleMusic.onerror = function() {
-        console.warn('Failed to load title music');
-    };
+    // Title screen music will be initialized when user presses a key
 },
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -132,14 +185,10 @@ engineInit(
             if (anyKeyPressed)
             {
                 titleScreenReady = true;
-                // Start playing title music
-                if (titleMusic && !titleMusicPlaying)
+                // Start playing random title music
+                if (!titleMusicPlaying)
                 {
-                    titleMusic.play().then(function() {
-                        titleMusicPlaying = true;
-                    }).catch(function(error) {
-                        console.warn('Could not play title music:', error);
-                    });
+                    playRandomTitleMusic();
                 }
             }
         }
@@ -162,6 +211,8 @@ engineInit(
             {
                 titleMusic.pause();
                 titleMusic.currentTime = 0;
+                titleMusic.onended = null; // Remove event listener to prevent next song from playing
+                titleMusic = null;
                 titleMusicPlaying = false;
             }
             gameState = 'playing';
