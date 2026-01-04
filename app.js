@@ -500,17 +500,9 @@ engineInit(
             const parallaxY = Math.max(-maxParallaxPixels, Math.min(maxParallaxPixels, -backgroundParallaxOffset.y * cameraScale)); // Negate Y because screen Y is inverted
             
             // Position background centered on screen with parallax offset
-            let drawX = screenCenterX - drawWidth / 2 + parallaxX;
-            let drawY = screenCenterY - drawHeight / 2 + parallaxY;
-            
-            // Clamp position to ensure background always covers entire canvas (no black visible)
-            // Background must extend at least to edges of canvas
-            const minX = -drawWidth + mainCanvas.width;
-            const maxX = 0;
-            const minY = -drawHeight + mainCanvas.height;
-            const maxY = 0;
-            drawX = Math.max(minX, Math.min(maxX, drawX));
-            drawY = Math.max(minY, Math.min(maxY, drawY));
+            // No position clamping needed - 20% buffer + 15% max parallax ensures full coverage
+            const drawX = screenCenterX - drawWidth / 2 + parallaxX;
+            const drawY = screenCenterY - drawHeight / 2 + parallaxY;
             
             // Draw the animated GIF (it will animate because it's an img element in the DOM)
             mainContext.drawImage(levelBackgroundGif, drawX, drawY, drawWidth, drawHeight);
