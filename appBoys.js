@@ -82,14 +82,6 @@ class Boy extends Character
     {
         // ALWAYS prevent fall damage tracking
         this.maxFallVelocity = 0;
-        
-        // CRITICAL: If dead or destroyed, remove from survivingBoys immediately
-        if (this.isDead() || this.destroyed || this.health <= 0)
-        {
-            const idx = survivingBoys.indexOf(this);
-            if (idx >= 0)
-                survivingBoys.splice(idx, 1);
-        }
             
         if (this.isDead() || !this.inUpdateWindow())
         {
@@ -129,10 +121,7 @@ class Boy extends Character
         {
             // He fell into the void - he dies (bypassing noFallDamage)
             this.health = 0;
-            // Remove from surviving boys immediately
-            const index = survivingBoys.indexOf(this);
-            if (index >= 0)
-                survivingBoys.splice(index, 1);
+            // destroy() will remove from survivingBoys array
             this.destroy();
             return;
         }
@@ -492,11 +481,6 @@ class Boy extends Character
             return 0;
         }
         
-        // Remove from surviving boys array before kill
-        const index = survivingBoys.indexOf(this);
-        if (index >= 0)
-            survivingBoys.splice(index, 1);
-        
         // Save weapon reference before parent kill
         const weaponRef = this.weapon;
         
@@ -574,35 +558,7 @@ class Boy extends Character
 // Mark boys so we can identify them
 Boy.prototype.isBoy = 1;
 
-// Function to spawn boys at level start
-function spawnBoys(spawnPos)
-{
-    // Clean up dead boys first to get accurate count
-    cleanupSurvivingBoys();
-    
-    // Check if we're at the maximum limit
-    if (survivingBoys.length >= MAX_BOYS)
-        return;
-    
-    // Always spawn 1 new boy at the beginning of every level
-    // Spawn beside player (to the right side) to avoid collision
-    // Offset boys to spawn after girls to prevent visual overlap
-    const spacing = 2.0; // Space between boys (2 units apart)
-    const baseOffset = 1.5; // Base offset from checkpoint (to the right)
-    // Calculate how many girls exist to offset boys after them
-    let girlCount = 0;
-    if (typeof survivingGirls !== 'undefined' && typeof cleanupSurvivingGirls === 'function')
-    {
-        cleanupSurvivingGirls();
-        girlCount = survivingGirls.length;
-    }
-    const offsetX = baseOffset + girlCount * spacing + survivingBoys.length * spacing; // Spawn after all girls
-    const offset = vec2(offsetX, 0);
-    const boy = new Boy(spawnPos.add(offset));
-    survivingBoys.push(boy);
-}
-
-// Clean up the survivingBoys array - call this every frame to keep count accurate
+// Clean up the survivingBoys array - call this periodically to keep count accurate
 function cleanupSurvivingBoys()
 {
     // Remove any dead, destroyed, or fallen boys from the array

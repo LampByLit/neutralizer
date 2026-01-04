@@ -38,7 +38,7 @@ let gameState = 'title'; // game states: 'title', 'playing', 'gameOver', 'win'
 
 // level enemy limits: [maxEnemies, maxSlimes, maxBastards, maxMalefactors, maxFoes, maxSpiders, maxSpiderlings, maxBarristers, maxSolicitors]
 const levelLimits = {
-    1: [10, 1, 0, 0, 0, 1, 0, 0, 0, 0],  // Level 1: 1 spider boss, 0 barristers, 0 solicitors, 0 prosecutors (reduced from 20 to 10)
+    1: [15, 1, 0, 0, 0, 1, 0, 0, 0, 0],  // Level 1: 1 spider boss, 0 barristers, 0 solicitors, 0 prosecutors (increased from 10 to 15)
     2: [30, 3, 0, 0, 0, 0, 3, 1, 1, 0],  // Level 2: max 3 spiderlings, 1 barrister, 1 solicitor, 0 prosecutors (reduced from 40 to 30)
     3: [40, 10, 15, 0, 0, 0, 5, 0, 0, 1],  // Level 3: max 5 spiderlings, 0 barristers, 0 solicitors, 1 prosecutor (reduced from 50 to 40)
     4: [20, 0, 18, 1, 0, 1, 0, 0, 0, 1],  // Level 4: 20 total (1 malefactor, 1 spider, 18 bastards, 1 prosecutor) - reduced from 30 to 20, bastards reduced from 28 to 18
