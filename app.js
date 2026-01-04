@@ -455,8 +455,9 @@ engineInit(
             const gifAspect = levelBackgroundGif.width / levelBackgroundGif.height;
             const canvasAspect = mainCanvas.width / mainCanvas.height;
             
-            // Calculate size to cover canvas with safe buffer (20% extra on each side)
-            const safeBuffer = 0.2; // 20% buffer to ensure no black shows
+            // Calculate size to cover canvas with large buffer to prevent cutoff
+            // Large buffer ensures background always covers canvas even with parallax and camera movement
+            const safeBuffer = 0.5; // 50% buffer on each side (100% total larger) to ensure no black shows
             let drawWidth, drawHeight;
             if (gifAspect > canvasAspect)
             {
