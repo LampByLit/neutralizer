@@ -1733,6 +1733,9 @@ class JumperWeapon extends Weapon
     {
         super.update();
         
+        // Double fire rate boost: accumulate fireTimeBuffer again for 2x gun fire rate
+        this.fireTimeBuffer += timeDelta;
+        
         // Only handle jumper for player
         if (!this.parent.isPlayer)
             return;
@@ -1901,6 +1904,9 @@ class RadarWeapon extends Weapon
     {
         super.update();
         
+        // Double fire rate boost: accumulate fireTimeBuffer again for 2x gun fire rate
+        this.fireTimeBuffer += timeDelta;
+        
         // Only handle radar zoom for active player
         if (!this.parent.isPlayer || this.parent.playerIndex != 0)
             return;
@@ -1963,6 +1969,9 @@ class SmokerWeapon extends Weapon
     update()
     {
         super.update();
+        
+        // Double fire rate boost: accumulate fireTimeBuffer again for 2x gun fire rate
+        this.fireTimeBuffer += timeDelta;
         
         // Only handle gas spraying for player
         if (!this.parent.isPlayer)
@@ -2032,6 +2041,9 @@ class FangWeapon extends Weapon
     update()
     {
         super.update();
+        
+        // Double fire rate boost: accumulate fireTimeBuffer again for 2x gun fire rate
+        this.fireTimeBuffer += timeDelta;
         
         // Only handle venom firing for player
         if (!this.parent.isPlayer)
@@ -2374,6 +2386,9 @@ class TransporterWeapon extends Weapon
     {
         super.update(); // This handles the gun firing normally
         
+        // Double fire rate boost: accumulate fireTimeBuffer again for 2x gun fire rate
+        this.fireTimeBuffer += timeDelta;
+        
         // Only handle pearl throwing for player
         if (!this.parent.isPlayer)
             return;
@@ -2502,6 +2517,9 @@ class WardrobeWeapon extends Weapon
     update()
     {
         super.update();
+        
+        // Double fire rate boost: accumulate fireTimeBuffer again for 2x gun fire rate
+        this.fireTimeBuffer += timeDelta;
         
         // Only handle wardrobe for player
         if (!this.parent.isPlayer)
