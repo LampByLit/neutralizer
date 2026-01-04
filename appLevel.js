@@ -36,16 +36,16 @@ let skyParticles, skyRain, skySoundTimer = new Timer;
 let gameTimer = new Timer, levelTimer = new Timer, levelEndTimer = new Timer, gameOverTimer = new Timer, gameCompleteTimer = new Timer;
 let gameState = 'title'; // game states: 'title', 'playing', 'gameOver', 'win'
 
-// level enemy limits: [maxEnemies, maxSlimes, maxBastards, maxMalefactors, maxFoes, maxSpiders, maxSpiderlings, maxBarristers, maxSolicitors]
+// level enemy limits: [maxEnemies, maxSlimes, maxBastards, maxMalefactors, maxFoes, maxSpiders, maxSpiderlings, maxBarristers, maxSolicitors, maxProsecutors, maxMosquitoes]
 const levelLimits = {
-    1: [15, 1, 0, 0, 0, 1, 0, 0, 0, 0],  // Level 1: 1 spider boss, 0 barristers, 0 solicitors, 0 prosecutors (increased from 10 to 15)
-    2: [30, 3, 0, 0, 0, 0, 3, 1, 1, 0],  // Level 2: max 3 spiderlings, 1 barrister, 1 solicitor, 0 prosecutors (reduced from 40 to 30)
-    3: [40, 10, 15, 0, 0, 0, 5, 0, 0, 1],  // Level 3: max 5 spiderlings, 0 barristers, 0 solicitors, 1 prosecutor (reduced from 50 to 40)
-    4: [20, 0, 18, 1, 0, 1, 0, 0, 0, 1],  // Level 4: 20 total (1 malefactor, 1 spider, 18 bastards, 1 prosecutor) - reduced from 30 to 20, bastards reduced from 28 to 18
-    5: [50, 20, 15, 10, 1, 0, 8, 1, 1, 1],  // Level 5: 50 enemies total, including 10 malefactors, 1 foe, and 8 spiderlings, 1 barrister, 1 solicitor, 1 prosecutor (reduced from 60 to 50)
+    1: [15, 1, 0, 0, 0, 1, 0, 0, 0, 0, 2],  // Level 1: 1 spider boss, 0 barristers, 0 solicitors, 0 prosecutors, 2 mosquitoes (increased from 10 to 15)
+    2: [30, 3, 0, 0, 0, 0, 3, 1, 1, 0, 2],  // Level 2: max 3 spiderlings, 1 barrister, 1 solicitor, 0 prosecutors, 2 mosquitoes (reduced from 40 to 30)
+    3: [40, 10, 15, 0, 0, 0, 5, 0, 0, 1, 2],  // Level 3: max 5 spiderlings, 0 barristers, 0 solicitors, 1 prosecutor, 2 mosquitoes (reduced from 50 to 40)
+    4: [20, 0, 18, 1, 0, 1, 0, 0, 0, 1, 2],  // Level 4: 20 total (1 malefactor, 1 spider, 18 bastards, 1 prosecutor, 2 mosquitoes) - reduced from 30 to 20, bastards reduced from 28 to 18
+    5: [50, 20, 15, 10, 1, 0, 8, 1, 1, 1, 2],  // Level 5: 50 enemies total, including 10 malefactors, 1 foe, and 8 spiderlings, 1 barrister, 1 solicitor, 1 prosecutor, 2 mosquitoes (reduced from 60 to 50)
 };
-let levelMaxEnemies, levelMaxSlimes, levelMaxBastards, levelMaxMalefactors, levelMaxFoes, levelMaxSpiders, levelMaxSpiderlings, levelMaxBarristers, levelMaxSolicitors, levelMaxProsecutors;
-let totalEnemiesSpawned, totalSlimesSpawned, totalBastardsSpawned, totalMalefactorsSpawned, totalFoesSpawned, totalSpidersSpawned, totalSpiderlingsSpawned, totalBarristersSpawned, totalSolicitorsSpawned, totalProsecutorsSpawned;
+let levelMaxEnemies, levelMaxSlimes, levelMaxBastards, levelMaxMalefactors, levelMaxFoes, levelMaxSpiders, levelMaxSpiderlings, levelMaxBarristers, levelMaxSolicitors, levelMaxProsecutors, levelMaxMosquitoes;
+let totalEnemiesSpawned, totalSlimesSpawned, totalBastardsSpawned, totalMalefactorsSpawned, totalFoesSpawned, totalSpidersSpawned, totalSpiderlingsSpawned, totalBarristersSpawned, totalSolicitorsSpawned, totalProsecutorsSpawned, totalMosquitoesSpawned;
 
 let tileBackground, keyItemSpawned;
 const setTileBackgroundData = (pos, data=0)=>
@@ -664,7 +664,7 @@ function generateLevel()
     }
     checkpointPos = raycastHit.add(vec2(0,1));
 
-    // track total enemies, slimes, bastards, malefactors, foes, spiders, spiderlings, barristers, and solicitors spawned for this level
+    // track total enemies, slimes, bastards, malefactors, foes, spiders, spiderlings, barristers, solicitors, prosecutors, and mosquitoes spawned for this level
     totalEnemiesSpawned = 0;
     totalSlimesSpawned = 0;
     totalBastardsSpawned = 0;
@@ -675,6 +675,7 @@ function generateLevel()
     totalBarristersSpawned = 0;
     totalSolicitorsSpawned = 0;
     totalProsecutorsSpawned = 0;
+    totalMosquitoesSpawned = 0;
     const totalSlimesSpawnedRef = { value: 0 };
     const totalBastardsSpawnedRef = { value: 0 };
     const totalMalefactorsSpawnedRef = { value: 0 };
@@ -1030,6 +1031,7 @@ function generateLevel()
     totalBarristersSpawned = totalBarristersSpawnedRef.value;
     totalSolicitorsSpawned = totalSolicitorsSpawnedRef.value;
     totalProsecutorsSpawned = totalProsecutorsSpawnedRef.value;
+    totalMosquitoesSpawned = 0; // Mosquitoes are spawned separately after computer
 
     // spawn jackrock - one per level
     // First, find all existing spiders to avoid spawning too close
@@ -1258,6 +1260,46 @@ function generateLevel()
                 {
                     new Computer(computerBottomLeft);
                     computerSpawned = true;
+                    
+                    // Spawn mosquitoes near computer (2 mosquitoes per level)
+                    if (levelMaxMosquitoes > 0 && totalMosquitoesSpawned < levelMaxMosquitoes)
+                    {
+                        const computerCenterX = computerBottomLeft.x + 2; // Center of 4x4 computer
+                        const computerCenterY = computerBottomLeft.y + 2;
+                        const computerPos = vec2(computerCenterX, computerCenterY);
+                        
+                        // Find ground level at computer position for reference
+                        const groundTest = vec2(computerCenterX, levelSize.y);
+                        const groundRaycast = tileCollisionRaycast(groundTest, vec2(computerCenterX, 0));
+                        
+                        if (groundRaycast)
+                        {
+                            const groundY = groundRaycast.y;
+                            const hoverHeight = 2.5; // Spawn 2.5 tiles above ground
+                            
+                            // Spawn 2 mosquitoes, one on each side of computer
+                            for(let i = 0; i < 2 && totalMosquitoesSpawned < levelMaxMosquitoes; i++)
+                            {
+                                // Offset horizontally from computer (left and right)
+                                const offsetX = (i == 0 ? -4 : 4); // 4 tiles left or right
+                                const spawnX = computerCenterX + offsetX;
+                                
+                                // Spawn in air above ground
+                                const spawnY = groundY - hoverHeight;
+                                const mosquitoPos = vec2(spawnX, spawnY);
+                                
+                                // Check if position is valid (empty space, not in wall)
+                                if (getTileCollisionData(mosquitoPos) <= 0 &&
+                                    getTileCollisionData(mosquitoPos.add(vec2(0, 0.5))) <= 0 &&
+                                    getTileCollisionData(mosquitoPos.add(vec2(0, -0.5))) <= 0)
+                                {
+                                    new Mosquito(mosquitoPos);
+                                    totalMosquitoesSpawned++;
+                                    totalEnemiesSpawned++;
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1481,6 +1523,7 @@ function nextLevel()
     levelMaxBarristers = limits[7] || 0;
     levelMaxSolicitors = limits[8] || 0;
     levelMaxProsecutors = limits[9] || 0;
+    levelMaxMosquitoes = limits[10] || 0;
     levelEnemyCount = levelMaxEnemies; // keep for compatibility with existing code
     levelSeed = randSeed = rand(1e9)|0;
     levelSize = level == 1 ? vec2(300,200) : vec2(min(level*99,400),200);

@@ -4016,6 +4016,362 @@ class Spiderling extends Enemy
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class Mosquito extends Enemy
+{
+    constructor(pos) 
+    { 
+        super(pos);
+        
+        // Override type - use a unique type number (14 for mosquito)
+        this.type = 14; // type_mosquito
+        
+        // Mosquito is small and flies
+        this.size = this.size.scale(this.sizeScale = 0.8); // Slightly smaller than normal
+        this.health = this.healthMax = 1; // Weak health
+        this.maxSpeed = maxCharacterSpeed * 0.25; // 25% of normal speed (slow flying)
+        
+        // Mosquito sprites - tile 20 (stand), tile 21 (fly) from tiles.png
+        this.mosquitoStandTile = 20;
+        this.mosquitoFlyTile = 21;
+        this.mosquitoTileSize = vec2(8); // 8x8px sprites
+        
+        // State management
+        this.isFlying = true; // Start flying
+        this.standingTimer = new Timer;
+        this.landingDecisionTimer = new Timer;
+        this.landingDecisionTimer.set(rand(15, 10)); // Decide to land every 10-15 seconds
+        
+        // Flying properties
+        this.hoverHeight = 2.5; // Preferred height above ground
+        this.standingDuration = 7; // 7 seconds standing
+        this.targetHoverY = pos.y; // Target Y position for hovering
+        
+        // Remove weapon - mosquito is melee only
+        if (this.weapon)
+        {
+            this.weapon.destroy();
+            this.weapon = null;
+        }
+        
+        // Enhanced vision range
+        this.maxVisionRange = 12;
+        
+        // Melee attack timer
+        this.meleeCooldownTimer = new Timer;
+        
+        // Don't burn (optional)
+        // this.canBurn = 0;
+        
+        // Color - dark brown/black like a mosquito
+        this.color = new Color(0.2, 0.15, 0.1);
+        this.eyeColor = new Color(0.8, 0.6, 0.4);
+    }
+    
+    update()
+    {
+        if (!aiEnable || levelWarmup || this.isDead() || !this.inUpdateWindow())
+        {
+            // Call Character.update() directly when AI disabled
+            Character.prototype.update.call(this);
+            return;
+        }
+
+        // Update check if players are visible (same as Enemy)
+        const sightCheckFrames = 9;
+        if (frame%sightCheckFrames == this.sightCheckFrame)
+        {
+            const sawRecently = this.sawPlayerTimer.isSet() && this.sawPlayerTimer.get() < 5;
+            const visionRangeSquared = (sawRecently ? this.maxVisionRange * 1.2 : this.maxVisionRange)**2;
+            for(const player of players)
+            {
+                if (player && !player.isDead())
+                if (sawRecently || this.getMirrorSign() == sign(player.pos.x - this.pos.x))
+                if (sawRecently || abs(player.pos.x - this.pos.x) > abs(player.pos.y - this.pos.y))
+                if (this.pos.distanceSquared(player.pos) < visionRangeSquared)
+                {
+                    const raycastHit = tileCollisionRaycast(this.pos, player.pos);
+                    if (!raycastHit)
+                    {
+                        this.alert(player.pos, 1);
+                        break;
+                    }
+                }
+            }
+
+            if (sawRecently)
+            {
+                // alert nearby enemies
+                alertEnemies(this.pos, this.sawPlayerPos);
+            }
+        }
+
+        // State management: flying vs standing
+        if (this.isFlying)
+        {
+            // Flying state
+            this.updateFlying();
+        }
+        else
+        {
+            // Standing state
+            this.updateStanding();
+        }
+        
+        // Call parent update for physics
+        // We need to handle gravity specially for flying mosquitoes
+        const wasFlying = this.isFlying;
+        const velocityBeforeUpdate = this.velocity.copy();
+        
+        // Temporarily set gravityScale to 0 if flying (Character.update() will reset it, but we'll counteract)
+        if (wasFlying)
+        {
+            this.gravityScale = 0;
+            this.groundObject = null;
+        }
+        
+        super.update();
+        
+        // If flying, counteract any gravity that was applied
+        // Character.update() resets gravityScale to 1, then applies gravity in EngineObject.update()
+        // So we need to remove the gravity that was added
+        if (wasFlying)
+        {
+            // Calculate how much gravity was applied (gravity * gravityScale, where gravityScale was reset to 1)
+            const gravityApplied = gravity * 1; // Character.update() resets to 1, so full gravity was applied
+            this.velocity.y -= gravityApplied; // Remove the gravity that was applied
+            this.gravityScale = 0; // Set back to 0 for next frame
+            this.groundObject = null; // Don't stick to ground
+        }
+        
+        // Clamp velocity to mosquito's max speed
+        if (abs(this.velocity.x) > this.maxSpeed)
+            this.velocity.x = sign(this.velocity.x) * this.maxSpeed;
+        if (abs(this.velocity.y) > this.maxSpeed)
+            this.velocity.y = sign(this.velocity.y) * this.maxSpeed;
+    }
+    
+    updateFlying()
+    {
+        // Check if we should land (periodic decision)
+        if (this.landingDecisionTimer.elapsed())
+        {
+            this.landingDecisionTimer.set(rand(15, 10)); // Next decision in 10-15 seconds
+            
+            // Random chance to land (30% chance)
+            if (rand() < 0.3)
+            {
+                // Try to find a valid landing spot
+                const groundTest = vec2(this.pos.x, levelSize.y);
+                const groundRaycast = tileCollisionRaycast(groundTest, vec2(this.pos.x, 0));
+                
+                if (groundRaycast)
+                {
+                    const groundY = groundRaycast.y;
+                    const landingPos = vec2(this.pos.x, groundY - 0.5); // Just above ground
+                    
+                    // Check if landing spot is valid (empty space)
+                    if (getTileCollisionData(landingPos) <= 0)
+                    {
+                        // Start landing - descend to ground
+                        this.isFlying = false;
+                        this.standingTimer.set(this.standingDuration);
+                        this.targetHoverY = groundY - 0.5;
+                    }
+                }
+            }
+        }
+        
+        // Maintain hover height above ground
+        const groundTest = vec2(this.pos.x, this.pos.y);
+        const groundRaycast = tileCollisionRaycast(groundTest, vec2(this.pos.x, levelSize.y));
+        
+        if (groundRaycast)
+        {
+            const groundY = groundRaycast.y;
+            this.targetHoverY = groundY - this.hoverHeight;
+            
+            // Adjust velocity to maintain hover height
+            const heightDiff = this.targetHoverY - this.pos.y;
+            if (abs(heightDiff) > 0.2)
+            {
+                this.velocity.y += sign(heightDiff) * 0.01; // Gentle vertical adjustment
+            }
+            else
+            {
+                // Maintain position - counteract any drift
+                this.velocity.y *= 0.95; // Damping
+            }
+        }
+        
+        // Movement and obstacle avoidance
+        this.moveInput = vec2(0, 0);
+        
+        if (this.sawPlayerTimer.isSet() && this.sawPlayerTimer.get() < 10)
+        {
+            // Chase player
+            const timeSinceSawPlayer = this.sawPlayerTimer.get();
+            if (this.reactionTimer.active())
+            {
+                // Just saw player - pause briefly
+                this.moveInput.x = 0;
+            }
+            else if (timeSinceSawPlayer < 5)
+            {
+                // Actively chasing player
+                const delta = this.sawPlayerPos.subtract(this.pos);
+                const dist = delta.length();
+                const playerDirection = sign(delta.x);
+                
+                // Melee attack when close
+                if (dist < 2.0 && !this.meleeCooldownTimer.isSet())
+                {
+                    this.pressedMelee = 1;
+                    this.meleeCooldownTimer.set(1.5);
+                }
+                
+                // Smart movement with obstacle avoidance
+                this.moveInput = this.calculateSmartMovement(delta, playerDirection);
+            }
+            else
+            {
+                // Lost player - search
+                this.moveInput.x = randSign() * rand(0.3, 0.1);
+                this.moveInput.y = clamp(this.sawPlayerPos.y - this.pos.y, 0.3, -0.3);
+            }
+        }
+        else
+        {
+            // Idle behavior - gentle floating
+            if (rand() < 0.02)
+                this.moveInput.x = randSign() * rand(0.2, 0.1);
+            if (rand() < 0.02)
+                this.moveInput.y = randSign() * rand(0.2, 0.1);
+        }
+        
+        // Face player if chasing
+        if (this.sawPlayerTimer.isSet() && this.sawPlayerTimer.get() < 5)
+            this.mirror = this.sawPlayerPos.x < this.pos.x;
+    }
+    
+    updateStanding()
+    {
+        // Wait for timer
+        this.moveInput = vec2(0, 0);
+        
+        // Check if standing timer is done
+        if (this.standingTimer.elapsed())
+        {
+            // Resume flying - take off
+            this.isFlying = true;
+            this.landingDecisionTimer.set(rand(15, 10)); // Next landing decision
+            // Give a small upward boost to take off
+            this.velocity.y = -0.1;
+        }
+        else
+        {
+            // Still standing - just wait
+            // Face player if visible
+            if (this.sawPlayerTimer.isSet() && this.sawPlayerTimer.get() < 5)
+            {
+                this.mirror = this.sawPlayerPos.x < this.pos.x;
+                
+                // Can still melee attack while standing
+                const dist = this.pos.distance(this.sawPlayerPos);
+                if (dist < 2.0 && !this.meleeCooldownTimer.isSet())
+                {
+                    this.pressedMelee = 1;
+                    this.meleeCooldownTimer.set(1.5);
+                }
+            }
+        }
+    }
+    
+    calculateSmartMovement(delta, playerDirection)
+    {
+        // Smart movement with obstacle avoidance
+        const moveInput = vec2(0, 0);
+        const lookAhead = playerDirection * 1.0;
+        
+        // Check for obstacles ahead
+        const checkPos = this.pos.add(vec2(lookAhead, 0));
+        const obstacleAhead = getTileCollisionData(checkPos) > 0;
+        
+        // Check for ceiling above
+        const checkAbove = this.pos.add(vec2(0, -1.5));
+        const ceilingAbove = getTileCollisionData(checkAbove) > 0;
+        
+        // Check for floor below (when trying to descend)
+        const checkBelow = this.pos.add(vec2(0, 1.5));
+        const floorBelow = getTileCollisionData(checkBelow) > 0;
+        
+        // Horizontal movement
+        if (!obstacleAhead)
+        {
+            // Clear path ahead - move toward player
+            moveInput.x = playerDirection * rand(0.4, 0.2);
+        }
+        else
+        {
+            // Obstacle ahead - try to go around
+            // Try going up or down
+            if (!ceilingAbove && delta.y < 0)
+            {
+                // Go up
+                moveInput.y = -rand(0.3, 0.2);
+            }
+            else if (!floorBelow && delta.y > 0)
+            {
+                // Go down
+                moveInput.y = rand(0.3, 0.2);
+            }
+            else
+            {
+                // Can't go up or down - try opposite direction
+                moveInput.x = -playerDirection * rand(0.3, 0.1);
+            }
+        }
+        
+        // Vertical movement toward player (if no obstacles)
+        if (!ceilingAbove && !floorBelow)
+        {
+            const verticalDiff = delta.y;
+            if (abs(verticalDiff) > 1.0)
+            {
+                moveInput.y = clamp(verticalDiff * 0.3, 0.3, -0.3);
+            }
+        }
+        
+        return moveInput;
+    }
+    
+    render()
+    {
+        if (!isOverlapping(this.pos, this.size, cameraPos, renderWindowSize))
+            return;
+        
+        const sizeScale = this.sizeScale;
+        const color = this.color.scale(this.burnColorPercent(), 1);
+        const eyeColor = this.eyeColor.scale(this.burnColorPercent(), 1);
+        
+        // Choose sprite based on state
+        const bodyTileIndex = this.isFlying ? this.mosquitoFlyTile : this.mosquitoStandTile;
+        
+        // Draw body sprite
+        const bodyPos = this.pos.add(vec2(0, -0.1 + 0.06 * Math.sin(this.walkCyclePercent * PI)).scale(sizeScale));
+        drawTile(bodyPos, vec2(sizeScale), bodyTileIndex, this.mosquitoTileSize, color, this.angle, this.mirror);
+        
+        // Draw eyes (small, on top of body)
+        if (!this.isDead())
+        {
+            const blinkScale = this.canBlink ? .5 + .5*Math.cos(this.blinkTimer.getPercent()*PI*2) : 1;
+            const eyePos = this.pos.add(vec2(this.getMirrorSign(.03), .3).scale(sizeScale).rotate(-this.angle));
+            drawTile(eyePos, vec2(sizeScale/3, blinkScale*sizeScale/3), 2+1, vec2(8), eyeColor, this.angle, this.mirror, this.additiveColor);
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 class Player extends Character
 {
     constructor(pos, playerIndex=0) 
