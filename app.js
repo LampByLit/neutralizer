@@ -74,6 +74,9 @@ let titleMusic = null;
 let titleMusicPlaying = false;
 let titleScreenReady = false; // Track if user has pressed any key to start music
 
+// Title screen sparkles
+let titleSparkles = [];
+
 // Array of all intro song URLs
 const introSongs = [
     'https://mp3.tom7.org/t7es/2016/superior-olive.mp3',
@@ -189,6 +192,61 @@ engineInit(
                 titleScreenReady = true;
                 // Start playing random title music immediately
                 playRandomTitleMusic();
+                // Initialize sparkles
+                titleSparkles = [];
+                const titleX = mainCanvas.width / 2;
+                const titleY = mainCanvas.height / 2 - 100;
+                const titleScale = 0.8;
+                const titleWidth = titleImage.complete && titleImage.width > 0 ? titleImage.width * titleScale : 400;
+                const titleHeight = titleImage.complete && titleImage.height > 0 ? titleImage.height * titleScale : 100;
+                
+                for (let i = 0; i < 30; i++)
+                {
+                    titleSparkles.push({
+                        x: titleX + (rand() - 0.5) * titleWidth * 1.2,
+                        y: titleY + (rand() - 0.5) * titleHeight * 1.2,
+                        size: 15 + rand() * 20,
+                        phase: rand() * Math.PI * 2,
+                        speed: 0.5 + rand() * 1.5,
+                        colorPhase: rand() * Math.PI * 2,
+                        glitchX: 0,
+                        glitchY: 0,
+                        glitchPhase: rand() * Math.PI * 2
+                    });
+                }
+            }
+            
+            // Update sparkles when titleScreenReady
+            if (titleScreenReady && titleSparkles.length > 0)
+            {
+                const titleX = mainCanvas.width / 2;
+                const titleY = mainCanvas.height / 2 - 100;
+                const titleScale = 0.8;
+                const titleWidth = titleImage.complete && titleImage.width > 0 ? titleImage.width * titleScale : 400;
+                const titleHeight = titleImage.complete && titleImage.height > 0 ? titleImage.height * titleScale : 100;
+                
+                for (let sparkle of titleSparkles)
+                {
+                    // Update sparkle animation
+                    sparkle.phase += sparkle.speed * 0.02;
+                    sparkle.colorPhase += 0.05;
+                    if (sparkle.glitchPhase !== undefined) {
+                        sparkle.glitchPhase += 0.3;
+                    } else {
+                        sparkle.glitchPhase = rand() * Math.PI * 2;
+                    }
+                    
+                    // Keep sparkles randomly positioned on logo with slight drift
+                    sparkle.x = titleX + (rand() - 0.5) * titleWidth * 1.2 + Math.sin(sparkle.phase) * 5;
+                    sparkle.y = titleY + (rand() - 0.5) * titleHeight * 1.2 + Math.cos(sparkle.phase * 0.7) * 5;
+                    
+                    // Glitchy random offsets
+                    randSeeded((frame + sparkle.glitchPhase * 1000) * 1000);
+                    if (sparkle.glitchX === undefined) sparkle.glitchX = 0;
+                    if (sparkle.glitchY === undefined) sparkle.glitchY = 0;
+                    sparkle.glitchX = (rand() - 0.5) * 8;
+                    sparkle.glitchY = (rand() - 0.5) * 8;
+                }
             }
         }
 
@@ -593,6 +651,48 @@ engineInit(
             mainContext.font = 'bold 64px JetBrains Mono';
             mainContext.fillText('MALEFACTOR', mainCanvas.width/2, mainCanvas.height/2 - 100);
         }
+        
+        // Draw sparkles on title logo when titleScreenReady
+        if (titleScreenReady && titleSparkles.length > 0)
+        {
+            const titleWidth = titleImage.complete && titleImage.width > 0 ? titleImage.width * titleScale : 400;
+            const titleHeight = titleImage.complete && titleImage.height > 0 ? titleImage.height * titleScale : 100;
+            const titleLeft = titleX - titleWidth/2;
+            const titleRight = titleX + titleWidth/2;
+            const titleTop = titleY - titleHeight/2;
+            const titleBottom = titleY + titleHeight/2;
+            
+            for (let sparkle of titleSparkles)
+            {
+                // Only draw sparkles that are near the title logo
+                if (sparkle.x >= titleLeft - 50 && sparkle.x <= titleRight + 50 &&
+                    sparkle.y >= titleTop - 50 && sparkle.y <= titleBottom + 50)
+                {
+                    // Twinkling effect using sine wave
+                    const twinkle = (Math.sin(frame * 0.1 + sparkle.phase) + 1) * 0.5;
+                    const alpha = 0.4 + twinkle * 0.6;
+                    
+                    // Purple color with slight variation
+                    randSeeded((frame + sparkle.colorPhase * 1000) * 2000);
+                    const purpleR = 0.7 + (rand() - 0.5) * 0.2;
+                    const purpleG = 0.2 + (rand() - 0.5) * 0.1;
+                    const purpleB = 0.9 + (rand() - 0.5) * 0.1;
+                    
+                    // Draw glitchy pixelated sparkle (large square with offset)
+                    const sparkleSize = sparkle.size * (0.7 + twinkle * 0.3);
+                    const drawX = Math.floor(sparkle.x - sparkleSize/2 + sparkle.glitchX);
+                    const drawY = Math.floor(sparkle.y - sparkleSize/2 + sparkle.glitchY);
+                    
+                    // Draw multiple offset copies for glitch effect
+                    mainContext.fillStyle = `rgba(${Math.floor(purpleR * 255)}, ${Math.floor(purpleG * 255)}, ${Math.floor(purpleB * 255)}, ${alpha * 0.3})`;
+                    mainContext.fillRect(drawX - 2, drawY - 2, Math.ceil(sparkleSize), Math.ceil(sparkleSize));
+                    mainContext.fillRect(drawX + 2, drawY + 2, Math.ceil(sparkleSize), Math.ceil(sparkleSize));
+                    
+                    mainContext.fillStyle = `rgba(${Math.floor(purpleR * 255)}, ${Math.floor(purpleG * 255)}, ${Math.floor(purpleB * 255)}, ${alpha})`;
+                    mainContext.fillRect(drawX, drawY, Math.ceil(sparkleSize), Math.ceil(sparkleSize));
+                }
+            }
+        }
 
         // Level selector - COMMENTED OUT
         // mainContext.textAlign = 'center';
@@ -625,19 +725,143 @@ engineInit(
             mainContext.fillText('Press Enter to Begin', mainCanvas.width/2, mainCanvas.height/2 + 70);
         }
 
-        // Controls subtitle
+        // Helper function to render colored text with wrapping
+        function drawColoredText(text, x, y, fontSize, defaultColor, maxWidth, lineHeight) {
+            mainContext.font = fontSize;
+            mainContext.textAlign = 'left';
+            mainContext.textBaseline = 'top';
+            
+            const colorMap = {
+                'red': new Color(1, 0.2, 0.2),
+                'orange': new Color(1, 0.6, 0),
+                'yellow': new Color(1, 1, 0),
+                'green': new Color(0.2, 1, 0.2),
+                'cyan': new Color(0, 1, 1),
+                'pink': new Color(1, 0.5, 0.8),
+                'purple': new Color(0.8, 0.2, 1)
+            };
+            
+            let currentX = x;
+            let currentY = y;
+            let i = 0;
+            let wordStart = i;
+            let wordStartX = currentX;
+            let currentColor = defaultColor;
+            
+            // Helper to wrap to next line
+            function wrapLine() {
+                currentX = x;
+                currentY += lineHeight;
+            }
+            
+            // Helper to measure text width
+            function measureText(str) {
+                return mainContext.measureText(str).width;
+            }
+            
+            while (i < text.length) {
+                // Check for color tags (case-insensitive, handles mismatched closing tags)
+                const openTagMatch = text.substring(i).match(/^<(\w+)>/i);
+                if (openTagMatch) {
+                    const colorName = openTagMatch[1].toLowerCase();
+                    const openTagLen = openTagMatch[0].length;
+                    i += openTagLen;
+                    
+                    // Find the closing tag anywhere after the opening tag (case-insensitive)
+                    const remainingText = text.substring(i);
+                    const closeTagIndex = remainingText.search(/<\/\w+>/i);
+                    if (closeTagIndex !== -1) {
+                        const content = remainingText.substring(0, closeTagIndex);
+                        const closeTagMatch = remainingText.substring(closeTagIndex).match(/^<\/\w+>/i);
+                        const color = colorMap[colorName] || defaultColor;
+                        
+                        // Check if this content fits on current line
+                        const contentWidth = measureText(content);
+                        if (maxWidth && currentX + contentWidth > x + maxWidth && currentX > x) {
+                            wrapLine();
+                        }
+                        
+                        mainContext.fillStyle = color.rgba();
+                        mainContext.fillText(content, currentX, currentY);
+                        currentX += contentWidth;
+                        i += content.length + closeTagMatch[0].length;
+                    } else {
+                        // No closing tag found, treat opening tag as regular text
+                        i -= openTagLen; // Go back to render the opening tag
+                        const tagText = openTagMatch[0];
+                        const tagWidth = measureText(tagText);
+                        if (maxWidth && currentX + tagWidth > x + maxWidth && currentX > x) {
+                            wrapLine();
+                        }
+                        mainContext.fillStyle = defaultColor.rgba();
+                        mainContext.fillText(tagText, currentX, currentY);
+                        currentX += tagWidth;
+                        i += openTagLen;
+                    }
+                } else {
+                    // Regular text - handle word wrapping
+                    const nextTag = text.indexOf('<', i);
+                    const textEnd = nextTag === -1 ? text.length : nextTag;
+                    const regularText = text.substring(i, textEnd);
+                    
+                    // Split by spaces to handle word wrapping
+                    let wordStartIdx = 0;
+                    while (wordStartIdx < regularText.length) {
+                        const spaceIdx = regularText.indexOf(' ', wordStartIdx);
+                        const wordEndIdx = spaceIdx === -1 ? regularText.length : spaceIdx + 1;
+                        const word = regularText.substring(wordStartIdx, wordEndIdx);
+                        const wordWidth = measureText(word);
+                        
+                        // Check if word fits on current line
+                        if (maxWidth && currentX + wordWidth > x + maxWidth && currentX > x) {
+                            wrapLine();
+                        }
+                        
+                        mainContext.fillStyle = defaultColor.rgba();
+                        mainContext.fillText(word, currentX, currentY);
+                        currentX += wordWidth;
+                        wordStartIdx = wordEndIdx;
+                    }
+                    
+                    i = textEnd;
+                    if (nextTag === -1) break;
+                }
+            }
+            
+            return currentY;
+        }
+
+        // Two columns layout
         mainContext.font = 'bold 20px JetBrains Mono';
-        const controlsY = mainCanvas.height/2 + 140;
+        const columnsY = mainCanvas.height/2 + 140;
         const lineHeight = 24;
-        mainContext.fillText('WASD = Move', mainCanvas.width/2, controlsY);
-        mainContext.fillText('Arrows = Aim', mainCanvas.width/2, controlsY + lineHeight);
-        mainContext.fillText('E = Melee', mainCanvas.width/2, controlsY + lineHeight * 2);
-        mainContext.fillText('C = Grenade', mainCanvas.width/2, controlsY + lineHeight * 3);
-        mainContext.fillText('Space = Shoot', mainCanvas.width/2, controlsY + lineHeight * 4);
-        mainContext.fillText('Shift = Roll', mainCanvas.width/2, controlsY + lineHeight * 5);
-        mainContext.fillText('F = Weapon', mainCanvas.width/2, controlsY + lineHeight * 6);
-        mainContext.fillText('Q = Unequip', mainCanvas.width/2, controlsY + lineHeight * 7);
-        mainContext.fillText('X = Zoom', mainCanvas.width/2, controlsY + lineHeight * 8);
+        const leftColumnX = mainCanvas.width * 0.25;
+        const rightColumnX = mainCanvas.width * 0.55;
+        const rightColumnMaxWidth = mainCanvas.width * 0.4; // Max width for right column (from 0.55 to 0.95)
+        const defaultTextColor = new Color(1, 1, 1);
+
+        // Left column: Controls
+        mainContext.textAlign = 'left';
+        mainContext.fillStyle = defaultTextColor.rgba();
+        mainContext.fillText('WASD = Move', leftColumnX, columnsY);
+        mainContext.fillText('Arrows = Aim', leftColumnX, columnsY + lineHeight);
+        mainContext.fillText('E = Melee', leftColumnX, columnsY + lineHeight * 2);
+        mainContext.fillText('C = Grenade', leftColumnX, columnsY + lineHeight * 3);
+        mainContext.fillText('Space = Shoot', leftColumnX, columnsY + lineHeight * 4);
+        mainContext.fillText('Shift = Roll', leftColumnX, columnsY + lineHeight * 5);
+        mainContext.fillText('F = Weapon', leftColumnX, columnsY + lineHeight * 6);
+        mainContext.fillText('Q = Unequip', leftColumnX, columnsY + lineHeight * 7);
+        mainContext.fillText('X = Zoom', leftColumnX, columnsY + lineHeight * 8);
+        mainContext.fillText('Z = Carry', leftColumnX, columnsY + lineHeight * 9);
+
+        // Right column: Objectives with colors (with wrapping)
+        let rightColumnY = columnsY;
+        rightColumnY = drawColoredText('Zamn! What a mess!', rightColumnX, rightColumnY, 'bold 20px JetBrains Mono', defaultTextColor, rightColumnMaxWidth, lineHeight) + lineHeight;
+        rightColumnY = drawColoredText('Neutralize all <red>Malefactors</red>.', rightColumnX, rightColumnY, 'bold 20px JetBrains Mono', defaultTextColor, rightColumnMaxWidth, lineHeight) + lineHeight;
+        rightColumnY = drawColoredText('Decommission the <orange>Calculator</orange>.', rightColumnX, rightColumnY, 'bold 20px JetBrains Mono', defaultTextColor, rightColumnMaxWidth, lineHeight) + lineHeight;
+        rightColumnY = drawColoredText('Login to all Node <cyan>Terminals</cyan>.', rightColumnX, rightColumnY, 'bold 20px JetBrains Mono', defaultTextColor, rightColumnMaxWidth, lineHeight) + lineHeight;
+        rightColumnY = drawColoredText('Detonate the <pink>Pussybomb</pink>.', rightColumnX, rightColumnY, 'bold 20px JetBrains Mono', defaultTextColor, rightColumnMaxWidth, lineHeight) + lineHeight;
+        drawColoredText('<yellow>Protip:</yellow> Use the <orange>Calculator</orange> to Transmute <cyan>Terminals</cyan> and <green>Greenhorns</green> into <purple>Henchmen</purple>.', rightColumnX, rightColumnY, 'bold 20px JetBrains Mono', defaultTextColor, rightColumnMaxWidth, lineHeight);
     }
     else if (gameState === 'playing')
     {
