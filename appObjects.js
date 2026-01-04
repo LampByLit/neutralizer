@@ -855,7 +855,7 @@ const getAllItemTypes = ()=> [itemType_life, itemType_health, itemType_laser, it
 ///////////////////////////////////////////////////////////////////////////////
 // TEST MODE - REMOVE THIS ENTIRE SECTION FOR PRODUCTION
 ///////////////////////////////////////////////////////////////////////////////
-const testModeEnabled = true; // Set to false to disable test mode
+const testModeEnabled = false; // Set to false to disable test mode
 const testModeItemType = itemType_wardrobe; // Change this to test different items (e.g., itemType_laser, itemType_hammer, etc.)
 // Available item types: itemType_life, itemType_health, itemType_laser, itemType_cannon, itemType_jumper, 
 // itemType_hammer, itemType_radar, itemType_smoker, itemType_fang, itemType_ladymaker, itemType_transporter, itemType_wardrobe
@@ -2286,25 +2286,53 @@ class WardrobeWeapon extends Weapon
         // Track if F was pressed last frame
         this.wasPressingF = 0;
         
-        // Available suit pairs: [standingIndex, jumpingIndex]
+        // Available suit pairs: [standingIndex, jumpingIndex, name]
         const suitPairs = [
-            [8, 9],   // Pair 1
-            [10, 11], // Pair 2
-            [20, 21]  // Pair 3
+            [8, 9, 'bruce'],     // bruce
+            [10, 11, 'gavin'],   // gavin
+            [18, 19, 'butch'],   // butch
+            [20, 21, 'pinstripe'] // pinstripe
         ];
         
         // Randomly select a suit pair
         const selectedPair = suitPairs[rand(suitPairs.length)|0];
         this.standingTileIndex = selectedPair[0];
         this.jumpingTileIndex = selectedPair[1];
+        this.suitName = selectedPair[2];
         
         // Store suit in player's wardrobe suits array for persistence
+        // Only set suit if player doesn't already have one (one suit per level)
+        console.log('[Wardrobe] ===== WARDROBE EQUIPPED =====');
+        console.log('[Wardrobe] Constructor - parent.isPlayer:', this.parent.isPlayer, 'parent.playerIndex:', this.parent.playerIndex);
+        console.log('[Wardrobe] Selected suit pair - standing:', this.standingTileIndex, 'jumping:', this.jumpingTileIndex);
         if (this.parent.isPlayer && typeof playerWardrobeSuits !== 'undefined')
         {
-            playerWardrobeSuits[this.parent.playerIndex] = {
-                standing: this.standingTileIndex,
-                jumping: this.jumpingTileIndex
-            };
+            // Check if player already has a suit set for this level
+            const existingSuit = playerWardrobeSuits[this.parent.playerIndex];
+            if (existingSuit)
+            {
+                console.log('[Wardrobe] ⚠ Suit already exists for player', this.parent.playerIndex, '- keeping existing suit "' + (existingSuit.name || 'unknown') + '":', JSON.stringify(existingSuit));
+                console.log('[Wardrobe] New suit selection ignored (one suit per level)');
+                // Use the existing suit indices instead of the new random selection
+                this.standingTileIndex = existingSuit.standing;
+                this.jumpingTileIndex = existingSuit.jumping;
+                this.suitName = existingSuit.name || 'unknown';
+            }
+            else
+            {
+                // First time equipping wardrobe this level - set the suit
+                playerWardrobeSuits[this.parent.playerIndex] = {
+                    standing: this.standingTileIndex,
+                    jumping: this.jumpingTileIndex,
+                    name: this.suitName
+                };
+                console.log('[Wardrobe] ✓ Stored NEW suit "' + this.suitName + '" in playerWardrobeSuits[' + this.parent.playerIndex + ']:', JSON.stringify(playerWardrobeSuits[this.parent.playerIndex]));
+                console.log('[Wardrobe] Full playerWardrobeSuits array:', JSON.stringify(playerWardrobeSuits));
+            }
+        }
+        else
+        {
+            console.log('[Wardrobe] ✗ WARNING - Not storing suit. isPlayer:', this.parent.isPlayer, 'playerWardrobeSuits defined:', typeof playerWardrobeSuits !== 'undefined');
         }
     }
     

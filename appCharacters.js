@@ -206,22 +206,28 @@ class Character extends GameObject
             // just landed - apply fall damage if falling fast enough (unless rolling)
             if (wasOnGroundBeforeUpdate == 0 && this.maxFallVelocity < 0 && !this.dodgeTimer.active())
             {
-                // Calculate fall damage based on impact velocity
-                // Damage threshold: -0.6 (small falls don't hurt)
-                // Max damage at -1.2+ velocity (lethal falls)
-                const fallSpeed = -this.maxFallVelocity;
-                if (fallSpeed > 0.6)
+                // Skip fall damage if jumper suit is equipped
+                const hasJumperSuit = this.isPlayer && this.equippedWeaponType == 'JumperWeapon';
+                
+                if (!hasJumperSuit)
                 {
-                    // Scale damage: 0.6 speed = 0 damage, 1.2+ speed = 1 damage (lethal)
-                    const damage = clamp((fallSpeed - 0.6) / 0.6, 0, 1);
-                    if (damage > 0)
+                    // Calculate fall damage based on impact velocity
+                    // Damage threshold: -0.6 (small falls don't hurt)
+                    // Max damage at -1.2+ velocity (lethal falls)
+                    const fallSpeed = -this.maxFallVelocity;
+                    if (fallSpeed > 0.6)
                     {
-                        this.damage(damage, null);
-                        // Play sound effect for fall damage
-                        if (damage > 0.5)
-                            playSound(sound_die, this.pos);
-                        else
-                            playSound(sound_walk, this.pos);
+                        // Scale damage: 0.6 speed = 0 damage, 1.2+ speed = 1 damage (lethal)
+                        const damage = clamp((fallSpeed - 0.6) / 0.6, 0, 1);
+                        if (damage > 0)
+                        {
+                            this.damage(damage, null);
+                            // Play sound effect for fall damage
+                            if (damage > 0.5)
+                                playSound(sound_die, this.pos);
+                            else
+                                playSound(sound_walk, this.pos);
+                        }
                     }
                 }
             }
@@ -277,8 +283,43 @@ class Character extends GameObject
         if (!isOverlapping(this.pos, this.size, cameraPos, renderWindowSize))
             return;
 
+        // Check for wardrobe suit (only for players)
+        let wardrobeSuit = null;
+        if (this.isPlayer && typeof playerWardrobeSuits !== 'undefined' && playerWardrobeSuits[this.playerIndex])
+        {
+            wardrobeSuit = playerWardrobeSuits[this.playerIndex];
+            // Debug logging (only log occasionally to avoid spam)
+            if (Math.random() < 0.01) // Log ~1% of frames
+            {
+                console.log('[Wardrobe] Render - ✓ Found suit for player', this.playerIndex, ':', JSON.stringify(wardrobeSuit));
+            }
+        }
+        else if (this.isPlayer && Math.random() < 0.01) // Debug when suit not found
+        {
+            console.log('[Wardrobe] Render - ✗ No suit found. isPlayer:', this.isPlayer, 'playerIndex:', this.playerIndex, 
+                       'playerWardrobeSuits defined:', typeof playerWardrobeSuits !== 'undefined',
+                       'playerWardrobeSuits[' + this.playerIndex + ']:', playerWardrobeSuits ? playerWardrobeSuits[this.playerIndex] : 'N/A',
+                       'Full array:', JSON.stringify(playerWardrobeSuits));
+        }
+
         // set tile to use
-        this.tileIndex = this.isDead() ? this.bodyTile : this.climbingLadder || this.groundTimer.active() ? this.bodyTile + 2*this.walkCyclePercent|0 : this.bodyTile+1;
+        let bodyTileIndex;
+        if (wardrobeSuit)
+        {
+            // Use wardrobe suit tiles from tiles2.png with multi-frame walking animation
+            if (this.isDead())
+                bodyTileIndex = wardrobeSuit.standing; // Use standing sprite when dead
+            else if (this.climbingLadder || this.groundObject)
+                bodyTileIndex = wardrobeSuit.standing + (this.walkCyclePercent|0); // Alternate between standing and jumping for walking animation
+            else
+                bodyTileIndex = wardrobeSuit.jumping; // Use jumping sprite when in air
+        }
+        else
+        {
+            // Use default body tiles
+            this.tileIndex = this.isDead() ? this.bodyTile : this.climbingLadder || this.groundTimer.active() ? this.bodyTile + 2*this.walkCyclePercent|0 : this.bodyTile+1;
+            bodyTileIndex = this.tileIndex;
+        }
 
         let additive = this.additiveColor.add(this.extraAdditiveColor);
         if (this.isPlayer && !this.isDead() && this.dodgeRechargeTimer.elapsed() && this.dodgeRechargeTimer.get() < .2)
@@ -296,7 +337,36 @@ class Character extends GameObject
         const meleeHeadOffset = this.meleeTimer.active() ? -.12 * Math.sin(this.meleeTimer.getPercent() * PI) : 0;
 
         const bodyPos = this.pos.add(vec2(0,-.1+.06*Math.sin(this.walkCyclePercent*PI)).scale(sizeScale));
-        drawTile(bodyPos, vec2(sizeScale), this.tileIndex, this.tileSize, color, this.angle, this.mirror, additive);
+        
+        // Draw body sprite - use drawTile2 for wardrobe suits, drawTile for default
+        if (wardrobeSuit && typeof drawTile2 === 'function')
+        {
+            // Debug logging (only log occasionally to avoid spam)
+            if (Math.random() < 0.01) // Log ~1% of frames
+            {
+                console.log('[Wardrobe] Drawing suit - bodyTileIndex:', bodyTileIndex, 'drawTile2 available:', typeof drawTile2 === 'function');
+                // Check if tiles2.png is loaded
+                if (typeof tileImage2 !== 'undefined')
+                {
+                    const isLoaded = tileImage2 ? (tileImage2.complete && tileImage2.width > 0) : false;
+                    console.log('[Wardrobe] tileImage2 loaded:', isLoaded, 'complete:', tileImage2?.complete, 'width:', tileImage2?.width);
+                }
+                else
+                {
+                    console.log('[Wardrobe] tileImage2 is undefined');
+                }
+            }
+            drawTile2(bodyPos, vec2(sizeScale), bodyTileIndex, vec2(16), color, this.angle, this.mirror, additive);
+        }
+        else
+        {
+            if (wardrobeSuit && Math.random() < 0.01) // Debug when drawTile2 not available
+            {
+                console.log('[Wardrobe] ✗ WARNING - Suit found but drawTile2 not available. drawTile2 type:', typeof drawTile2);
+            }
+            drawTile(bodyPos, vec2(sizeScale), bodyTileIndex, this.tileSize, color, this.angle, this.mirror, additive);
+        }
+        
         drawTile(this.pos.add(vec2(this.getMirrorSign(.05) + meleeHeadOffset * this.getMirrorSign(),.46).scale(sizeScale).rotate(-this.angle)),vec2(sizeScale/2),this.headTile,vec2(8), headColor,this.angle,this.mirror, additive);
 
         //for(let i = this.grenadeCount; i--;)
@@ -2519,17 +2589,29 @@ class Malefactor extends Enemy
         if (this.isPlayer && typeof playerWardrobeSuits !== 'undefined' && playerWardrobeSuits[this.playerIndex])
         {
             wardrobeSuit = playerWardrobeSuits[this.playerIndex];
+            // Debug logging (only log occasionally to avoid spam)
+            if (Math.random() < 0.01) // Log ~1% of frames
+            {
+                console.log('[Wardrobe] Render - ✓ Found suit for player', this.playerIndex, ':', JSON.stringify(wardrobeSuit));
+            }
+        }
+        else if (this.isPlayer && Math.random() < 0.01) // Debug when suit not found
+        {
+            console.log('[Wardrobe] Render - ✗ No suit found. isPlayer:', this.isPlayer, 'playerIndex:', this.playerIndex, 
+                       'playerWardrobeSuits defined:', typeof playerWardrobeSuits !== 'undefined',
+                       'playerWardrobeSuits[' + this.playerIndex + ']:', playerWardrobeSuits ? playerWardrobeSuits[this.playerIndex] : 'N/A',
+                       'Full array:', JSON.stringify(playerWardrobeSuits));
         }
 
         // set tile to use
         let bodyTileIndex;
         if (wardrobeSuit)
         {
-            // Use wardrobe suit tiles from tiles2.png
+            // Use wardrobe suit tiles from tiles2.png with multi-frame walking animation
             if (this.isDead())
                 bodyTileIndex = wardrobeSuit.standing; // Use standing sprite when dead
-            else if (this.climbingLadder || this.groundTimer.active())
-                bodyTileIndex = wardrobeSuit.standing; // Use standing sprite when on ground/ladder
+            else if (this.climbingLadder || this.groundObject)
+                bodyTileIndex = wardrobeSuit.standing + (this.walkCyclePercent|0); // Alternate between standing and jumping for walking animation
             else
                 bodyTileIndex = wardrobeSuit.jumping; // Use jumping sprite when in air
         }
@@ -2559,10 +2641,29 @@ class Malefactor extends Enemy
         // Draw body sprite - use drawTile2 for wardrobe suits, drawTile for default
         if (wardrobeSuit && typeof drawTile2 === 'function')
         {
+            // Debug logging (only log occasionally to avoid spam)
+            if (Math.random() < 0.01) // Log ~1% of frames
+            {
+                console.log('[Wardrobe] Drawing suit - bodyTileIndex:', bodyTileIndex, 'drawTile2 available:', typeof drawTile2 === 'function');
+                // Check if tiles2.png is loaded
+                if (typeof tileImage2 !== 'undefined')
+                {
+                    const isLoaded = tileImage2 ? (tileImage2.complete && tileImage2.width > 0) : false;
+                    console.log('[Wardrobe] tileImage2 loaded:', isLoaded, 'complete:', tileImage2?.complete, 'width:', tileImage2?.width);
+                }
+                else
+                {
+                    console.log('[Wardrobe] tileImage2 is undefined');
+                }
+            }
             drawTile2(bodyPos, vec2(sizeScale), bodyTileIndex, vec2(16), color, this.angle, this.mirror, additive);
         }
         else
         {
+            if (wardrobeSuit && Math.random() < 0.01) // Debug when drawTile2 not available
+            {
+                console.log('[Wardrobe] ✗ WARNING - Suit found but drawTile2 not available. drawTile2 type:', typeof drawTile2);
+            }
             drawTile(bodyPos, vec2(sizeScale), bodyTileIndex, this.tileSize, color, this.angle, this.mirror, additive);
         }
         drawTile(this.pos.add(vec2(this.getMirrorSign(.05) + meleeHeadOffset * this.getMirrorSign(),.46).scale(sizeScale).rotate(-this.angle)),vec2(sizeScale/2),this.headTile,vec2(8), headColor,this.angle,this.mirror, additive);

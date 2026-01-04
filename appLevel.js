@@ -1461,6 +1461,7 @@ function nextLevel()
     // Clear checkpoint tracking for new level
     allCheckpoints = [];
     allComputers = []; // Clear computers for new level
+    playerWardrobeSuits = []; // Clear wardrobe suits for new level (one suit per level)
     
     // set level limits
     const limits = levelLimits[level] || levelLimits[5]; // use level 5 limits for levels beyond 5

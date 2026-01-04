@@ -577,6 +577,7 @@ engineInit(
         mainContext.fillText('Shift = Roll', mainCanvas.width/2, controlsY + lineHeight * 5);
         mainContext.fillText('F = Weapon', mainCanvas.width/2, controlsY + lineHeight * 6);
         mainContext.fillText('Q = Unequip', mainCanvas.width/2, controlsY + lineHeight * 7);
+        mainContext.fillText('X = Zoom', mainCanvas.width/2, controlsY + lineHeight * 8);
     }
     else if (gameState === 'playing')
     {
