@@ -3576,6 +3576,141 @@ class Computer extends GameObject
                     this.onTileDestroyed(i);
                 }
             }
+            
+            // ========== TRANSMUTATION FEATURE ==========
+            // Transform girls and terminals within 10 tiles into boys
+            const transmuteRangeSquared = 10 * 10; // 10 tiles squared
+            
+            // Check all girls
+            if (typeof survivingGirls !== 'undefined')
+            {
+                for (let i = survivingGirls.length - 1; i >= 0; i--)
+                {
+                    const girl = survivingGirls[i];
+                    if (girl && !girl.destroyed && !girl.isDead() && !girl.transmuted)
+                    {
+                        const distSq = this.pos.distanceSquared(girl.pos);
+                        if (distSq <= transmuteRangeSquared)
+                        {
+                            // Transform girl to boy
+                            const transformPos = girl.pos.copy();
+                            
+                            // Create confetti effect (same as health boost)
+                            const colors = [
+                                [new Color(1,0,0,.8), new Color(1,.2,.2,.8)], // Red
+                                [new Color(0,1,0,.8), new Color(.2,1,.2,.8)], // Green
+                                [new Color(0,0,1,.8), new Color(.2,.2,1,.8)], // Blue
+                                [new Color(1,1,0,.8), new Color(1,1,.2,.8)], // Yellow
+                                [new Color(1,0,1,.8), new Color(1,.2,1,.8)], // Magenta
+                                [new Color(0,1,1,.8), new Color(.2,1,1,.8)], // Cyan
+                            ];
+                            
+                            colors.forEach((colorPair, idx) => {
+                                const angleOffset = (idx / colors.length) * PI * 2;
+                                new ParticleEmitter(
+                                    transformPos, .3, .15, 150, PI * 2, // pos, emitSize, emitTime, emitRate, emitCone (full circle)
+                                    0, undefined,     // tileIndex, tileSize
+                                    colorPair[0], colorPair[1], // colorStartA, colorStartB
+                                    new Color(colorPair[0].r, colorPair[0].g, colorPair[0].b, 0), 
+                                    new Color(colorPair[1].r, colorPair[1].g, colorPair[1].b, 0), // colorEndA, colorEndB (fade to transparent)
+                                    .4, .3, .15, .2, .2, // particleTime, sizeStart, sizeEnd, particleSpeed, particleAngleSpeed
+                                    .95, 1, .8, PI * 2, .1,  // damping, angleDamping, gravityScale, particleCone, fadeRate
+                                    .6, 0, 0, 0, 1e8  // randomness, collide, additive, randomColorLinear, renderOrder
+                                );
+                            });
+                            
+                            // Play girl sound (checkpoint sound used when girls spawn)
+                            playSound(sound_checkpoint, transformPos);
+                            
+                            // Mark as transmuted before destroying
+                            girl.transmuted = true;
+                            
+                            // Create new boy at same position (full health)
+                            if (typeof Boy !== 'undefined')
+                            {
+                                const newBoy = new Boy(transformPos);
+                                // Boys spawn at full health automatically
+                            }
+                            
+                            // Destroy the girl
+                            girl.destroy();
+                        }
+                    }
+                }
+            }
+            
+            // Check all terminals (including those being carried)
+            for (const obj of engineObjects)
+            {
+                if (obj && obj.type == propType_terminal && !obj.destroyed && !obj.transmuted)
+                {
+                    // Check if terminal is being carried by a player
+                    let terminalPos = obj.pos.copy();
+                    let isCarried = false;
+                    let carryingPlayer = null;
+                    
+                    if (obj.parent && obj.parent.isPlayer && obj.parent.isCarrying && obj.parent.carriedObject == obj)
+                    {
+                        isCarried = true;
+                        carryingPlayer = obj.parent;
+                        terminalPos = obj.parent.pos.copy(); // Use player position for carried terminal
+                    }
+                    
+                    const distSq = this.pos.distanceSquared(terminalPos);
+                    if (distSq <= transmuteRangeSquared)
+                    {
+                        // If terminal is being carried, drop it first
+                        if (isCarried && carryingPlayer)
+                        {
+                            carryingPlayer.dropCarriedObject();
+                            terminalPos = obj.pos.copy(); // Update position after drop
+                        }
+                        
+                        // Transform terminal to boy
+                        const transformPos = terminalPos.copy();
+                        
+                        // Create confetti effect (same as health boost)
+                        const colors = [
+                            [new Color(1,0,0,.8), new Color(1,.2,.2,.8)], // Red
+                            [new Color(0,1,0,.8), new Color(.2,1,.2,.8)], // Green
+                            [new Color(0,0,1,.8), new Color(.2,.2,1,.8)], // Blue
+                            [new Color(1,1,0,.8), new Color(1,1,.2,.8)], // Yellow
+                            [new Color(1,0,1,.8), new Color(1,.2,1,.8)], // Magenta
+                            [new Color(0,1,1,.8), new Color(.2,1,1,.8)], // Cyan
+                        ];
+                        
+                        colors.forEach((colorPair, idx) => {
+                            const angleOffset = (idx / colors.length) * PI * 2;
+                            new ParticleEmitter(
+                                transformPos, .3, .15, 150, PI * 2, // pos, emitSize, emitTime, emitRate, emitCone (full circle)
+                                0, undefined,     // tileIndex, tileSize
+                                colorPair[0], colorPair[1], // colorStartA, colorStartB
+                                new Color(colorPair[0].r, colorPair[0].g, colorPair[0].b, 0), 
+                                new Color(colorPair[1].r, colorPair[1].g, colorPair[1].b, 0), // colorEndA, colorEndB (fade to transparent)
+                                .4, .3, .15, .2, .2, // particleTime, sizeStart, sizeEnd, particleSpeed, particleAngleSpeed
+                                .95, 1, .8, PI * 2, .1,  // damping, angleDamping, gravityScale, particleCone, fadeRate
+                                .6, 0, 0, 0, 1e8  // randomness, collide, additive, randomColorLinear, renderOrder
+                            );
+                        });
+                        
+                        // Play girl sound (checkpoint sound used when girls spawn)
+                        playSound(sound_checkpoint, transformPos);
+                        
+                        // Mark as transmuted before destroying
+                        obj.transmuted = true;
+                        
+                        // Create new boy at same position (full health)
+                        if (typeof Boy !== 'undefined')
+                        {
+                            const newBoy = new Boy(transformPos);
+                            // Boys spawn at full health automatically
+                        }
+                        
+                        // Destroy the terminal
+                        obj.destroy();
+                    }
+                }
+            }
         }
     }
     
