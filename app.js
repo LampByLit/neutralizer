@@ -780,13 +780,14 @@ engineInit(
         mainContext.fillText('LEVEL ' + level, hudX, hudY);
         mainContext.fillText('LIVES ' + playerLives, hudX, hudY + lineHeight);
         mainContext.fillText('MALEFACTORS ' + enemiesCount, hudX, hudY + lineHeight * 2);
-        mainContext.fillText('LOGINS ' + securedCheckpoints + '/' + totalCheckpoints, hudX, hudY + lineHeight * 3);
-        mainContext.fillText('CALCULATORS ' + destroyedComputers + '/' + totalComputers, hudX, hudY + lineHeight * 4);
-        mainContext.fillText('PUSSYBOMB ' + destroyedPussybombs + '/1', hudX, hudY + lineHeight * 5);
         
         // Clean up and count living girls
         cleanupSurvivingGirls();
-        mainContext.fillText('GREENHORNS ' + survivingGirls.length, hudX, hudY + lineHeight * 6);
+        mainContext.fillText('GREENHORNS ' + survivingGirls.length, hudX, hudY + lineHeight * 3);
+        
+        mainContext.fillText('LOGINS ' + securedCheckpoints + '/' + totalCheckpoints, hudX, hudY + lineHeight * 4);
+        mainContext.fillText('CALCULATORS ' + destroyedComputers + '/' + totalComputers, hudX, hudY + lineHeight * 5);
+        mainContext.fillText('PUSSYBOMB ' + destroyedPussybombs + '/1', hudX, hudY + lineHeight * 6);
 
         // fade in level transition
         const fade = levelEndTimer.isSet() ? percent(levelEndTimer.get(), 3, 1) : percent(levelTimer.get(), .5, 2);
