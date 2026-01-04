@@ -879,24 +879,9 @@ engineInit(
             }
         }
 
-        // Count destroyed pussybombs
-        let destroyedPussybombs = 0;
-        let totalPussybombs = 0;
-        for (const pussybomb of allPussybombs)
-        {
-            if (pussybomb)
-            {
-                ++totalPussybombs;
-                // Count as destroyed if marked as destroyed OR if object is destroyed
-                if (pussybomb.pussybombDestroyed || (pussybomb.destroyed !== undefined && pussybomb.destroyed))
-                    ++destroyedPussybombs;
-            }
-        }
-
-        // Level completion requires: all enemies dead AND all checkpoints secured AND all computers destroyed AND pussybomb destroyed
+        // Level completion requires: all enemies dead AND all checkpoints secured AND all computers destroyed
         if (!enemiesCount && totalCheckpoints > 0 && securedCheckpoints >= totalCheckpoints && 
-            totalComputers > 0 && destroyedComputers >= totalComputers && 
-            totalPussybombs > 0 && destroyedPussybombs >= totalPussybombs && !levelEndTimer.isSet())
+            totalComputers > 0 && destroyedComputers >= totalComputers && !levelEndTimer.isSet())
             levelEndTimer.set();
 
         mainContext.fillStyle = new Color(1,1,1).rgba();
@@ -920,7 +905,6 @@ engineInit(
         
         mainContext.fillText('LOGINS ' + securedCheckpoints + '/' + totalCheckpoints, hudX, hudY + lineHeight * 5);
         mainContext.fillText('CALCULATORS ' + destroyedComputers + '/' + totalComputers, hudX, hudY + lineHeight * 6);
-        mainContext.fillText('PUSSYBOMB ' + Math.min(destroyedPussybombs, 1) + '/1', hudX, hudY + lineHeight * 7);
 
         // fade in level transition
         const fade = levelEndTimer.isSet() ? percent(levelEndTimer.get(), 3, 1) : percent(levelTimer.get(), .5, 2);
