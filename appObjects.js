@@ -551,6 +551,8 @@ class Checkpoint extends GameObject
 
     update()
     {
+        super.update();
+        
         // Spawn terminal on first update if not first checkpoint
         if (!this.terminalSpawned && !this.isFirstCheckpoint)
         {
