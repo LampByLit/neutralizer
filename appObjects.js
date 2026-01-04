@@ -3611,13 +3611,20 @@ class Computer extends GameObject
                             girl.transmuted = true;
                             
                             // Create new boy at same position (full health)
+                            // Check limit first to ensure we don't exceed MAX_BOYS
                             if (typeof Boy !== 'undefined')
                             {
-                                const newBoy = new Boy(transformPos);
-                                // Boys spawn at full health automatically
-                                // Add to survivingBoys array so it persists across levels
-                                if (typeof survivingBoys !== 'undefined')
+                                // Clean up dead boys first to get accurate count
+                                if (typeof cleanupSurvivingBoys === 'function')
+                                    cleanupSurvivingBoys();
+                                
+                                // Check if we're at the maximum limit (50)
+                                const maxBoys = (typeof MAX_BOYS !== 'undefined') ? MAX_BOYS : 50;
+                                if (typeof survivingBoys !== 'undefined' && survivingBoys.length < maxBoys)
                                 {
+                                    const newBoy = new Boy(transformPos);
+                                    // Boys spawn at full health automatically
+                                    // Add to survivingBoys array so it persists across levels
                                     survivingBoys.push(newBoy);
                                 }
                             }
@@ -3690,13 +3697,20 @@ class Computer extends GameObject
                         obj.transmuted = true;
                         
                         // Create new boy at same position (full health)
+                        // Check limit first to ensure we don't exceed MAX_BOYS
                         if (typeof Boy !== 'undefined')
                         {
-                            const newBoy = new Boy(transformPos);
-                            // Boys spawn at full health automatically
-                            // Add to survivingBoys array so it persists across levels
-                            if (typeof survivingBoys !== 'undefined')
+                            // Clean up dead boys first to get accurate count
+                            if (typeof cleanupSurvivingBoys === 'function')
+                                cleanupSurvivingBoys();
+                            
+                            // Check if we're at the maximum limit (50)
+                            const maxBoys = (typeof MAX_BOYS !== 'undefined') ? MAX_BOYS : 50;
+                            if (typeof survivingBoys !== 'undefined' && survivingBoys.length < maxBoys)
                             {
+                                const newBoy = new Boy(transformPos);
+                                // Boys spawn at full health automatically
+                                // Add to survivingBoys array so it persists across levels
                                 survivingBoys.push(newBoy);
                             }
                         }

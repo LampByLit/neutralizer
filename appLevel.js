@@ -908,11 +908,11 @@ function generateLevel()
         }
     }
 
-    // Spawn TON of crates on level 4
+    // Spawn TON of crates on level 4 (reduced for better performance)
     if (level == 4)
     {
         // Scan across the level and place crates densely on solid ground
-        const crateSpacing = 2; // Spawn crates every 2 tiles (very dense!)
+        const crateSpacing = 4; // Spawn crates every 4 tiles (reduced from 2 for better performance)
         const minDistanceFromCheckpoint = 10; // Don't spawn too close to start
         
         for(let x = minDistanceFromCheckpoint; x < levelSize.x - minDistanceFromCheckpoint; x += crateSpacing)
@@ -933,8 +933,8 @@ function generateLevel()
                         getTileCollisionData(cratePos) <= 0 &&
                         abs(checkpointPos.x - cratePos.x) > minDistanceFromCheckpoint)
                     {
-                        // Spawn multiple crates at this location (stack them!)
-                        const crateCount = randSeeded(3) + 1; // 1-3 crates per spot
+                        // Spawn fewer crates at this location (reduced for performance)
+                        const crateCount = randSeeded(2) + 1; // 1-2 crates per spot (reduced from 1-3)
                         for(let i = 0; i < crateCount; i++)
                         {
                             const offsetY = i * 0.6; // Stack them vertically
@@ -956,8 +956,8 @@ function generateLevel()
             }
         }
         
-        // Also spawn crates in clusters for extra density
-        for(let cluster = 0; cluster < 30; cluster++)
+        // Also spawn crates in clusters for extra density (reduced for performance)
+        for(let cluster = 0; cluster < 15; cluster++) // Reduced from 30 to 15
         {
             const clusterX = randSeeded(levelSize.x - 40, 40);
             const testPos = vec2(clusterX, levelSize.y);
@@ -968,8 +968,8 @@ function generateLevel()
                 const groundY = (raycastHit.y - 0.5) | 0;
                 const clusterCenter = vec2(clusterX, groundY - 0.5);
                 
-                // Create a cluster of 5-10 crates
-                const clusterSize = randSeeded(6) + 5;
+                // Create a cluster of 3-6 crates (reduced for performance)
+                const clusterSize = randSeeded(4) + 3; // Reduced from 5-10 to 3-6
                 for(let i = 0; i < clusterSize; i++)
                 {
                     const angle = randSeeded(PI * 2);
@@ -1380,7 +1380,7 @@ function applyArtToLevel()
             );
             skyParticles.elasticity = .2;
             skyParticles.trailScale = 2;
-            skyParticles.emitRate = 200; // Reduced rain rate for better performance
+            skyParticles.emitRate = 100; // Further reduced rain rate for better performance (was 200)
             skyParticles.angle = PI+rand(.5,-.5);
         }
         else
@@ -1414,9 +1414,9 @@ function applyArtToLevel()
                     .5, 1              // randomness, collide, additive, randomColorLinear, renderOrder
                 );
             }
-            // Reduced precipitation rate: 60% chance of precipitation, with rate between 100-200 (reduced from 0-500)
+            // Reduced precipitation rate: 60% chance of precipitation, with rate between 50-100 (reduced from 100-200)
             // This ensures snow still appears while improving performance
-            skyParticles.emitRate = precipitationEnable && rand()<.6 ? rand(200, 100) : 0;
+            skyParticles.emitRate = precipitationEnable && rand()<.6 ? rand(100, 50) : 0;
             skyParticles.angle = PI+rand(.5,-.5);
         }
     }

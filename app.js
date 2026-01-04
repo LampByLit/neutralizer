@@ -259,6 +259,8 @@ engineInit(
                 titleMusic = null;
                 titleMusicPlaying = false;
             }
+            // Clean up title sparkles when starting game
+            titleSparkles = [];
             gameState = 'playing';
             resetGame();
         }
@@ -318,6 +320,15 @@ engineInit(
             titleMusicPlaying = false;
         }
         
+        // Periodic cleanup of arrays every 60 frames (about once per second) to free memory
+        if (frame % 60 === 0)
+        {
+            if (typeof cleanupSurvivingGirls === 'function')
+                cleanupSurvivingGirls();
+            if (typeof cleanupSurvivingBoys === 'function')
+                cleanupSurvivingBoys();
+        }
+        
         // restart if no lives left
         let minDeadTime = 1e3;
         let allPlayersDead = players.length > 0;
@@ -357,6 +368,8 @@ engineInit(
         // Reset music flag and title screen state so it will restart when title screen is shown
         titleMusicPlaying = false;
         titleScreenReady = false;
+        // Clean up title sparkles to free memory
+        titleSparkles = [];
     }
     else if (gameState === 'win' && gameCompleteTimer.get() > 4)
     {
@@ -365,6 +378,8 @@ engineInit(
         // Reset music flag and title screen state so it will restart when title screen is shown
         titleMusicPlaying = false;
         titleScreenReady = false;
+        // Clean up title sparkles to free memory
+        titleSparkles = [];
     }
 },
 
@@ -438,16 +453,16 @@ engineInit(
         // Draw animated GIF background (day or night) with parallax
         if (levelBackgroundGif && levelBackgroundGif.complete && levelBackgroundGif.width > 0)
         {
-            // Calculate maximum possible parallax offset
+            // Calculate maximum possible parallax offset (reduced buffer for better performance)
             // Max level width is 400 tiles, parallax speed is 0.1, so max offset is ~40 tiles
-            // Convert to screen pixels: 40 * cameraScale
-            const maxParallaxOffsetPixels = levelSize.x * 0.1 * cameraScale;
+            // Convert to screen pixels: 40 * cameraScale, but reduce buffer to save memory
+            const maxParallaxOffsetPixels = levelSize.x * 0.1 * cameraScale * 0.5; // Reduced buffer by 50%
             
             // Scale GIF to cover entire canvas while maintaining aspect ratio
             const gifAspect = levelBackgroundGif.width / levelBackgroundGif.height;
             const canvasAspect = mainCanvas.width / mainCanvas.height;
             
-            // Calculate base size to cover canvas, then add HUGE buffer for parallax
+            // Calculate base size to cover canvas, then add reduced buffer for parallax
             // Need to cover canvas + max parallax offset in both directions
             let drawWidth, drawHeight;
             if (gifAspect > canvasAspect)
