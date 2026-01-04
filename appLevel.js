@@ -1789,8 +1789,7 @@ function nextLevel()
         }, 0); // Check all objects, not just collide objects
         
         // If no girl found, force spawn one (guaranteed location) - but respect max limit
-        const MAX_GIRLS = 50;
-        if (girlCount == 0 && (typeof survivingGirls === 'undefined' || survivingGirls.length < MAX_GIRLS))
+        if (girlCount == 0 && typeof survivingGirls !== 'undefined' && (typeof MAX_GIRLS === 'undefined' || survivingGirls.length < MAX_GIRLS))
         {
             const girlSpawnPos = checkpointPos.add(vec2(1.5, 0));
             const newGirl = new Girl(girlSpawnPos);
