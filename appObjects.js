@@ -856,7 +856,7 @@ const getAllItemTypes = ()=> [itemType_life, itemType_health, itemType_laser, it
 // TEST MODE - REMOVE THIS ENTIRE SECTION FOR PRODUCTION
 ///////////////////////////////////////////////////////////////////////////////
 const testModeEnabled = true; // Set to false to disable test mode
-const testModeItemType = itemType_transporter; // Change this to test different items (e.g., itemType_laser, itemType_hammer, etc.)
+const testModeItemType = itemType_wardrobe; // Change this to test different items (e.g., itemType_laser, itemType_hammer, etc.)
 // Available item types: itemType_life, itemType_health, itemType_laser, itemType_cannon, itemType_jumper, 
 // itemType_hammer, itemType_radar, itemType_smoker, itemType_fang, itemType_ladymaker, itemType_transporter, itemType_wardrobe
 ///////////////////////////////////////////////////////////////////////////////
@@ -2034,7 +2034,6 @@ class PearlProjectile extends GameObject
         // Ignore collisions for a brief moment after spawn to prevent immediate teleport
         if (realTime < this.ignoreCollisionsUntil)
         {
-            console.log('[PearlProjectile] Ignoring collisions, time remaining:', (this.ignoreCollisionsUntil - realTime).toFixed(3));
             return;
         }
 
@@ -2043,7 +2042,6 @@ class PearlProjectile extends GameObject
         const tileCollision = getTileCollisionData(this.pos);
         if (tileCollision > 0 && tileCollision != tileType_ladder)
         {
-            console.log('[PearlProjectile] Tile collision detected, teleporting player');
             this.teleportPlayer();
             return;
         }
@@ -2051,7 +2049,6 @@ class PearlProjectile extends GameObject
         // Check for ground contact
         if (this.groundObject)
         {
-            console.log('[PearlProjectile] Ground contact detected, teleporting player');
             this.teleportPlayer();
             return;
         }
@@ -2068,7 +2065,6 @@ class PearlProjectile extends GameObject
                 // Pass through enemies, but collide with other objects
                 if (!o.isCharacter || o.team == this.team)
                 {
-                    console.log('[PearlProjectile] Object collision detected with:', o, 'teleporting player');
                     this.teleportPlayer();
                     return;
                 }
@@ -2080,12 +2076,8 @@ class PearlProjectile extends GameObject
     {
         if (this.destroyed || !this.attacker || !this.attacker.isPlayer)
         {
-            console.log('[PearlProjectile] teleportPlayer() - early return, destroyed:', this.destroyed, 'attacker:', this.attacker);
             return;
         }
-        
-        console.log('[PearlProjectile] teleportPlayer() - teleporting player from', this.attacker.pos.x.toFixed(2), this.attacker.pos.y.toFixed(2), 'to', this.pos.x.toFixed(2), this.pos.y.toFixed(2));
-        console.log('[PearlProjectile] Velocity:', this.velocity.x.toFixed(2), this.velocity.y.toFixed(2), 'groundObject:', this.groundObject);
         
         const playerSize = this.attacker.size || vec2(.6, .95);
         const playerHalfHeight = playerSize.y * 0.5;
@@ -2107,10 +2099,6 @@ class PearlProjectile extends GameObject
         
         // Move player 5 tiles back from pearl position
         let playerPos = this.pos.add(backDirection.scale(5.0));
-        
-        console.log('[PearlProjectile] Travel direction:', travelDirection.x.toFixed(2), travelDirection.y.toFixed(2));
-        console.log('[PearlProjectile] Back direction:', backDirection.x.toFixed(2), backDirection.y.toFixed(2));
-        console.log('[PearlProjectile] Initial player pos (5 tiles back):', playerPos.x.toFixed(2), playerPos.y.toFixed(2));
         
         // If pearl hit ground or was moving down, ensure player is on top of ground
         if (this.groundObject || this.velocity.y > 0.1)
@@ -2138,11 +2126,8 @@ class PearlProjectile extends GameObject
             if (groundTileY != playerTileY || getTileCollisionData(vec2(playerTileX, groundTileY)) > 0)
             {
                 playerPos.y = groundTileY + 0.5 + playerHalfHeight;
-                console.log('[PearlProjectile] Found ground at tile Y:', groundTileY, 'positioning player at Y:', playerPos.y.toFixed(2));
             }
         }
-        
-        console.log('[PearlProjectile] Final player pos:', playerPos.x.toFixed(2), playerPos.y.toFixed(2));
         
         // Teleport the player to the calculated position
         this.attacker.pos = playerPos;
@@ -2154,8 +2139,6 @@ class PearlProjectile extends GameObject
         
         // Destroy the pearl
         this.destroy();
-        
-        console.log('[PearlProjectile] Player teleported to', this.attacker.pos.x.toFixed(2), this.attacker.pos.y.toFixed(2), 'and pearl destroyed');
     }
     
     collideWithObject(o)
@@ -2163,7 +2146,6 @@ class PearlProjectile extends GameObject
         // Ignore collisions with attacker (player) for a brief moment after spawn
         if (o == this.attacker && realTime < this.ignoreCollisionsUntil)
         {
-            console.log('[PearlProjectile] Ignoring collision with attacker (player)');
             return 0;
         }
         
@@ -2174,7 +2156,6 @@ class PearlProjectile extends GameObject
             return 0;
         }
         
-        console.log('[PearlProjectile] collideWithObject - colliding with:', o, 'teleporting player');
         // Teleport on other collisions
         this.teleportPlayer();
         return 1;
@@ -2234,8 +2215,6 @@ class TransporterWeapon extends Weapon
             // Fire immediately on first press, then every 5 seconds while holding
             const shouldFire = !this.hasFiredThisPress || this.pearlCooldownBuffer >= rate;
             
-            console.log('[TransporterWeapon] F pressed - shouldFire:', shouldFire, 'hasFiredThisPress:', this.hasFiredThisPress, 'pearlCooldownBuffer:', this.pearlCooldownBuffer.toFixed(2), 'rate:', rate.toFixed(2));
-            
             if (shouldFire)
             {
                 // Get base aim angle from parent
@@ -2256,21 +2235,12 @@ class TransporterWeapon extends Weapon
                         vec2(this.parent.getMirrorSign(.55), 0).scale(sizeScale)
                     );
                     
-                    console.log('[TransporterWeapon] Firing pearl!');
-                    console.log('[TransporterWeapon] Player pos:', this.parent.pos.x.toFixed(2), this.parent.pos.y.toFixed(2));
-                    console.log('[TransporterWeapon] Weapon pos:', weaponPos.x.toFixed(2), weaponPos.y.toFixed(2));
-                    console.log('[TransporterWeapon] Mirror:', this.parent.mirror, 'Aim angle:', baseAimAngle.toFixed(2));
-                    console.log('[TransporterWeapon] Forward direction:', forwardDirection.x.toFixed(2), forwardDirection.y.toFixed(2));
-                    
                     // Create pearl projectile
                     const pearl = new PearlProjectile(weaponPos, this.parent);
                     
                     // Throw pearl much farther than hammer
                     pearl.velocity = this.parent.velocity.add(vec2(this.parent.getMirrorSign(), rand(.8,.7)).normalize(.6+rand(.1)));
                     pearl.angleVelocity = this.parent.getMirrorSign() * rand(.8,.5);
-                    
-                    console.log('[TransporterWeapon] Pearl velocity:', pearl.velocity.x.toFixed(2), pearl.velocity.y.toFixed(2));
-                    console.log('[TransporterWeapon] Pearl created successfully');
                     
                     // Play sound
                     playSound(sound_jump, weaponPos);
@@ -2281,10 +2251,6 @@ class TransporterWeapon extends Weapon
                     // Update fire tracking
                     this.pearlCooldownBuffer -= rate;
                     this.hasFiredThisPress = 1;
-                }
-                else
-                {
-                    console.log('[TransporterWeapon] Not firing forward - mirror:', this.parent.mirror, 'forwardDirection.x:', forwardDirection.x.toFixed(2));
                 }
             }
         }
