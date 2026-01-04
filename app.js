@@ -457,7 +457,7 @@ engineInit(
             
             // Calculate size to cover canvas with large buffer to prevent cutoff
             // Large buffer ensures background always covers canvas even with parallax and camera movement
-            const safeBuffer = 0.5; // 50% buffer on each side (100% total larger) to ensure no black shows
+            const safeBuffer = 0.75; // 75% buffer on each side (150% total larger) to ensure no black shows
             let drawWidth, drawHeight;
             if (gifAspect > canvasAspect)
             {
