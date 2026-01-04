@@ -623,14 +623,15 @@ function generateLevel()
         skyParticles.destroy();
 
     // remove all objects that are not persistnt or are descendants of something persitant
-    // But preserve surviving girls and their children (weapons)
+    // But preserve surviving girls, boys and their children (weapons)
     const girlsToPreserve = [];
     const objectsToPreserve = [];
     for(const o of engineObjects)
     {
-        if (o.isGirl && !o.destroyed && !o.isDead())
+        if ((o.isGirl || o.isBoy) && !o.destroyed && !o.isDead())
         {
-            girlsToPreserve.push(o);
+            if (o.isGirl)
+                girlsToPreserve.push(o);
             objectsToPreserve.push(o);
             // Also preserve children (weapons)
             for(const child of o.children || [])
@@ -645,7 +646,7 @@ function generateLevel()
     engineObjects = [];
     engineCollideObjects = [];
     
-    // Restore preserved girls and their children to engineObjects
+    // Restore preserved girls, boys and their children to engineObjects
     for(const obj of objectsToPreserve)
     {
         if (obj && !obj.destroyed)
@@ -1852,6 +1853,10 @@ function nextLevel()
     // spawn girls (surviving girls from previous level + 1 new one)
     respawnSurvivingGirls(checkpointPos);
     spawnGirls(checkpointPos);
+    
+    // spawn boys (surviving boys from previous level + 1 new one)
+    respawnSurvivingBoys(checkpointPos);
+    spawnBoys(checkpointPos);
     
     // CRITICAL VERIFICATION: Ensure level 4 has at least 1 girl (guaranteed spawn)
     if (level == 4)

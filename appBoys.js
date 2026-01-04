@@ -1,20 +1,20 @@
 /*
-    Friendly NPC Girls
+    Friendly NPC Boys
     Extends Character to create helpful companions
 */
 
 'use strict';
 
-// Global array to track surviving girls across levels
-let survivingGirls = [];
+// Global array to track surviving boys across levels
+let survivingBoys = [];
 
-// Maximum number of girls allowed
-const MAX_GIRLS = 50;
+// Maximum number of boys allowed
+const MAX_BOYS = 50;
 
-// Helper function to create and protect a weapon for a girl
-function createProtectedWeapon(girl)
+// Helper function to create and protect a weapon for a boy
+function createProtectedWeapon(boy)
 {
-    const weapon = new Weapon(girl.pos, girl);
+    const weapon = new Weapon(boy.pos, boy);
     // Ensure weapon is visible (not hidden)
     weapon.hidden = 0;
     // Make sure weapon doesn't take damage or have health
@@ -27,7 +27,7 @@ function createProtectedWeapon(girl)
     return weapon;
 }
 
-class Girl extends Character
+class Boy extends Character
 {
     constructor(pos) 
     { 
@@ -36,13 +36,11 @@ class Girl extends Character
         this.team = team_player;
         this.health = this.healthMax = 10;
         this.persistent = 1; // Survive level transitions
-        this.noFallDamage = 1; // Girls don't take fall damage
+        this.noFallDamage = 1; // Boys don't take fall damage
         
         // AI timers
         this.sawEnemyTimer = new Timer;
-        this.shootTimer = new Timer;
-        this.burstShootTimer = new Timer; // For burst fire mode
-        this.randomShootTimer = new Timer; // For random shooting
+        this.attackDelayTimer = new Timer; // Brief delay before starting to shoot
         this.holdJumpTimer = new Timer;
         this.followDistanceTimer = new Timer;
         this.spawnSafetyTimer = new Timer;
@@ -56,15 +54,14 @@ class Girl extends Character
         this.followDistance = 1.0; // Stay very close to player
         this.targetEnemy = null;
         this.lastStuckPos = null; // Track last stuck position for pathfinding
-        this.burstShotsRemaining = 0; // Burst fire counter
-        this.girlIndex = survivingGirls.length; // For staggering positions
+        this.boyIndex = survivingBoys.length; // For staggering positions
         
         // Appearance - using tiles2.png, no head/eyes
         // Use a full character sprite from tiles2.png (full tile, not small item)
-        // Using tile 23 as a full character sprite (spiders use 20-22, so 23+ should be available)
-        this.bodyTile = 23; // Full character sprite from tiles2.png
+        // Using tile 24 as a full character sprite (next after girls at 23)
+        this.bodyTile = 24; // Full character sprite from tiles2.png
         this.tileSize = vec2(8); // Full character tile size (8x8 pixels, same as other characters)
-        this.color = new Color(1, 0.6, 0.8); // Pinkish color
+        this.color = new Color(1, 1, 1); // No tint - white/default color
         this.sizeScale = 0.7;
         
         // Weapon - ensure it never takes damage or fall damage
@@ -75,11 +72,7 @@ class Girl extends Character
         this.sightCheckFrame = rand(9)|0;
         
         // Initialize timers that need starting values
-        this.randomShootTimer.set(rand(2, 1)); // Random initial delay
         this.pathfindTimer.set(0); // Start immediately
-        this.burstShootTimer.set(0); // Ready for burst fire
-        this.randomNoiseTimer = new Timer; // For occasional cute noises
-        this.randomNoiseTimer.set(rand(20, 10)); // First noise in 10-20 seconds
     }
     
     update()
@@ -87,12 +80,12 @@ class Girl extends Character
         // ALWAYS prevent fall damage tracking
         this.maxFallVelocity = 0;
         
-        // CRITICAL: If dead or destroyed, remove from survivingGirls immediately
+        // CRITICAL: If dead or destroyed, remove from survivingBoys immediately
         if (this.isDead() || this.destroyed || this.health <= 0)
         {
-            const idx = survivingGirls.indexOf(this);
+            const idx = survivingBoys.indexOf(this);
             if (idx >= 0)
-                survivingGirls.splice(idx, 1);
+                survivingBoys.splice(idx, 1);
         }
             
         if (this.isDead() || !this.inUpdateWindow())
@@ -127,16 +120,16 @@ class Girl extends Character
         }
 
         // ========== VOID DEATH & SAFETY TELEPORT ==========
-        // Falling into void KILLS the girl - no rescue from void holes!
+        // Falling into void KILLS the boy - no rescue from void holes!
         const fellIntoVoid = this.pos.y < -5;
         if (fellIntoVoid)
         {
-            // She fell into the void - she dies (bypassing noFallDamage)
+            // He fell into the void - he dies (bypassing noFallDamage)
             this.health = 0;
-            // Remove from surviving girls immediately
-            const index = survivingGirls.indexOf(this);
+            // Remove from surviving boys immediately
+            const index = survivingBoys.indexOf(this);
             if (index >= 0)
-                survivingGirls.splice(index, 1);
+                survivingBoys.splice(index, 1);
             this.destroy();
             return;
         }
@@ -147,7 +140,7 @@ class Girl extends Character
         if (stuckInWall || wayTooFar)
         {
             // Teleport to player's position (slightly offset)
-            this.pos = player.pos.add(vec2(this.girlIndex + 1, 0));
+            this.pos = player.pos.add(vec2(this.boyIndex + 1, 0));
             this.velocity = vec2(0, 0);
             this.groundObject = 0; // Reset ground state
         }
@@ -179,8 +172,19 @@ class Girl extends Character
                         this.targetEnemy = o;
                         closestDist = distSq;
                         this.sawEnemyTimer.set();
+                        // Start brief delay timer when enemy is first spotted
+                        if (!this.attackDelayTimer.isSet())
+                        {
+                            this.attackDelayTimer.set(0.2); // Brief 0.2 second delay before attacking
+                        }
                     }
                 }
+            }
+            
+            // Reset attack delay if no enemy visible
+            if (!this.targetEnemy)
+            {
+                this.attackDelayTimer.unset();
             }
         }
 
@@ -193,8 +197,8 @@ class Girl extends Character
         const desiredDist = 2.0; // Comfortable following distance
         const maxFollowDist = 5.0; // Start walking faster beyond this
         
-        // Stagger position slightly for multiple girls
-        const staggerOffset = this.girlIndex * 0.8;
+        // Stagger position slightly for multiple boys
+        const staggerOffset = this.boyIndex * 0.8;
         
         // Movement towards player - calm walking pace
         this.moveInput = vec2(0, 0);
@@ -220,7 +224,7 @@ class Girl extends Character
             // Too close - gently back off
             this.moveInput.x = -playerDirection * 0.15;
         }
-        // else: She's at a good distance, just stay put
+        // else: He's at a good distance, just stay put
         
         // Vertical movement for ladders only
         if (abs(toPlayer.y) > 3 && this.climbingLadder)
@@ -291,7 +295,7 @@ class Girl extends Character
         if (this.wantsToJump)
             this.holdJumpTimer.set(0.25); // Decent jump height
         
-        // ========== COMBAT - SHOOTING ==========
+        // ========== COMBAT - AGGRESSIVE SHOOTING ==========
         this.holdingShoot = false;
         
         if (this.targetEnemy && !this.targetEnemy.isDead())
@@ -304,52 +308,28 @@ class Girl extends Character
             if (!this.dodgeTimer.active())
                 this.mirror = toEnemy.x < 0;
             
-            // Aim at enemy
+            // Aim at enemy with good accuracy
             if (this.weapon)
             {
                 const aimAngle = Math.atan2(toEnemy.y, abs(toEnemy.x));
                 this.weapon.localAngle = -aimAngle * this.getMirrorSign();
             }
             
-            // Burst fire at enemies
-            if (this.shootTimer.elapsed() || !this.shootTimer.isSet())
+            // Wait briefly before attacking, then shoot aggressively
+            // Attack delay timer ensures brief pause when enemy is first spotted
+            if (this.attackDelayTimer.elapsed() || !this.attackDelayTimer.isSet())
             {
-                // Start new burst
-                this.burstShotsRemaining = 3 + (rand() * 3 | 0); // 3-5 shot bursts
-                this.shootTimer.set(1.5 + rand()); // Pause between bursts
-            }
-            
-            if (this.burstShotsRemaining > 0)
-            {
-                if (this.burstShootTimer.elapsed() || !this.burstShootTimer.isSet())
-                {
-                    this.holdingShoot = true;
-                    this.burstShotsRemaining--;
-                    this.burstShootTimer.set(0.08); // Fast burst fire
-                    
-                    // Alert player's enemies to girl's position
-                    alertEnemies(this.pos, this.pos);
-                }
+                // Continuous aggressive fire at player's rate (fireRate = 8)
+                // The weapon's built-in fireRate will handle the rate limiting
+                this.holdingShoot = true;
+                
+                // Alert player's enemies to boy's position
+                alertEnemies(this.pos, this.pos);
             }
         }
         else
         {
-            // No enemy - random shooting for personality (she likes her gun!)
-            if (this.randomShootTimer.elapsed())
-            {
-                // Random chance to fire a shot into the air/ahead
-                if (rand() < 0.03) // 3% chance when timer elapses
-                {
-                    this.holdingShoot = true;
-                    this.randomShootTimer.set(0.1);
-                }
-                else
-                {
-                    this.randomShootTimer.set(rand(3, 1)); // Wait 1-3 seconds
-                }
-            }
-            
-            // Face movement direction or player
+            // No enemy - face movement direction or player
             if (this.moveInput.x && !this.dodgeTimer.active())
                 this.mirror = this.moveInput.x < 0;
             else if (distToPlayer > 0.5)
@@ -364,22 +344,6 @@ class Girl extends Character
         if (this.weapon)
             this.weapon.triggerIsDown = this.holdingShoot && !this.dodgeTimer.active();
 
-        // ========== RANDOM NOISES ==========
-        if (this.randomNoiseTimer.elapsed())
-        {
-            // Pick a random noise and play it very quietly
-            const noiseType = rand(3) | 0;
-            const vol = 0.08; // Very quiet
-            if (noiseType == 0)
-                zzfx(...[vol,0,130.8128,.11,.19,.3,5,.4245983405873669,,,,,,.3,,,,.83,.03,,-854]);
-            else if (noiseType == 1)
-                zzfx(...[vol,,172,.37,,.21,5,.8,,11,39,.05,.03,.6,,,.08,.97,,,-851]);
-            else
-                zzfx(...[vol,,770,.12,.01,.11,1,.7,-9,79,,,.07,.3,,.1,,.95,.33,,-1444]);
-            
-            this.randomNoiseTimer.set(rand(45, 20)); // Next noise in 20-45 seconds
-        }
-
         // ========== PHYSICS UPDATE ==========
         // Store state before update
         const wasOnGround = this.groundObject || this.groundTimer.active();
@@ -392,19 +356,21 @@ class Girl extends Character
 
         // ========== SILENT JUMP (after super.update) ==========
         // Handle jump manually to avoid jump sound
+        // Boys jump 1.5x higher than girls
         if (this.wantsToJump && wasOnGround && !this.jumpTimer.active())
         {
-            // Good jump height to clear obstacles
-            this.velocity.y = 0.15;
+            // 1.5x jump height: 0.15 * 1.5 = 0.225
+            this.velocity.y = 0.225;
             this.jumpTimer.set(0.2);
             this.preventJumpTimer.set(0.4); // Reasonable cooldown
             this.groundTimer.unset();
         }
         
-        // Jump continuation for holding jump
+        // Jump continuation for holding jump - also 1.5x
         if (this.jumpTimer.active() && this.holdingJump && this.velocity.y > 0)
         {
-            this.velocity.y += 0.015;
+            // 1.5x jump continuation: 0.015 * 1.5 = 0.0225
+            this.velocity.y += 0.0225;
         }
         
         // Ensure weapon protection
@@ -415,7 +381,7 @@ class Girl extends Character
     // Override damage to prevent fall damage, bleeding, and death sounds
     damage(damage, damagingObject)
     {
-        // Prevent ALL fall damage for girls (damagingObject is null for fall damage)
+        // Prevent ALL fall damage for boys (damagingObject is null for fall damage)
         if (this.noFallDamage && damagingObject == null)
         {
             // This is fall damage - completely ignore it
@@ -453,10 +419,10 @@ class Girl extends Character
             return 0;
         }
         
-        // Remove from surviving girls array before kill
-        const index = survivingGirls.indexOf(this);
+        // Remove from surviving boys array before kill
+        const index = survivingBoys.indexOf(this);
         if (index >= 0)
-            survivingGirls.splice(index, 1);
+            survivingBoys.splice(index, 1);
         
         // Save weapon reference before parent kill
         const weaponRef = this.weapon;
@@ -481,12 +447,12 @@ class Girl extends Character
         return result;
     }
 
-    // Override destroy to clean up from survivingGirls array
+    // Override destroy to clean up from survivingBoys array
     destroy()
     {
-        const index = survivingGirls.indexOf(this);
+        const index = survivingBoys.indexOf(this);
         if (index >= 0)
-            survivingGirls.splice(index, 1);
+            survivingBoys.splice(index, 1);
         super.destroy();
     }
 
@@ -497,12 +463,12 @@ class Girl extends Character
         if (o.isPlayer)
             return 0; // No collision
         
-        // Pass through other girls
-        if (o.isGirl)
+        // Pass through other boys
+        if (o.isBoy)
             return 0;
         
-        // Pass through boys
-        if (o.isBoy)
+        // Pass through girls too
+        if (o.isGirl)
             return 0;
         
         // Normal collision for everything else
@@ -521,7 +487,8 @@ class Girl extends Character
                          this.bodyTile + 1);
 
         const sizeScale = this.sizeScale;
-        const color = this.color.scale(this.burnColorPercent(), 1);
+        // No color tint - use white/default color
+        const color = new Color(1, 1, 1).scale(this.burnColorPercent(), 1);
         const additive = this.additiveColor.add(this.extraAdditiveColor);
 
         // Draw body using drawTile2 from tiles2.png (no head, no eyes)
@@ -534,72 +501,72 @@ class Girl extends Character
     }
 }
 
-// Mark girls so we can identify them
-Girl.prototype.isGirl = 1;
+// Mark boys so we can identify them
+Boy.prototype.isBoy = 1;
 
-// Function to spawn girls at level start
-function spawnGirls(spawnPos)
+// Function to spawn boys at level start
+function spawnBoys(spawnPos)
 {
-    // Clean up dead girls first to get accurate count
-    cleanupSurvivingGirls();
+    // Clean up dead boys first to get accurate count
+    cleanupSurvivingBoys();
     
     // Check if we're at the maximum limit
-    if (survivingGirls.length >= MAX_GIRLS)
+    if (survivingBoys.length >= MAX_BOYS)
         return;
     
-    // Always spawn 1 new girl at the beginning of every level
+    // Always spawn 1 new boy at the beginning of every level
     // Spawn beside player (to the right side) to avoid collision
-    // Use a spacing that accounts for existing girls to prevent overlap
-    const spacing = 2.0; // Space between girls (2 units apart)
+    // Use a spacing that accounts for existing boys to prevent overlap
+    const spacing = 2.0; // Space between boys (2 units apart)
     const baseOffset = 1.5; // Base offset from checkpoint (to the right)
-    const offsetX = baseOffset + survivingGirls.length * spacing; // Spread out based on existing girls
+    const offsetX = baseOffset + survivingBoys.length * spacing; // Spread out based on existing boys
     const offset = vec2(offsetX, 0);
-    const girl = new Girl(spawnPos.add(offset));
-    survivingGirls.push(girl);
+    const boy = new Boy(spawnPos.add(offset));
+    survivingBoys.push(boy);
 }
 
-// Clean up the survivingGirls array - call this every frame to keep count accurate
-function cleanupSurvivingGirls()
+// Clean up the survivingBoys array - call this every frame to keep count accurate
+function cleanupSurvivingBoys()
 {
-    // Remove any dead, destroyed, or fallen girls from the array
-    for (let i = survivingGirls.length - 1; i >= 0; i--)
+    // Remove any dead, destroyed, or fallen boys from the array
+    for (let i = survivingBoys.length - 1; i >= 0; i--)
     {
-        const g = survivingGirls[i];
-        if (!g || g.destroyed || g.isDead() || g.health <= 0 || g.pos.y < -5)
+        const b = survivingBoys[i];
+        if (!b || b.destroyed || b.isDead() || b.health <= 0 || b.pos.y < -5)
         {
-            survivingGirls.splice(i, 1);
+            survivingBoys.splice(i, 1);
         }
     }
 }
 
-// Function to respawn surviving girls from previous level
-function respawnSurvivingGirls(spawnPos)
+// Function to respawn surviving boys from previous level
+function respawnSurvivingBoys(spawnPos)
 {
     // Clean up first
-    cleanupSurvivingGirls();
+    cleanupSurvivingBoys();
     
-    // Respawn surviving girls beside checkpoint (to avoid collision with player)
+    // Respawn surviving boys beside checkpoint (to avoid collision with player)
     // Spread them out horizontally so they don't overlap
-    const spacing = 2.0; // Space between girls (2 units apart)
+    const spacing = 2.0; // Space between boys (2 units apart)
     const baseOffset = 1.5; // Base offset from checkpoint (to the right)
     
     let index = 0;
-    for(const girl of survivingGirls)
+    for(const boy of survivingBoys)
     {
-        if (!girl || girl.destroyed || girl.isDead())
+        if (!boy || boy.destroyed || boy.isDead())
             continue;
             
         // Reset position beside checkpoint, spread out horizontally
         const offsetX = baseOffset + index * spacing;
-        girl.pos = spawnPos.add(vec2(offsetX, 0));
-        girl.velocity = vec2(0, 0);
-        girl.health = girl.healthMax;
-        girl.deadTimer.unset();
+        boy.pos = spawnPos.add(vec2(offsetX, 0));
+        boy.velocity = vec2(0, 0);
+        boy.health = boy.healthMax;
+        boy.deadTimer.unset();
         
-        // Ensure she has a weapon (recreate if missing)
-        if (!girl.weapon || girl.weapon.destroyed)
+        // Ensure he has a weapon (recreate if missing)
+        if (!boy.weapon || boy.weapon.destroyed)
         {
-            createProtectedWeapon(girl);
+            createProtectedWeapon(boy);
         }
         
         index++;

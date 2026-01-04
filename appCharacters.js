@@ -341,13 +341,39 @@ class Character extends GameObject
             }
             useDrawTile2 = false; // Climbing tiles are from tiles.png
         }
+        else if (this.isPlayer && this.climbingLadder)
+        {
+            // Use ladder climbing sprites - alternate between climb and jump
+            useDrawTile2 = false; // Climbing tiles are from tiles.png
+            let climbTileIndex;
+            if (wardrobeSuit)
+            {
+                // Use suit-specific climbing tiles
+                const suitName = wardrobeSuit.name;
+                if (suitName === 'gavin')
+                    climbTileIndex = 9;
+                else if (suitName === 'pinstripe')
+                    climbTileIndex = 23;
+                else if (suitName === 'butch')
+                    climbTileIndex = 26;
+                else // bruce or unknown
+                    climbTileIndex = 7;
+                // Alternate between climb sprite and jump sprite
+                bodyTileIndex = (this.walkCyclePercent|0) ? wardrobeSuit.jumping : climbTileIndex;
+            }
+            else
+            {
+                // No wardrobe suit - use standard climbing tile (7) and alternate with jump sprite (bodyTile+1)
+                bodyTileIndex = (this.walkCyclePercent|0) ? this.bodyTile+1 : 7;
+            }
+        }
         else if (wardrobeSuit)
         {
             // Use wardrobe suit tiles from tiles2.png with multi-frame walking animation
             useDrawTile2 = true;
             if (this.isDead())
                 bodyTileIndex = wardrobeSuit.standing; // Use standing sprite when dead
-            else if (this.climbingLadder || this.groundObject)
+            else if (this.groundObject)
                 bodyTileIndex = wardrobeSuit.standing + (this.walkCyclePercent|0); // Alternate between standing and jumping for walking animation
             else
                 bodyTileIndex = wardrobeSuit.jumping; // Use jumping sprite when in air
@@ -355,7 +381,7 @@ class Character extends GameObject
         else
         {
             // Use default body tiles
-            this.tileIndex = this.isDead() ? this.bodyTile : this.climbingLadder || this.groundTimer.active() ? this.bodyTile + 2*this.walkCyclePercent|0 : this.bodyTile+1;
+            this.tileIndex = this.isDead() ? this.bodyTile : this.groundTimer.active() ? this.bodyTile + 2*this.walkCyclePercent|0 : this.bodyTile+1;
             bodyTileIndex = this.tileIndex;
             useDrawTile2 = false; // Default tiles are from tiles.png
         }
