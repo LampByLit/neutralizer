@@ -314,12 +314,34 @@ class Prop extends GameObject
         if (this.type == propType_barrel_water)
             makeWater(this.pos);
 
-        // Drop item from all crates and barrels (20% chance)
-        if (this.type < propType_rock && rand() < .2)
+        // Drop item from all crates and barrels
+        // TEST MODE: 100% chance for test item | NORMAL: 20% chance for random item
+        if (this.type < propType_rock)
         {
-            const itemTypes = getAllItemTypes();
-            const randomItemType = itemTypes[rand(itemTypes.length)|0];
-            new Item(this.pos, randomItemType);
+            let shouldDropItem = false;
+            let itemTypeToDrop = null;
+            
+            if (typeof testModeEnabled !== 'undefined' && testModeEnabled)
+            {
+                // TEST MODE: Always drop the test item
+                shouldDropItem = true;
+                itemTypeToDrop = typeof testModeItemType !== 'undefined' ? testModeItemType : itemType_laser;
+            }
+            else
+            {
+                // NORMAL MODE: 20% chance for random item
+                if (rand() < .2)
+                {
+                    shouldDropItem = true;
+                    const itemTypes = getAllItemTypes();
+                    itemTypeToDrop = itemTypes[rand(itemTypes.length)|0];
+                }
+            }
+            
+            if (shouldDropItem && itemTypeToDrop !== null)
+            {
+                new Item(this.pos, itemTypeToDrop);
+            }
         }
 
         this.destroy();
@@ -745,7 +767,7 @@ class KeyItem extends GameObject
 ///////////////////////////////////////////////////////////////////////////////
 
 // Item type definitions
-// Order: Life (0), Health (1), Laser (2), Cannon (3), Jumper (4), Hammer (5), Radar (6), Smoker (7), Fang (8), Ladymaker (9), Transporter (10)
+// Order: Life (0), Health (1), Laser (2), Cannon (3), Jumper (4), Hammer (5), Radar (6), Smoker (7), Fang (8), Ladymaker (9), Transporter (10), Wardrobe (11)
 const itemType_life = 0;
 const itemType_health = 1;
 const itemType_laser = 2;
@@ -757,6 +779,7 @@ const itemType_smoker = 7;
 const itemType_fang = 8;
 const itemType_ladymaker = 9;
 const itemType_transporter = 10;
+const itemType_wardrobe = 11;
 
 const itemType_consumable = 0;
 const itemType_equipable = 1;
@@ -818,11 +841,25 @@ const itemRegistry = {
         category: itemType_equipable, 
         tileIndex: 10, 
         weaponType: 'TransporterWeapon' 
+    },
+    [itemType_wardrobe]: { 
+        category: itemType_equipable, 
+        tileIndex: 11, 
+        weaponType: 'WardrobeWeapon' 
     }
 };
 
 // Get all available item types for random selection
 const getAllItemTypes = ()=> [itemType_life, itemType_health, itemType_laser, itemType_cannon, itemType_jumper, itemType_hammer, itemType_radar, itemType_smoker, itemType_fang, itemType_ladymaker];
+
+///////////////////////////////////////////////////////////////////////////////
+// TEST MODE - REMOVE THIS ENTIRE SECTION FOR PRODUCTION
+///////////////////////////////////////////////////////////////////////////////
+const testModeEnabled = true; // Set to false to disable test mode
+const testModeItemType = itemType_transporter; // Change this to test different items (e.g., itemType_laser, itemType_hammer, etc.)
+// Available item types: itemType_life, itemType_health, itemType_laser, itemType_cannon, itemType_jumper, 
+// itemType_hammer, itemType_radar, itemType_smoker, itemType_fang, itemType_ladymaker, itemType_transporter, itemType_wardrobe
+///////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -1977,16 +2014,27 @@ class PearlProjectile extends GameObject
         this.gravityScale = 1; // Affected by gravity for ballistic trajectory
         this.setCollision();
         this.color = new Color(0, 0, 0, 1); // All black (hammer sprite)
+        this.ignoreCollisionsUntil = realTime + 0.1; // Ignore collisions for 0.1 seconds after spawn to prevent immediate teleport
+        console.log('[PearlProjectile] Created at pos:', pos.x.toFixed(2), pos.y.toFixed(2), 'attacker:', attacker);
     }
 
     update()
     {
         super.update();
 
+        // Ignore collisions for a brief moment after spawn to prevent immediate teleport
+        if (realTime < this.ignoreCollisionsUntil)
+        {
+            console.log('[PearlProjectile] Ignoring collisions, time remaining:', (this.ignoreCollisionsUntil - realTime).toFixed(3));
+            return;
+        }
+
         // Check for any collision - teleport player immediately on contact
         // Check tile collision
-        if (getTileCollisionData(this.pos) > 0 && getTileCollisionData(this.pos) != tileType_ladder)
+        const tileCollision = getTileCollisionData(this.pos);
+        if (tileCollision > 0 && tileCollision != tileType_ladder)
         {
+            console.log('[PearlProjectile] Tile collision detected, teleporting player');
             this.teleportPlayer();
             return;
         }
@@ -1994,6 +2042,7 @@ class PearlProjectile extends GameObject
         // Check for ground contact
         if (this.groundObject)
         {
+            console.log('[PearlProjectile] Ground contact detected, teleporting player');
             this.teleportPlayer();
             return;
         }
@@ -2001,11 +2050,16 @@ class PearlProjectile extends GameObject
         // Check for object collisions (but pass through enemies)
         forEachObject(this.pos, this.size, (o)=>
         {
-            if (o.isGameObject && !o.parent && o != this.attacker)
+            // Skip self and attacker
+            if (o == this || o == this.attacker)
+                return;
+                
+            if (o.isGameObject && !o.parent)
             {
                 // Pass through enemies, but collide with other objects
                 if (!o.isCharacter || o.team == this.team)
                 {
+                    console.log('[PearlProjectile] Object collision detected with:', o, 'teleporting player');
                     this.teleportPlayer();
                     return;
                 }
@@ -2016,22 +2070,94 @@ class PearlProjectile extends GameObject
     teleportPlayer()
     {
         if (this.destroyed || !this.attacker || !this.attacker.isPlayer)
+        {
+            console.log('[PearlProjectile] teleportPlayer() - early return, destroyed:', this.destroyed, 'attacker:', this.attacker);
             return;
+        }
         
-        // Teleport the player to pearl position
-        this.attacker.pos = this.pos.copy();
+        console.log('[PearlProjectile] teleportPlayer() - teleporting player from', this.attacker.pos.x.toFixed(2), this.attacker.pos.y.toFixed(2), 'to', this.pos.x.toFixed(2), this.pos.y.toFixed(2));
+        console.log('[PearlProjectile] Velocity:', this.velocity.x.toFixed(2), this.velocity.y.toFixed(2), 'groundObject:', this.groundObject);
+        
+        const playerSize = this.attacker.size || vec2(.6, .95);
+        const playerHalfHeight = playerSize.y * 0.5;
+        
+        // Get the direction the pearl was traveling (normalized)
+        let travelDirection = this.velocity.copy();
+        if (travelDirection.lengthSquared() < 0.001)
+        {
+            // If velocity is too small, use a default direction (up/back)
+            travelDirection = vec2(0, -1);
+        }
+        else
+        {
+            travelDirection = travelDirection.normalize();
+        }
+        
+        // Reverse the direction (opposite of where pearl was going)
+        const backDirection = travelDirection.scale(-1);
+        
+        // Move player 5 tiles back from pearl position
+        let playerPos = this.pos.add(backDirection.scale(5.0));
+        
+        console.log('[PearlProjectile] Travel direction:', travelDirection.x.toFixed(2), travelDirection.y.toFixed(2));
+        console.log('[PearlProjectile] Back direction:', backDirection.x.toFixed(2), backDirection.y.toFixed(2));
+        console.log('[PearlProjectile] Initial player pos (5 tiles back):', playerPos.x.toFixed(2), playerPos.y.toFixed(2));
+        
+        // If pearl hit ground or was moving down, ensure player is on top of ground
+        if (this.groundObject || this.velocity.y > 0.1)
+        {
+            // Find the top of the ground tile at the player's X position
+            const playerTileX = playerPos.x|0;
+            let groundTileY = playerPos.y|0;
+            
+            // Check tiles from player position upward to find ground
+            for (let checkY = playerTileY; checkY <= playerTileY + 10; checkY++)
+            {
+                const tileData = getTileCollisionData(vec2(playerTileX, checkY));
+                if (tileData > 0 && tileData != tileType_ladder)
+                {
+                    groundTileY = checkY;
+                }
+                else if (groundTileY != playerTileY)
+                {
+                    // Found ground, now we're past it
+                    break;
+                }
+            }
+            
+            // Position player on top of ground tile
+            if (groundTileY != playerTileY || getTileCollisionData(vec2(playerTileX, groundTileY)) > 0)
+            {
+                playerPos.y = groundTileY + 0.5 + playerHalfHeight;
+                console.log('[PearlProjectile] Found ground at tile Y:', groundTileY, 'positioning player at Y:', playerPos.y.toFixed(2));
+            }
+        }
+        
+        console.log('[PearlProjectile] Final player pos:', playerPos.x.toFixed(2), playerPos.y.toFixed(2));
+        
+        // Teleport the player to the calculated position
+        this.attacker.pos = playerPos;
         this.attacker.velocity = vec2(0, 0);
-        this.attacker.groundObject = 0; // Reset ground state
+        // Don't reset groundObject - let physics system detect it naturally
         
         // Play sound
         playSound(sound_jump, this.pos);
         
         // Destroy the pearl
         this.destroy();
+        
+        console.log('[PearlProjectile] Player teleported to', this.attacker.pos.x.toFixed(2), this.attacker.pos.y.toFixed(2), 'and pearl destroyed');
     }
     
     collideWithObject(o)
     {
+        // Ignore collisions with attacker (player) for a brief moment after spawn
+        if (o == this.attacker && realTime < this.ignoreCollisionsUntil)
+        {
+            console.log('[PearlProjectile] Ignoring collision with attacker (player)');
+            return 0;
+        }
+        
         // Pass through enemies, but teleport on other collisions
         if (o.isCharacter && o.team != this.team)
         {
@@ -2039,6 +2165,7 @@ class PearlProjectile extends GameObject
             return 0;
         }
         
+        console.log('[PearlProjectile] collideWithObject - colliding with:', o, 'teleporting player');
         // Teleport on other collisions
         this.teleportPlayer();
         return 1;
@@ -2073,30 +2200,34 @@ class TransporterWeapon extends Weapon
     constructor(pos, parent)
     {
         super(pos, parent);
-        this.fireTimeBuffer = 0;
+        this.pearlCooldownBuffer = 0; // Separate buffer for pearl cooldown (doesn't interfere with gun firing)
         this.fireRate = 0.2; // 5 second cooldown (1/5 = 0.2)
         this.hidden = 1; // Don't render the weapon sprite (helmet is rendered separately)
+        this.hasFiredThisPress = 0; // Track if we've fired on current F press
     }
     
     update()
     {
-        super.update();
+        super.update(); // This handles the gun firing normally
         
         // Only handle pearl throwing for player
         if (!this.parent.isPlayer)
             return;
         
-        this.fireTimeBuffer += timeDelta;
-        
         // Check if F key is pressed (key code 70)
-        const fJustPressed = !this.parent.playerIndex && keyWasPressed(70);
+        const pressingF = !this.parent.playerIndex && keyIsDown(70);
         
-        if (fJustPressed)
+        if (pressingF)
         {
+            this.pearlCooldownBuffer += timeDelta;
             const rate = 1/this.fireRate; // 5 seconds
             
-            // Check if cooldown is ready
-            if (this.fireTimeBuffer >= rate)
+            // Fire immediately on first press, then every 5 seconds while holding
+            const shouldFire = !this.hasFiredThisPress || this.pearlCooldownBuffer >= rate;
+            
+            console.log('[TransporterWeapon] F pressed - shouldFire:', shouldFire, 'hasFiredThisPress:', this.hasFiredThisPress, 'pearlCooldownBuffer:', this.pearlCooldownBuffer.toFixed(2), 'rate:', rate.toFixed(2));
+            
+            if (shouldFire)
             {
                 // Get base aim angle from parent
                 const baseAimAngle = this.parent.aimAngle || 0;
@@ -2116,12 +2247,21 @@ class TransporterWeapon extends Weapon
                         vec2(this.parent.getMirrorSign(.55), 0).scale(sizeScale)
                     );
                     
+                    console.log('[TransporterWeapon] Firing pearl!');
+                    console.log('[TransporterWeapon] Player pos:', this.parent.pos.x.toFixed(2), this.parent.pos.y.toFixed(2));
+                    console.log('[TransporterWeapon] Weapon pos:', weaponPos.x.toFixed(2), weaponPos.y.toFixed(2));
+                    console.log('[TransporterWeapon] Mirror:', this.parent.mirror, 'Aim angle:', baseAimAngle.toFixed(2));
+                    console.log('[TransporterWeapon] Forward direction:', forwardDirection.x.toFixed(2), forwardDirection.y.toFixed(2));
+                    
                     // Create pearl projectile
                     const pearl = new PearlProjectile(weaponPos, this.parent);
                     
-                    // Use same throw trajectory as hammer (thrown far)
-                    pearl.velocity = this.parent.velocity.add(vec2(this.parent.getMirrorSign(), rand(.8,.7)).normalize(.25+rand(.02)));
+                    // Throw pearl much farther than hammer
+                    pearl.velocity = this.parent.velocity.add(vec2(this.parent.getMirrorSign(), rand(.8,.7)).normalize(.6+rand(.1)));
                     pearl.angleVelocity = this.parent.getMirrorSign() * rand(.8,.5);
+                    
+                    console.log('[TransporterWeapon] Pearl velocity:', pearl.velocity.x.toFixed(2), pearl.velocity.y.toFixed(2));
+                    console.log('[TransporterWeapon] Pearl created successfully');
                     
                     // Play sound
                     playSound(sound_jump, weaponPos);
@@ -2129,10 +2269,90 @@ class TransporterWeapon extends Weapon
                     // Alert enemies
                     alertEnemies(weaponPos, weaponPos);
                     
-                    // Reset cooldown
-                    this.fireTimeBuffer = 0;
+                    // Update fire tracking
+                    this.pearlCooldownBuffer -= rate;
+                    this.hasFiredThisPress = 1;
+                }
+                else
+                {
+                    console.log('[TransporterWeapon] Not firing forward - mirror:', this.parent.mirror, 'forwardDirection.x:', forwardDirection.x.toFixed(2));
                 }
             }
+        }
+        else
+        {
+            // Not pressing F, reset buffer and fire flag
+            this.pearlCooldownBuffer = min(this.pearlCooldownBuffer, 0);
+            this.hasFiredThisPress = 0;
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class WardrobeWeapon extends Weapon
+{
+    constructor(pos, parent)
+    {
+        super(pos, parent);
+        this.hidden = 1; // Don't render the weapon sprite (helmet is rendered separately)
+        
+        // Wardrobe sound effects - array of 7 different sounds
+        this.wardrobeSounds = [
+            [,,16,,.48,.17,2,2.8,,,-62,.11,,,,,,.56,.25],
+            [1.4,,406,.37,.36,.001,,2.8,,,136,.05,.16,,,.1,.05,.85,.03,.01],
+            [.5,,103,.02,.13,.01,5,.8954348352102028,,,37,.02,,,,,,.5,.17,,-1435],
+            [.5,,103,.02,.13,.01,5,.8954348696969698,,,37,.02,,,,,,.5,.17,,-1435],
+            [.5,,103,.02,.13,.02,3,1.1,,,137,.03,,,,,,.3,.17,,-1437],
+            [.5,,103,.02,.13,.02,3,1.1,,,137,.03,,,,,,.3,.18,,-1437],
+            [2.3,,684,.07,.17,.38,5,1.0535271613990804,,,,,,,,.1,,.63,.26,,-905]
+        ];
+        
+        // Track if F was pressed last frame
+        this.wasPressingF = 0;
+        
+        // Available suit pairs: [standingIndex, jumpingIndex]
+        const suitPairs = [
+            [8, 9],   // Pair 1
+            [10, 11], // Pair 2
+            [20, 21]  // Pair 3
+        ];
+        
+        // Randomly select a suit pair
+        const selectedPair = suitPairs[rand(suitPairs.length)|0];
+        this.standingTileIndex = selectedPair[0];
+        this.jumpingTileIndex = selectedPair[1];
+        
+        // Store suit in player's wardrobe suits array for persistence
+        if (this.parent.isPlayer && typeof playerWardrobeSuits !== 'undefined')
+        {
+            playerWardrobeSuits[this.parent.playerIndex] = {
+                standing: this.standingTileIndex,
+                jumping: this.jumpingTileIndex
+            };
+        }
+    }
+    
+    update()
+    {
+        super.update();
+        
+        // Only handle wardrobe for player
+        if (!this.parent.isPlayer)
+            return;
+        
+        // Check if F key is pressed (key code 70)
+        const pressingF = !this.parent.playerIndex && keyIsDown(70);
+        const fJustPressed = !this.parent.playerIndex && keyWasPressed(70);
+        const fJustPressedThisFrame = pressingF && !this.wasPressingF; // Detect F press even if keyWasPressed missed it
+        
+        this.wasPressingF = pressingF;
+        
+        // If F was just pressed, play a random sound
+        if (fJustPressed || fJustPressedThisFrame)
+        {
+            const randomSound = this.wardrobeSounds[rand(this.wardrobeSounds.length)|0];
+            playSound(randomSound, this.parent.pos);
         }
     }
 }
@@ -3075,11 +3295,90 @@ class Computer extends GameObject
         
         // Add to global array
         allComputers.push(this);
+        
+        // Initialize looping computer sound
+        this.computerSoundSource = null;
+        this.computerSoundGain = null;
+        this.initComputerSound();
+    }
+    
+    initComputerSound()
+    {
+        if (!soundEnable || !hadInput) return;
+        
+        // Create buffer for computer sound (this will also initialize audioContext if needed)
+        const buffer = createZzfxBuffer(sound_computer);
+        if (!buffer || !audioContext) return;
+        
+        // Create gain node for volume control
+        this.computerSoundGain = audioContext.createGain();
+        this.computerSoundGain.connect(audioContext.destination);
+        
+        // Create and start looping source
+        this.computerSoundSource = audioContext.createBufferSource();
+        this.computerSoundSource.buffer = buffer;
+        this.computerSoundSource.loop = true;
+        this.computerSoundSource.connect(this.computerSoundGain);
+        this.computerSoundSource.start();
+        
+        // Start with volume 0, will be updated in update()
+        this.computerSoundGain.gain.value = 0;
+    }
+    
+    stopComputerSound()
+    {
+        if (this.computerSoundSource)
+        {
+            try {
+                this.computerSoundSource.stop();
+            } catch(e) {} // Ignore if already stopped
+            this.computerSoundSource = null;
+        }
+        if (this.computerSoundGain)
+        {
+            try {
+                this.computerSoundGain.disconnect();
+            } catch(e) {} // Ignore if already disconnected
+            this.computerSoundGain = null;
+        }
     }
     
     update()
     {
         super.update();
+        
+        // Update computer sound volume based on distance to player
+        if (this.computerSoundSource && this.computerSoundGain && !this.computerDestroyed)
+        {
+            // Get player position (single player for now)
+            const player = players[0];
+            if (player && !player.isDead())
+            {
+                const distance = this.pos.distance(player.pos);
+                const maxDistance = 30; // Silent beyond 30 tiles
+                
+                if (distance <= maxDistance)
+                {
+                    // Linear volume: 1.0 at distance 0, 0.0 at distance 30
+                    const volume = 1.0 - (distance / maxDistance);
+                    this.computerSoundGain.gain.value = volume;
+                }
+                else
+                {
+                    this.computerSoundGain.gain.value = 0;
+                }
+            }
+            else
+            {
+                this.computerSoundGain.gain.value = 0;
+            }
+        }
+        
+        // Stop sound if computer is destroyed
+        if (this.computerDestroyed && this.computerSoundSource)
+        {
+            this.stopComputerSound();
+        }
         
         // Check if any tile is broken
         if (!this.computerDestroyed)
@@ -3106,6 +3405,10 @@ class Computer extends GameObject
     {
         const tilePos = this.tilePositions[tileIndex];
         const centerPos = tilePos.add(vec2(0.5));
+        
+        // Play random destruction sound
+        const destroySound = sound_computerDestroy[rand(sound_computerDestroy.length)|0];
+        playSound(destroySound, centerPos);
         
         // Reveal tile 14 in background layer
         // We need to set the background tile data and update the background layer
@@ -3243,6 +3546,9 @@ class Computer extends GameObject
     {
         if (this.destroyed)
             return;
+        
+        // Stop computer sound
+        this.stopComputerSound();
         
         // Remove from global array
         const index = allComputers.indexOf(this);

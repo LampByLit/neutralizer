@@ -608,6 +608,8 @@ engineInit(
                     headwearTileIndex = 9; // itemType_ladymaker tileIndex
                 else if (player.equippedWeaponType == 'TransporterWeapon')
                     headwearTileIndex = 10; // itemType_transporter tileIndex
+                else if (player.equippedWeaponType == 'WardrobeWeapon')
+                    headwearTileIndex = 11; // itemType_wardrobe tileIndex
                 
                 if (headwearTileIndex >= 0 && typeof drawTile2 === 'function')
                 {
@@ -685,6 +687,19 @@ engineInit(
         const hudX = 20;
         const hudY = 30;
         const lineHeight = 20;
+
+        // TEST MODE: Display "TEST MODE" at top center if enabled
+        // REMOVE THIS SECTION FOR PRODUCTION
+        if (typeof testModeEnabled !== 'undefined' && testModeEnabled)
+        {
+            mainContext.textAlign = 'center';
+            mainContext.fillStyle = new Color(1, 1, 0).rgba(); // Yellow color for visibility
+            mainContext.font = 'bold 24px JetBrains Mono';
+            mainContext.fillText('TEST MODE', mainCanvas.width / 2, 30);
+            mainContext.textAlign = 'left'; // Reset to left for HUD
+            mainContext.fillStyle = new Color(1, 1, 1).rgba(); // Reset to white for HUD
+        }
+        // END TEST MODE SECTION
 
         mainContext.fillText('LEVEL ' + level, hudX, hudY);
         mainContext.fillText('LIVES ' + playerLives, hudX, hudY + lineHeight);

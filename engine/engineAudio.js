@@ -16,6 +16,101 @@ let audioContext;            // main audio context
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// create a zzfx sound buffer without playing it (for looping sounds)
+function createZzfxBuffer(zzfxSound)
+{
+    if (!soundEnable || !hadInput) return null;
+    
+    // Unpack parameters with defaults (use let so we can modify them)
+    let [
+        volume = 1, randomness = .05, frequency = 220, attack = 0, sustain = 0,
+        release = .1, shape = 0, shapeCurve = 1, slide = 0, deltaSlide = 0,
+        pitchJump = 0, pitchJumpTime = 0, repeatTime = 0, noise = 0, modulation = 0,
+        bitCrush = 0, delay = 0, sustainVolume = 1, decay = 0, tremolo = 0
+    ] = zzfxSound;
+    
+    // init parameters
+    let PI2 = PI*2, sign = v => v>0?1:-1,
+        startSlide = slide *= 500 * PI2 / zzfxR / zzfxR, b=[],
+        startFrequency = frequency *= (1 + randomness*2*Math.random() - randomness) * PI2 / zzfxR,
+        t=0, tm=0, i=0, j=1, r=0, c=0, s=0, f, length;
+        
+    // scale by sample rate
+    const attackScaled = attack * zzfxR + 9; // minimum attack to prevent pop
+    const decayScaled = decay * zzfxR;
+    const sustainScaled = sustain * zzfxR;
+    const releaseScaled = release * zzfxR;
+    const delayScaled = delay * zzfxR;
+    const deltaSlideScaled = deltaSlide * 500 * PI2 / zzfxR**3;
+    const modulationScaled = modulation * PI2 / zzfxR;
+    const pitchJumpScaled = pitchJump * PI2 / zzfxR;
+    const pitchJumpTimeScaled = pitchJumpTime * zzfxR;
+    const repeatTimeScaled = repeatTime * zzfxR | 0;
+
+    // generate waveform
+    for(length = attackScaled + decayScaled + sustainScaled + releaseScaled + delayScaled | 0;
+        i < length; b[i++] = s)
+    {
+        if (!(++c%(bitCrush*100|0)))                      // bit crush
+        {
+            s = shape? shape>1? shape>2? shape>3?         // wave shape
+                Math.sin((t%PI2)**3) :                    // 4 noise
+                Math.max(Math.min(Math.tan(t),1),-1):     // 3 tan
+                1-(2*t/PI2%2+2)%2:                        // 2 saw
+                1-4*abs(Math.round(t/PI2)-t/PI2):    // 1 triangle
+                Math.sin(t);                              // 0 sin
+                
+            s = (repeatTimeScaled ?
+                    1 - tremolo + tremolo*Math.sin(PI2*i/repeatTimeScaled) // tremolo
+                    : 1) *
+                sign(s)*(abs(s)**shapeCurve) *       // curve 0=square, 2=pointy
+                volume * audioVolume * (                  // envelope
+                i < attackScaled ? i/attackScaled :                   // attack
+                i < attackScaled + decayScaled ?                      // decay
+                1-((i-attackScaled)/decayScaled)*(1-sustainVolume) :  // decay falloff
+                i < attackScaled  + decayScaled + sustainScaled ?           // sustain
+                sustainVolume :                           // sustain volume
+                i < length - delayScaled ?                      // release
+                (length - i - delayScaled)/releaseScaled *            // release falloff
+                sustainVolume :                           // release volume
+                0);                                       // post release
+ 
+            s = delayScaled ? s/2 + (delayScaled > i ? 0 :            // delay
+                (i<length-delayScaled? 1 : (length-i)/delayScaled) *  // release delay 
+                b[i-delayScaled|0]/2) : s;                      // sample delay
+        }
+
+        f = (frequency += slide += deltaSlideScaled) *          // frequency
+            Math.cos(modulationScaled*tm++);                    // modulation
+        t += f - f*noise*(1 - (Math.sin(i)+1)*1e9%2);     // noise
+
+        if (j && ++j > pitchJumpTimeScaled)       // pitch jump
+        {
+            frequency += pitchJumpScaled;         // apply pitch jump
+            startFrequency += pitchJumpScaled;    // also apply to start
+            j = 0;                          // reset pitch jump time
+        }
+
+        if (repeatTimeScaled && !(++r % repeatTimeScaled)) // repeat
+        {
+            frequency = startFrequency;     // reset frequency
+            slide = startSlide;             // reset slide
+            j = j || 1;                     // reset pitch jump time
+        }
+    }
+    
+    // create audio context
+    if (!audioContext)
+        audioContext = new (window.AudioContext||webkitAudioContext);
+
+    // create buffer
+    const buffer = audioContext.createBuffer(1, b.length, zzfxR);
+    buffer.getChannelData(0).set(b);
+    return buffer;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 // play a zzfx sound in world space with attenuation and culling
 function playSound(zzfxSound, pos, range=defaultSoundRange, volumeScale=1)
 {

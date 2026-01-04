@@ -2514,8 +2514,31 @@ class Malefactor extends Enemy
         if (!isOverlapping(this.pos, this.size, cameraPos, renderWindowSize) && !(this.persistent && this.isDead()))
             return;
 
+        // Check for wardrobe suit (only for players)
+        let wardrobeSuit = null;
+        if (this.isPlayer && typeof playerWardrobeSuits !== 'undefined' && playerWardrobeSuits[this.playerIndex])
+        {
+            wardrobeSuit = playerWardrobeSuits[this.playerIndex];
+        }
+
         // set tile to use
-        this.tileIndex = this.isDead() ? this.bodyTile : this.climbingLadder || this.groundTimer.active() ? this.bodyTile + 2*this.walkCyclePercent|0 : this.bodyTile+1;
+        let bodyTileIndex;
+        if (wardrobeSuit)
+        {
+            // Use wardrobe suit tiles from tiles2.png
+            if (this.isDead())
+                bodyTileIndex = wardrobeSuit.standing; // Use standing sprite when dead
+            else if (this.climbingLadder || this.groundTimer.active())
+                bodyTileIndex = wardrobeSuit.standing; // Use standing sprite when on ground/ladder
+            else
+                bodyTileIndex = wardrobeSuit.jumping; // Use jumping sprite when in air
+        }
+        else
+        {
+            // Use default body tiles
+            this.tileIndex = this.isDead() ? this.bodyTile : this.climbingLadder || this.groundTimer.active() ? this.bodyTile + 2*this.walkCyclePercent|0 : this.bodyTile+1;
+            bodyTileIndex = this.tileIndex;
+        }
 
         let additive = this.additiveColor.add(this.extraAdditiveColor);
         if (this.isPlayer && !this.isDead() && this.dodgeRechargeTimer.elapsed() && this.dodgeRechargeTimer.get() < .2)
@@ -2532,7 +2555,16 @@ class Malefactor extends Enemy
         const meleeHeadOffset = this.meleeTimer.active() ? -.12 * Math.sin(this.meleeTimer.getPercent() * PI) : 0;
 
         const bodyPos = this.pos.add(vec2(0,-.1+.06*Math.sin(this.walkCyclePercent*PI)).scale(sizeScale));
-        drawTile(bodyPos, vec2(sizeScale), this.tileIndex, this.tileSize, color, this.angle, this.mirror, additive);
+        
+        // Draw body sprite - use drawTile2 for wardrobe suits, drawTile for default
+        if (wardrobeSuit && typeof drawTile2 === 'function')
+        {
+            drawTile2(bodyPos, vec2(sizeScale), bodyTileIndex, vec2(16), color, this.angle, this.mirror, additive);
+        }
+        else
+        {
+            drawTile(bodyPos, vec2(sizeScale), bodyTileIndex, this.tileSize, color, this.angle, this.mirror, additive);
+        }
         drawTile(this.pos.add(vec2(this.getMirrorSign(.05) + meleeHeadOffset * this.getMirrorSign(),.46).scale(sizeScale).rotate(-this.angle)),vec2(sizeScale/2),this.headTile,vec2(8), headColor,this.angle,this.mirror, additive);
 
         // Blinking glowing eyes - create pulsing glow effect
@@ -4072,6 +4104,8 @@ class Player extends Character
             newWeapon = new LadymakerWeapon(this.pos, this);
         else if (weaponType == 'TransporterWeapon')
             newWeapon = new TransporterWeapon(this.pos, this);
+        else if (weaponType == 'WardrobeWeapon')
+            newWeapon = new WardrobeWeapon(this.pos, this);
         else
             newWeapon = new Weapon(this.pos, this);
         
@@ -4108,6 +4142,10 @@ class Player extends Character
                 itemType = typeof itemType_fang !== 'undefined' ? itemType_fang : 8;
             else if (currentWeaponType == 'LadymakerWeapon')
                 itemType = typeof itemType_ladymaker !== 'undefined' ? itemType_ladymaker : 9;
+            else if (currentWeaponType == 'TransporterWeapon')
+                itemType = typeof itemType_transporter !== 'undefined' ? itemType_transporter : 10;
+            else if (currentWeaponType == 'WardrobeWeapon')
+                itemType = typeof itemType_wardrobe !== 'undefined' ? itemType_wardrobe : 11;
             
             // Create item slightly away from player so it doesn't immediately get collected
             if (itemType >= 0)

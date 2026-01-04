@@ -24,6 +24,7 @@ const tileBackgroundRenderOrder = -2e3;
 // level objects
 let players=[], playerLives, tileLayer, tileBackgroundLayer, totalKills;
 let playerEquippedWeapons = []; // Store equipped weapon type per player index (persists through respawn)
+let playerWardrobeSuits = []; // Store wardrobe suit indices per player index (persists through respawn and unequip)
 
 // level settings
 let levelSize, level, levelSeed, levelEnemyCount, levelWarmup;
