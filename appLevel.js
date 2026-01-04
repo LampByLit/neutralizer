@@ -1854,9 +1854,9 @@ function nextLevel()
     respawnSurvivingGirls(checkpointPos);
     spawnGirls(checkpointPos);
     
-    // spawn boys (surviving boys from previous level + 1 new one)
+    // spawn boys (surviving boys from previous level only - no new spawns at level start)
     respawnSurvivingBoys(checkpointPos);
-    spawnBoys(checkpointPos);
+    // spawnBoys(checkpointPos); // Removed - boys now only spawn during transmutation
     
     // CRITICAL VERIFICATION: Ensure level 4 has at least 1 girl (guaranteed spawn)
     if (level == 4)

@@ -791,7 +791,7 @@ engineInit(
         
         mainContext.fillText('LOGINS ' + securedCheckpoints + '/' + totalCheckpoints, hudX, hudY + lineHeight * 5);
         mainContext.fillText('CALCULATORS ' + destroyedComputers + '/' + totalComputers, hudX, hudY + lineHeight * 6);
-        mainContext.fillText('PUSSYBOMB ' + destroyedPussybombs + '/1', hudX, hudY + lineHeight * 7);
+        mainContext.fillText('PUSSYBOMB ' + Math.min(destroyedPussybombs, 1) + '/1', hudX, hudY + lineHeight * 7);
 
         // fade in level transition
         const fade = levelEndTimer.isSet() ? percent(levelEndTimer.get(), 3, 1) : percent(levelTimer.get(), .5, 2);

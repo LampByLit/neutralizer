@@ -3630,6 +3630,11 @@ class Computer extends GameObject
                             {
                                 const newBoy = new Boy(transformPos);
                                 // Boys spawn at full health automatically
+                                // Add to survivingBoys array so it persists across levels
+                                if (typeof survivingBoys !== 'undefined')
+                                {
+                                    survivingBoys.push(newBoy);
+                                }
                             }
                             
                             // Destroy the girl
@@ -3704,6 +3709,11 @@ class Computer extends GameObject
                         {
                             const newBoy = new Boy(transformPos);
                             // Boys spawn at full health automatically
+                            // Add to survivingBoys array so it persists across levels
+                            if (typeof survivingBoys !== 'undefined')
+                            {
+                                survivingBoys.push(newBoy);
+                            }
                         }
                         
                         // Destroy the terminal
