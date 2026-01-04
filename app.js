@@ -453,25 +453,21 @@ engineInit(
         // Draw animated GIF background (day or night) with parallax
         if (levelBackgroundGif && levelBackgroundGif.complete && levelBackgroundGif.width > 0)
         {
-            // Calculate maximum possible parallax offset (reduced buffer for better performance)
-            // Max level width is 400 tiles, parallax speed is 0.1, so max offset is ~40 tiles
-            // Convert to screen pixels: 40 * cameraScale, but reduce buffer to save memory
-            const maxParallaxOffsetPixels = levelSize.x * 0.1 * cameraScale * 0.5; // Reduced buffer by 50%
-            
             // Scale GIF to cover entire canvas while maintaining aspect ratio
+            // Always ensure full coverage with safe buffer
             const gifAspect = levelBackgroundGif.width / levelBackgroundGif.height;
             const canvasAspect = mainCanvas.width / mainCanvas.height;
             
-            // Calculate base size to cover canvas, then add reduced buffer for parallax
-            // Need to cover canvas + max parallax offset in both directions
+            // Calculate size to cover canvas with safe buffer (20% extra on each side)
+            const safeBuffer = 0.2; // 20% buffer to ensure no black shows
             let drawWidth, drawHeight;
             if (gifAspect > canvasAspect)
             {
-                // GIF is wider - scale to cover width + parallax buffer
-                drawWidth = mainCanvas.width + maxParallaxOffsetPixels * 2; // Buffer on both sides
+                // GIF is wider - scale to cover width with buffer
+                drawWidth = mainCanvas.width * (1 + safeBuffer * 2);
                 drawHeight = drawWidth / gifAspect;
-                // Make sure height also covers canvas + parallax
-                const minHeight = mainCanvas.height + maxParallaxOffsetPixels * 2;
+                // Make sure height also covers canvas with buffer
+                const minHeight = mainCanvas.height * (1 + safeBuffer * 2);
                 if (drawHeight < minHeight)
                 {
                     drawHeight = minHeight;
@@ -480,11 +476,11 @@ engineInit(
             }
             else
             {
-                // GIF is taller - scale to cover height + parallax buffer
-                drawHeight = mainCanvas.height + maxParallaxOffsetPixels * 2; // Buffer on both sides
+                // GIF is taller - scale to cover height with buffer
+                drawHeight = mainCanvas.height * (1 + safeBuffer * 2);
                 drawWidth = drawHeight * gifAspect;
-                // Make sure width also covers canvas + parallax
-                const minWidth = mainCanvas.width + maxParallaxOffsetPixels * 2;
+                // Make sure width also covers canvas with buffer
+                const minWidth = mainCanvas.width * (1 + safeBuffer * 2);
                 if (drawWidth < minWidth)
                 {
                     drawWidth = minWidth;
@@ -492,17 +488,32 @@ engineInit(
                 }
             }
             
-            // Apply parallax offset (convert world coordinates to screen pixels)
-            // Parallax offset is in world units, convert to screen pixels
-            const parallaxX = backgroundParallaxOffset.x * cameraScale;
-            const parallaxY = -backgroundParallaxOffset.y * cameraScale; // Negate Y because screen Y is inverted
+            // Center background on screen (camera view)
+            const screenCenterX = mainCanvas.width / 2;
+            const screenCenterY = mainCanvas.height / 2;
             
-            // Center the background and apply parallax
-            const drawX = (mainCanvas.width - drawWidth) / 2 + parallaxX;
-            const drawY = (mainCanvas.height - drawHeight) / 2 + parallaxY;
+            // Apply clamped parallax offset (convert world coordinates to screen pixels)
+            // Clamp parallax to ensure background never moves outside visible bounds
+            // Max parallax is limited to a small percentage of canvas size
+            const maxParallaxPixels = Math.min(mainCanvas.width, mainCanvas.height) * 0.15; // Max 15% of smaller dimension
+            const parallaxX = Math.max(-maxParallaxPixels, Math.min(maxParallaxPixels, backgroundParallaxOffset.x * cameraScale));
+            const parallaxY = Math.max(-maxParallaxPixels, Math.min(maxParallaxPixels, -backgroundParallaxOffset.y * cameraScale)); // Negate Y because screen Y is inverted
+            
+            // Position background centered on screen with parallax offset
+            let drawX = screenCenterX - drawWidth / 2 + parallaxX;
+            let drawY = screenCenterY - drawHeight / 2 + parallaxY;
+            
+            // Clamp position to ensure background always covers entire canvas (no black visible)
+            // Background must extend at least to edges of canvas
+            const minX = -drawWidth + mainCanvas.width;
+            const maxX = 0;
+            const minY = -drawHeight + mainCanvas.height;
+            const maxY = 0;
+            drawX = Math.max(minX, Math.min(maxX, drawX));
+            drawY = Math.max(minY, Math.min(maxY, drawY));
             
             // Draw the animated GIF (it will animate because it's an img element in the DOM)
-            mainContext.drawImage(levelBackgroundGif, drawX, drawY, drawWidth, drawHeight);
+            mainContext.drawImage(levelBackgroundGif, clampedX, clampedY, drawWidth, drawHeight);
         }
         else
         {
