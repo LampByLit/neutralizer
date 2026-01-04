@@ -230,9 +230,26 @@ class Boy extends Character
         }
         // else: He's at a good distance, just stay put
         
-        // Vertical movement for ladders only
-        if (abs(toPlayer.y) > 3 && this.climbingLadder)
+        // Ladder detection and climbing
+        // Check if we're near a ladder (same logic as Character class)
+        let touchingLadder = 0;
+        for(let y=2;y--;)
+        {
+            const testPos = this.pos.add(vec2(0, y - this.size.y*.5));
+            const collisionData = getTileCollisionData(testPos);
+            touchingLadder |= collisionData == tileType_ladder;
+        }
+        
+        // If player is significantly above or below and we're near a ladder, set vertical movement to climb
+        if (abs(toPlayer.y) > 3 && touchingLadder)
+        {
             this.moveInput.y = sign(toPlayer.y) * 0.5;
+        }
+        // Continue climbing if already on ladder
+        else if (abs(toPlayer.y) > 3 && this.climbingLadder)
+        {
+            this.moveInput.y = sign(toPlayer.y) * 0.5;
+        }
 
         // ========== OBSTACLE DETECTION & JUMPING ==========
         // Walk on foot when possible, but jump when needed to navigate
