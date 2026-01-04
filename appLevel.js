@@ -66,6 +66,17 @@ const resetGame=()=>
     gameState = 'playing';
     survivingGirls = []; // Clear girls on game reset
     survivingBoys = []; // Clear boys on game reset (boys only come from transmutation)
+    
+    // Destroy any boy objects that might exist in engineObjects (prevents boys from previous sessions)
+    if (typeof engineObjects !== 'undefined')
+    {
+        for(const o of engineObjects)
+        {
+            if (o && o.isBoy && !o.destroyed)
+                o.destroy();
+        }
+    }
+    
     nextLevel();
 }
 
