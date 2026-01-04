@@ -38,11 +38,11 @@ let gameState = 'title'; // game states: 'title', 'playing', 'gameOver', 'win'
 
 // level enemy limits: [maxEnemies, maxSlimes, maxBastards, maxMalefactors, maxFoes, maxSpiders, maxSpiderlings, maxBarristers, maxSolicitors]
 const levelLimits = {
-    1: [20, 1, 0, 0, 0, 1, 0, 0, 0, 0],  // Level 1: 1 spider boss, 0 barristers, 0 solicitors, 0 prosecutors
-    2: [40, 3, 0, 0, 0, 0, 3, 1, 1, 0],  // Level 2: max 3 spiderlings, 1 barrister, 1 solicitor, 0 prosecutors
-    3: [50, 10, 15, 0, 0, 0, 5, 0, 0, 1],  // Level 3: max 5 spiderlings, 0 barristers, 0 solicitors, 1 prosecutor
-    4: [30, 0, 28, 1, 0, 1, 0, 0, 0, 1],  // Level 4: 30 total (1 malefactor, 1 spider, 28 bastards), 0 barristers, 0 solicitors, 1 prosecutor
-    5: [60, 20, 15, 10, 1, 0, 8, 1, 1, 1],  // Level 5: 60 enemies total, including 10 malefactors, 1 foe, and 8 spiderlings, 1 barrister, 1 solicitor, 1 prosecutor
+    1: [10, 1, 0, 0, 0, 1, 0, 0, 0, 0],  // Level 1: 1 spider boss, 0 barristers, 0 solicitors, 0 prosecutors (reduced from 20 to 10)
+    2: [30, 3, 0, 0, 0, 0, 3, 1, 1, 0],  // Level 2: max 3 spiderlings, 1 barrister, 1 solicitor, 0 prosecutors (reduced from 40 to 30)
+    3: [40, 10, 15, 0, 0, 0, 5, 0, 0, 1],  // Level 3: max 5 spiderlings, 0 barristers, 0 solicitors, 1 prosecutor (reduced from 50 to 40)
+    4: [20, 0, 18, 1, 0, 1, 0, 0, 0, 1],  // Level 4: 20 total (1 malefactor, 1 spider, 18 bastards, 1 prosecutor) - reduced from 30 to 20, bastards reduced from 28 to 18
+    5: [50, 20, 15, 10, 1, 0, 8, 1, 1, 1],  // Level 5: 50 enemies total, including 10 malefactors, 1 foe, and 8 spiderlings, 1 barrister, 1 solicitor, 1 prosecutor (reduced from 60 to 50)
 };
 let levelMaxEnemies, levelMaxSlimes, levelMaxBastards, levelMaxMalefactors, levelMaxFoes, levelMaxSpiders, levelMaxSpiderlings, levelMaxBarristers, levelMaxSolicitors, levelMaxProsecutors;
 let totalEnemiesSpawned, totalSlimesSpawned, totalBastardsSpawned, totalMalefactorsSpawned, totalFoesSpawned, totalSpidersSpawned, totalSpiderlingsSpawned, totalBarristersSpawned, totalSolicitorsSpawned, totalProsecutorsSpawned;
@@ -65,6 +65,7 @@ const resetGame=()=>
     level = selectedLevel - 1; // Start at selected level (nextLevel increments it)
     gameState = 'playing';
     survivingGirls = []; // Clear girls on game reset
+    survivingBoys = []; // Clear boys on game reset (boys only come from transmutation)
     nextLevel();
 }
 
@@ -540,7 +541,7 @@ function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefact
         // spawn random enemies and props (level 4 skips this, it only has malefactors)
     if (level != 4)
     {
-        for(let i=20;totalEnemiesSpawnedRef.value < levelMaxEnemies && i--;)
+        for(let i=15;totalEnemiesSpawnedRef.value < levelMaxEnemies && i--;) // Reduced from 20 to 15 attempts for better performance
         {
             const pos = vec2(floorBottomCenterPos.x + randSeeded(99, -99), levelSize.y);
             raycastHit = tileCollisionRaycast(pos, vec2(pos.x, 0));
@@ -1379,7 +1380,7 @@ function applyArtToLevel()
             );
             skyParticles.elasticity = .2;
             skyParticles.trailScale = 2;
-            skyParticles.emitRate = 800; // Heavy rain for level 1
+            skyParticles.emitRate = 200; // Reduced rain rate for better performance
             skyParticles.angle = PI+rand(.5,-.5);
         }
         else
@@ -1413,7 +1414,9 @@ function applyArtToLevel()
                     .5, 1              // randomness, collide, additive, randomColorLinear, renderOrder
                 );
             }
-            skyParticles.emitRate = precipitationEnable && rand()<.5 ? rand(500) : 0;
+            // Reduced precipitation rate: 60% chance of precipitation, with rate between 100-200 (reduced from 0-500)
+            // This ensures snow still appears while improving performance
+            skyParticles.emitRate = precipitationEnable && rand()<.6 ? rand(200, 100) : 0;
             skyParticles.angle = PI+rand(.5,-.5);
         }
     }
