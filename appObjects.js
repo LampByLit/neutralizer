@@ -408,7 +408,7 @@ class Prop extends GameObject
         }
         else if (this.type == propType_node1)
         {
-            this.tileIndex = 1; // Tile index 1 from tiles.png
+            this.tileIndex = 28; // Tile index 28 from tiles.png
             this.tileSize = vec2(16); // tiles.png uses 16x16 tiles
             this.color = new Color(1,1,1); // White/default color
             this.baseColor = new Color(1,1,1); // Store base color for dark tint
@@ -878,7 +878,7 @@ class Prop extends GameObject
         {
             // Modem uses drawTile (tiles.png) with tile index 31
             // CPU uses drawTile (tiles.png) with tile index 27
-            // Node1 uses drawTile (tiles.png) with tile index 1
+            // Node1 uses drawTile (tiles.png) with tile index 28
             // Apply dark tint if destroyed with sound sequence
             let renderColor = this.color.scale(this.burnColorPercent(),1);
             if (this.isDestroyedWithDarkTint)
