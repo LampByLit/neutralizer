@@ -4477,9 +4477,10 @@ class Mosquito extends Enemy
             return;
         
         const sizeScale = this.sizeScale;
-        // Use color directly without burn scaling to avoid any tint
-        const color = this.color;
-        const eyeColor = this.eyeColor;
+        // Use pure white color directly (no tint, no burn scaling)
+        // Create new Color objects to ensure they're always valid and within 0-1 range
+        const color = new Color(1, 1, 1);
+        const eyeColor = new Color(0.8, 0.6, 0.4);
         
         // Choose sprite based on state
         let bodyTileIndex;
