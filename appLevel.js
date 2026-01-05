@@ -39,7 +39,7 @@ let gameState = 'title'; // game states: 'title', 'playing', 'gameOver', 'win'
 // level enemy limits: [maxEnemies, maxSlimes, maxBastards, maxMalefactors, maxFoes, maxSpiders, maxSpiderlings, maxBarristers, maxSolicitors, maxProsecutors, maxMosquitoes]
 const levelLimits = {
     1: [15, 1, 0, 0, 0, 1, 0, 0, 0, 0, 2],  // Level 1: 1 spider boss, 0 barristers, 0 solicitors, 0 prosecutors, 2 mosquitoes (increased from 10 to 15)
-    2: [30, 3, 0, 0, 0, 0, 3, 1, 1, 0, 2],  // Level 2: max 3 spiderlings, 1 barrister, 1 solicitor, 0 prosecutors, 2 mosquitoes (reduced from 40 to 30)
+    2: [40, 3, 0, 0, 0, 0, 3, 1, 1, 0, 2],  // Level 2: max 3 spiderlings, 1 barrister, 1 solicitor, 0 prosecutors, 2 mosquitoes (increased to 40 for larger buildings)
     3: [40, 10, 15, 0, 0, 0, 5, 0, 0, 1, 2],  // Level 3: max 5 spiderlings, 0 barristers, 0 solicitors, 1 prosecutor, 2 mosquitoes (reduced from 50 to 40)
     4: [20, 0, 18, 1, 0, 1, 0, 0, 0, 1, 2],  // Level 4: 20 total (1 malefactor, 1 spider, 18 bastards, 1 prosecutor, 2 mosquitoes) - reduced from 30 to 20, bastards reduced from 28 to 18
     5: [50, 20, 15, 10, 1, 0, 8, 1, 1, 1, 2],  // Level 5: 50 enemies total, including 10 malefactors, 1 foe, and 8 spiderlings, 1 barrister, 1 solicitor, 1 prosecutor, 2 mosquitoes (reduced from 60 to 50)
@@ -243,9 +243,28 @@ function buildBase(totalSlimesSpawnedRef, totalBastardsSpawnedRef, totalMalefact
 
     const cave = rand() < .5;
     const baseBottomCenterPos = raycastHit.int();
-    const baseSize = randSeeded(20,9)|0;
-    const baseFloors = cave? 1 : randSeeded(6,1)|0;
-    const basementFloors = randSeeded(cave?7:4, 0)|0;
+    // Level 2: larger buildings and caves for more impressive structures
+    let baseSize, baseFloors, basementFloors;
+    if (level == 2)
+    {
+        baseSize = randSeeded(28,18)|0; // Wider buildings: 18-28 tiles (was 9-20)
+        if (cave)
+        {
+            baseFloors = 1; // Caves still single floor above ground
+            basementFloors = randSeeded(9,3)|0; // Deeper caves: 3-9 basement floors (was 0-7)
+        }
+        else
+        {
+            baseFloors = randSeeded(8,4)|0; // More floors: 4-8 floors (was 1-6)
+            basementFloors = randSeeded(6,2)|0; // More basements: 2-6 basement floors (was 0-4)
+        }
+    }
+    else
+    {
+        baseSize = randSeeded(20,9)|0;
+        baseFloors = cave? 1 : randSeeded(6,1)|0;
+        basementFloors = randSeeded(cave?7:4, 0)|0;
+    }
     let floorBottomCenterPos = baseBottomCenterPos.subtract(vec2(0,basementFloors*6));
     floorBottomCenterPos.y = max(floorBottomCenterPos.y, 9); // prevent going through bottom
 
