@@ -4055,7 +4055,7 @@ class Mosquito extends Enemy
         
         // Flicker animation timer (for flying animation)
         this.flickerTimer = new Timer;
-        this.flickerTimer.set(0.1); // Flicker every 0.1 seconds (10 times per second)
+        this.flickerTimer.set(0.2); // Flicker every 0.2 seconds (5 times per second)
         this.flickerState = 0; // 0 = fly tile, 1 = stand tile
         
         // Remove weapon - mosquito is melee only
@@ -4487,7 +4487,7 @@ class Mosquito extends Enemy
             // Flicker animation during flight - alternate between fly and stand sprites
             if (this.flickerTimer.elapsed())
             {
-                this.flickerTimer.set(0.1); // Reset timer (flicker every 0.1 seconds)
+                this.flickerTimer.set(0.2); // Reset timer (flicker every 0.2 seconds)
                 this.flickerState = 1 - this.flickerState; // Toggle between 0 and 1
             }
             // Use fly tile when flickerState is 0, stand tile when flickerState is 1
