@@ -4477,14 +4477,22 @@ class Mosquito extends Enemy
             return;
         
         const sizeScale = this.sizeScale;
-        const color = this.color.scale(this.burnColorPercent(), 1);
-        const eyeColor = this.eyeColor.scale(this.burnColorPercent(), 1);
+        // Use color directly without burn scaling to avoid any tint
+        const color = this.color;
+        const eyeColor = this.eyeColor;
         
         // Choose sprite based on state
         let bodyTileIndex;
-        if (this.isFlying)
+        
+        // Dead mosquitoes always use stand tile (no animation)
+        if (this.isDead())
+        {
+            bodyTileIndex = this.mosquitoStandTile;
+        }
+        else if (this.isFlying)
         {
             // Flicker animation during flight - alternate between fly and stand sprites
+            // Only update flicker when flying AND not dead
             if (this.flickerTimer.elapsed())
             {
                 this.flickerTimer.set(0.2); // Reset timer (flicker every 0.2 seconds)
@@ -4495,7 +4503,7 @@ class Mosquito extends Enemy
         }
         else
         {
-            // Standing - always use stand tile
+            // Standing - always use stand tile (no animation)
             bodyTileIndex = this.mosquitoStandTile;
         }
         
