@@ -1373,8 +1373,9 @@ class Weapon extends EngineObject
         // When mirrored (facing left), the engine will negate the angle again, so we need to account for that
         const spriteAngle = -baseAimAngle * this.getMirrorSign();
 
-        // melee animation - gun moves forward (negate getMirrorSign so it always swings forward)
-        const meleeAngleOffset = this.parent.meleeTimer && this.parent.meleeTimer.active() ? 1.2 * Math.sin(this.parent.meleeTimer.getPercent() * PI) * -this.getMirrorSign() : 0;
+        // melee animation - gun moves forward
+        // Use parent's mirror sign to match extension direction
+        const meleeAngleOffset = this.parent.meleeTimer && this.parent.meleeTimer.active() ? 1.2 * Math.sin(this.parent.meleeTimer.getPercent() * PI) * this.parent.getMirrorSign() : 0;
         const meleeExtendOffset = this.parent.meleeTimer && this.parent.meleeTimer.active() ? .6 * Math.sin(this.parent.meleeTimer.getPercent() * PI) : 0;
 
         // extend weapon forward during melee
