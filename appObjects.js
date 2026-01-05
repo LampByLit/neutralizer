@@ -493,7 +493,7 @@ class Prop extends GameObject
                 // Mark as destroyed for level completion
                 this.pussybombDestroyed = true;
                 // Explode! (weaker force pushback)
-                explosion(this.pos, 35, true, 0.3); // Massive explosion radius, 35% force strength
+                explosion(this.pos, 25, true, 0.3); // Massive explosion radius, 35% force strength
                 this.destroy();
                 return;
             }
@@ -4339,9 +4339,9 @@ class Bell extends GameObject
         ];
         
         // Initialize looping bell sound
-        this.bellSoundSource = null;
         this.bellSoundGain = null;
         this.availableSounds = []; // Will be calculated based on intact tiles
+        this.bellSoundTimer = new Timer(0.1); // Play sound every 0.1 seconds
         this.initBellSound();
     }
     
@@ -4378,30 +4378,15 @@ class Bell extends GameObject
             this.bellSoundGain.connect(audioContext.destination);
         }
         
-        // Stop previous sound if playing
-        if (this.bellSoundSource)
-        {
-            try {
-                this.bellSoundSource.stop();
-            } catch(e) {} // Ignore if already stopped
-        }
-        
-        // Create and start new source (no loop - will play next when this ends)
-        this.bellSoundSource = audioContext.createBufferSource();
-        this.bellSoundSource.buffer = buffer;
-        this.bellSoundSource.loop = false;
-        this.bellSoundSource.connect(this.bellSoundGain);
-        
-        // When sound ends, play next random sound
-        this.bellSoundSource.onended = () => {
-            if (!this.bellDestroyed)
-                this.playNextRandomSound();
-        };
-        
-        this.bellSoundSource.start();
+        // Create and start new source (multiple sounds can play simultaneously)
+        const bellSoundSource = audioContext.createBufferSource();
+        bellSoundSource.buffer = buffer;
+        bellSoundSource.loop = false;
+        bellSoundSource.connect(this.bellSoundGain);
+        bellSoundSource.start();
         
         // Volume will be updated in update() based on distance
-        this.bellSoundGain.gain.value = 0;
+        // Note: We can't set volume per source when using gain node, so volume applies to all sounds
     }
     
     initBellSound()
@@ -4413,21 +4398,12 @@ class Bell extends GameObject
         
         if (this.availableSounds.length === 0) return;
         
-        // Start playing random sounds
-        this.playNextRandomSound();
+        // Start timer for playing sounds every 0.1 seconds
+        this.bellSoundTimer.set();
     }
     
     stopBellSound()
     {
-        if (this.bellSoundSource)
-        {
-            // Clear onended handler to prevent next sound from playing
-            this.bellSoundSource.onended = null;
-            try {
-                this.bellSoundSource.stop();
-            } catch(e) {} // Ignore if already stopped
-            this.bellSoundSource = null;
-        }
         if (this.bellSoundGain)
         {
             try {
@@ -4435,14 +4411,23 @@ class Bell extends GameObject
             } catch(e) {} // Ignore if already disconnected
             this.bellSoundGain = null;
         }
+        // Reset timer
+        this.bellSoundTimer.unset();
     }
     
     update()
     {
         super.update();
         
+        // Play sound every 0.1 seconds
+        if (!this.bellDestroyed && this.bellSoundTimer.get() >= 0.1)
+        {
+            this.bellSoundTimer.set(); // Reset timer
+            this.playNextRandomSound();
+        }
+        
         // Update bell sound volume based on distance to player
-        if (this.bellSoundSource && this.bellSoundGain && !this.bellDestroyed)
+        if (this.bellSoundGain && !this.bellDestroyed)
         {
             // Get player position (single player for now)
             const player = players[0];
@@ -4469,7 +4454,7 @@ class Bell extends GameObject
         }
         
         // Stop sound if bell is destroyed
-        if (this.bellDestroyed && this.bellSoundSource)
+        if (this.bellDestroyed)
         {
             this.stopBellSound();
         }
