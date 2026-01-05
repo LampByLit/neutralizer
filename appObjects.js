@@ -3612,39 +3612,101 @@ class Computer extends GameObject
         // Add to global array
         allComputers.push(this);
         
+        // Define all 6 computer sounds
+        this.computerSounds = [
+            [,,50,.07,1,.002,3,2.1,,,-451,1,,1,27,,,.96,.3],
+            [,,485,.02,.01,.04,,.9,-14,,221,1.07,.02,,,,,.95,.01],
+            [,,486,.01,.01,.04,5,.9,-14,,271,1.08,.02,,,,,1.05,.01],
+            [,,488,.01,.02,.05,5,.9,-14,,221,1.08,.02,-0.1,1,-0.1,.01,1.05],
+            [,,488,.01,.02,.05,5,.9,-13.9,,221,1.07,.02,-0.1,1,-0.1,.02,1.05],
+            [.8,,612,.34,.5,.38,,.6,,-2,,,,,,,,.78,.21,.4,-695]
+        ];
+        
         // Initialize looping computer sound
         this.computerSoundSource = null;
         this.computerSoundGain = null;
+        this.availableSounds = []; // Will be calculated based on intact tiles
         this.initComputerSound();
+    }
+    
+    // Calculate how many sounds are available based on intact tiles
+    getAvailableSounds()
+    {
+        const intactTiles = this.tileStates.filter(t => !t).length;
+        // Map: 16 tiles → 6 sounds, 12 → 4, 8 → 3, 4 → 1
+        const maxSounds = Math.max(1, Math.floor(intactTiles / 2.67));
+        return this.computerSounds.slice(0, maxSounds);
+    }
+    
+    // Play next random sound from available pool
+    playNextRandomSound()
+    {
+        if (!soundEnable || !hadInput || this.computerDestroyed) return;
+        
+        // Recalculate available sounds based on current tile state
+        this.availableSounds = this.getAvailableSounds();
+        
+        if (this.availableSounds.length === 0) return;
+        
+        // Pick random sound from available pool
+        const randomSound = this.availableSounds[rand(this.availableSounds.length)|0];
+        
+        // Create buffer for the selected sound
+        const buffer = createZzfxBuffer(randomSound);
+        if (!buffer || !audioContext) return;
+        
+        // Create gain node if it doesn't exist
+        if (!this.computerSoundGain)
+        {
+            this.computerSoundGain = audioContext.createGain();
+            this.computerSoundGain.connect(audioContext.destination);
+        }
+        
+        // Stop previous sound if playing
+        if (this.computerSoundSource)
+        {
+            try {
+                this.computerSoundSource.stop();
+            } catch(e) {} // Ignore if already stopped
+        }
+        
+        // Create and start new source (no loop - will play next when this ends)
+        this.computerSoundSource = audioContext.createBufferSource();
+        this.computerSoundSource.buffer = buffer;
+        this.computerSoundSource.loop = false;
+        this.computerSoundSource.connect(this.computerSoundGain);
+        
+        // When sound ends, play next random sound
+        this.computerSoundSource.onended = () => {
+            if (!this.computerDestroyed)
+                this.playNextRandomSound();
+        };
+        
+        this.computerSoundSource.start();
+        
+        // Volume will be updated in update() based on distance
+        this.computerSoundGain.gain.value = 0;
     }
     
     initComputerSound()
     {
         if (!soundEnable || !hadInput) return;
         
-        // Create buffer for computer sound (this will also initialize audioContext if needed)
-        const buffer = createZzfxBuffer(sound_computer);
-        if (!buffer || !audioContext) return;
+        // Calculate available sounds based on intact tiles
+        this.availableSounds = this.getAvailableSounds();
         
-        // Create gain node for volume control
-        this.computerSoundGain = audioContext.createGain();
-        this.computerSoundGain.connect(audioContext.destination);
+        if (this.availableSounds.length === 0) return;
         
-        // Create and start looping source
-        this.computerSoundSource = audioContext.createBufferSource();
-        this.computerSoundSource.buffer = buffer;
-        this.computerSoundSource.loop = true;
-        this.computerSoundSource.connect(this.computerSoundGain);
-        this.computerSoundSource.start();
-        
-        // Start with volume 0, will be updated in update()
-        this.computerSoundGain.gain.value = 0;
+        // Start playing random sounds
+        this.playNextRandomSound();
     }
     
     stopComputerSound()
     {
         if (this.computerSoundSource)
         {
+            // Clear onended handler to prevent next sound from playing
+            this.computerSoundSource.onended = null;
             try {
                 this.computerSoundSource.stop();
             } catch(e) {} // Ignore if already stopped
@@ -3951,6 +4013,12 @@ class Computer extends GameObject
         if (allDestroyed)
         {
             this.computerDestroyed = true;
+        }
+        else
+        {
+            // Recalculate available sounds when tiles are destroyed
+            // Current sound will finish, next sound will use updated pool
+            this.availableSounds = this.getAvailableSounds();
         }
     }
     
