@@ -480,6 +480,60 @@ function destroyTile(pos, makeSound = 1, cleanNeighbors = 1, maxCascadeChance = 
         // Fall through to normal destruction
     }
     
+    // Check if this is a bell tile
+    const isBellTile = (tileType == tileType_bell);
+    
+    // Handle bell tiles specially - they have health (same as computer)
+    if (isBellTile)
+    {
+        // Find the bell that contains this tile
+        for(const bell of allBells)
+        {
+            if (bell && !bell.destroyed)
+            {
+                for(let i = 0; i < bell.tilePositions.length; i++)
+                {
+                    const tilePos = bell.tilePositions[i];
+                    if (tilePos.x == pos.x && tilePos.y == pos.y)
+                    {
+                        // This tile belongs to this bell
+                        // Reduce health instead of destroying immediately
+                        if (bell.tileHealth[i] > 0)
+                        {
+                            bell.tileHealth[i]--;
+                            
+                            // Visual feedback for damage
+                            const centerPos = pos.add(vec2(.5));
+                            makeDebris(centerPos, new Color(1, 1, 0.5).mutate());
+                            makeSound && playSound(sound_destroyTile, centerPos);
+                            
+                            // Only destroy if health reaches 0
+                            if (bell.tileHealth[i] <= 0)
+                            {
+                                // Actually destroy the tile
+                                setTileCollisionData(pos, tileType_empty);
+                                if (tileLayer)
+                                {
+                                    const layerData = tileLayer.getData(pos);
+                                    if (layerData)
+                                    {
+                                        tileLayer.setData(pos, new TileLayerData, 1); // set and clear tile
+                                    }
+                                }
+                                
+                                bell.tileStates[i] = true;
+                                bell.onTileDestroyed(i);
+                            }
+                        }
+                        return 1; // Return success (handled)
+                    }
+                }
+            }
+        }
+        // If we get here, it's a bell tile but we couldn't find the bell
+        // Fall through to normal destruction
+    }
+    
     const centerPos = pos.add(vec2(.5));
     const layerData = tileLayer.getData(pos);
     if (layerData)
@@ -509,7 +563,7 @@ function destroyTile(pos, makeSound = 1, cleanNeighbors = 1, maxCascadeChance = 
                 if (getTileCollisionData(pos.add(vec2(0,-1))) == tileType)
                     new TileCascadeDestroy(pos.add(vec2(0,-1)), 1, 1, cascadeDepth + 1);
             }
-            else if (tileType != tileType_dirt && tileType != tileType_computer)
+            else if (tileType != tileType_dirt && tileType != tileType_computer && tileType != tileType_bell)
                 maxCascadeChance = 0;
 
             if (rand() < maxCascadeChance && getTileCollisionData(pos.add(vec2(0,1))) == tileType)

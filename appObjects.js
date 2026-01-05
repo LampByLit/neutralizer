@@ -703,6 +703,7 @@ let checkpointPos, activeCheckpoint, checkpointTimer = new Timer;
 let allCheckpoints = []; // Track all checkpoints
 let allComputers = []; // Track all computers
 let allPussybombs = []; // Track all pussybombs
+let allBells = []; // Track all bells
 
 class Checkpoint extends GameObject 
 {
@@ -4250,6 +4251,411 @@ class Computer extends GameObject
         const index = allComputers.indexOf(this);
         if (index >= 0)
             allComputers.splice(index, 1);
+        
+        // Destroy tile particle emitters
+        for(const emitters of this.tileParticleEmitters)
+        {
+            if (emitters)
+            {
+                for(const emitter of emitters)
+                {
+                    if (emitter && !emitter.destroyed)
+                        emitter.destroy();
+                }
+            }
+        }
+        
+        super.destroy();
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class Bell extends GameObject
+{
+    constructor(pos)
+    {
+        // pos is the bottom-left corner of the 3x3 grid
+        super(pos.int().add(vec2(1.5, 1.5))); // Center position of 3x3 grid
+        this.isBell = 1;
+        this.bellDestroyed = false; // Track if bell is destroyed (separate from EngineObject.destroyed)
+        this.renderOrder = tileRenderOrder;
+        
+        // Store tile positions (3x3 grid = 9 tiles)
+        this.tilePositions = [];
+        this.tileIndices = []; // Store which sprite (13, 14, 15, or 16) for each tile
+        this.tileStates = []; // Track if each tile is broken (true = broken)
+        this.tileHealth = []; // Track health for each tile (2 health per tile)
+        this.tileParticleEmitters = []; // Store particle emitters for each destroyed tile
+        this.tileBaseColors = []; // Store base color (red only for bell)
+        this.tileColorOffsets = []; // Store time offset for each tile's color animation
+        
+        const bellTiles = [13, 15, 16]; // Available tiles from tiles2.png (exclude 14 - reserved for damaged tiles)
+        const gridSize = 3;
+        
+        // Create 3x3 grid of tiles
+        for(let x = 0; x < gridSize; x++)
+        {
+            for(let y = 0; y < gridSize; y++)
+            {
+                const tilePos = pos.int().add(vec2(x, y));
+                this.tilePositions.push(tilePos.copy());
+                
+                // Random tile from available bell tiles
+                const tileIndex = bellTiles[rand(bellTiles.length)|0];
+                this.tileIndices.push(tileIndex);
+                this.tileStates.push(false); // Not broken yet
+                this.tileHealth.push(2); // Each tile has 2 health
+                
+                // All tiles use red base color only
+                const baseColor = new Color(1, 0, 0); // Red
+                this.tileBaseColors.push(baseColor);
+                
+                // Random time offset for each tile so they change at different rates
+                this.tileColorOffsets.push(rand(100));
+                
+                // Set collision data - use tileType_bell
+                setTileCollisionData(tilePos, tileType_bell);
+                
+                // Set background tile 14 behind bell (will be revealed when destroyed)
+                setTileBackgroundData(tilePos, tileType_dirt); // Use dirt as placeholder, will be replaced with tile 14 visual
+            }
+        }
+        
+        // Add to global array
+        allBells.push(this);
+        
+        // Define all 9 bell sounds (comments removed)
+        this.bellSounds = [
+            [,0,261.6256,.04,.1,.15,1,1.3,,,,,,,,,,.72,.18,,-1092],
+            [.7,0,261.6256,.02,.1,.37,5,1.3926083284742605,,,,,,.3,,,.17,.32,.11,,103],
+            [.7,0,261.6256,.02,.1,.37,5,1.3926083284742605,,,,,,.3,,,.17,.32,.11,,103],
+            [.7,0,261.6256,.02,.1,.37,5,1.3926083284742605,,,,,,.3,,,.17,.32,.11,,103],
+            [,0,65.40639,.01,.1,.48,5,1.9,,,,,,.2,,,,.98,.05],
+            [.5,0,65.40639,.15,.1,.26,5,1.3057224126253033,,,,,,.3,,.1,,.81,.12,,766],
+            [.5,0,65.40639,.15,.1,.26,5,1.3057224126253033,,,,,,.3,,.1,,.81,.12,,766],
+            [.5,0,65.40639,.15,.1,.26,5,1.3057224126253033,,,,,,.3,,.1,,.81,.12,,766],
+            [2,0,65.40639,.02,.51,.46,2,1.3,,,,,,,,.1,.12,.4,.04]
+        ];
+        
+        // Initialize looping bell sound
+        this.bellSoundSource = null;
+        this.bellSoundGain = null;
+        this.availableSounds = []; // Will be calculated based on intact tiles
+        this.initBellSound();
+    }
+    
+    // Calculate how many sounds are available based on intact tiles
+    getAvailableSounds()
+    {
+        const intactTiles = this.tileStates.filter(t => !t).length;
+        // Map: 9 tiles → 9 sounds, 6 → 6, 3 → 3
+        const maxSounds = Math.max(1, Math.floor(intactTiles * 9 / 9));
+        return this.bellSounds.slice(0, maxSounds);
+    }
+    
+    // Play next random sound from available pool
+    playNextRandomSound()
+    {
+        if (!soundEnable || !hadInput || this.bellDestroyed) return;
+        
+        // Recalculate available sounds based on current tile state
+        this.availableSounds = this.getAvailableSounds();
+        
+        if (this.availableSounds.length === 0) return;
+        
+        // Pick random sound from available pool
+        const randomSound = this.availableSounds[rand(this.availableSounds.length)|0];
+        
+        // Create buffer for the selected sound
+        const buffer = createZzfxBuffer(randomSound);
+        if (!buffer || !audioContext) return;
+        
+        // Create gain node if it doesn't exist
+        if (!this.bellSoundGain)
+        {
+            this.bellSoundGain = audioContext.createGain();
+            this.bellSoundGain.connect(audioContext.destination);
+        }
+        
+        // Stop previous sound if playing
+        if (this.bellSoundSource)
+        {
+            try {
+                this.bellSoundSource.stop();
+            } catch(e) {} // Ignore if already stopped
+        }
+        
+        // Create and start new source (no loop - will play next when this ends)
+        this.bellSoundSource = audioContext.createBufferSource();
+        this.bellSoundSource.buffer = buffer;
+        this.bellSoundSource.loop = false;
+        this.bellSoundSource.connect(this.bellSoundGain);
+        
+        // When sound ends, play next random sound
+        this.bellSoundSource.onended = () => {
+            if (!this.bellDestroyed)
+                this.playNextRandomSound();
+        };
+        
+        this.bellSoundSource.start();
+        
+        // Volume will be updated in update() based on distance
+        this.bellSoundGain.gain.value = 0;
+    }
+    
+    initBellSound()
+    {
+        if (!soundEnable || !hadInput) return;
+        
+        // Calculate available sounds based on intact tiles
+        this.availableSounds = this.getAvailableSounds();
+        
+        if (this.availableSounds.length === 0) return;
+        
+        // Start playing random sounds
+        this.playNextRandomSound();
+    }
+    
+    stopBellSound()
+    {
+        if (this.bellSoundSource)
+        {
+            // Clear onended handler to prevent next sound from playing
+            this.bellSoundSource.onended = null;
+            try {
+                this.bellSoundSource.stop();
+            } catch(e) {} // Ignore if already stopped
+            this.bellSoundSource = null;
+        }
+        if (this.bellSoundGain)
+        {
+            try {
+                this.bellSoundGain.disconnect();
+            } catch(e) {} // Ignore if already disconnected
+            this.bellSoundGain = null;
+        }
+    }
+    
+    update()
+    {
+        super.update();
+        
+        // Update bell sound volume based on distance to player
+        if (this.bellSoundSource && this.bellSoundGain && !this.bellDestroyed)
+        {
+            // Get player position (single player for now)
+            const player = players[0];
+            if (player && !player.isDead())
+            {
+                const distance = this.pos.distance(player.pos);
+                const maxDistance = 20; // Silent beyond 20 tiles (sound radius 20)
+                
+                if (distance <= maxDistance)
+                {
+                    // Linear volume: 1.0 at distance 0, 0.0 at distance 20
+                    const volume = 1.0 - (distance / maxDistance);
+                    this.bellSoundGain.gain.value = volume;
+                }
+                else
+                {
+                    this.bellSoundGain.gain.value = 0;
+                }
+            }
+            else
+            {
+                this.bellSoundGain.gain.value = 0;
+            }
+        }
+        
+        // Stop sound if bell is destroyed
+        if (this.bellDestroyed && this.bellSoundSource)
+        {
+            this.stopBellSound();
+        }
+        
+        // Check if any tile is broken
+        if (!this.bellDestroyed)
+        {
+            for(let i = 0; i < this.tilePositions.length; i++)
+            {
+                if (this.tileStates[i])
+                    continue; // Already destroyed
+                    
+                const tilePos = this.tilePositions[i];
+                const tileData = getTileCollisionData(tilePos);
+                
+                // If tile is no longer bell type, it's been destroyed
+                if (tileData != tileType_bell)
+                {
+                    this.tileStates[i] = true;
+                    this.onTileDestroyed(i);
+                }
+            }
+            
+            // No transmutation feature for bell
+        }
+    }
+    
+    onTileDestroyed(tileIndex)
+    {
+        const tilePos = this.tilePositions[tileIndex];
+        const centerPos = tilePos.add(vec2(0.5));
+        
+        // Play random destruction sound
+        const destroySound = sound_computerDestroy[rand(sound_computerDestroy.length)|0];
+        playSound(destroySound, centerPos);
+        
+        // Reveal tile 14 in background layer
+        // We need to set the background tile data and update the background layer
+        setTileBackgroundData(tilePos, tileType_dirt); // Use dirt type, but render as tile 14
+        
+        // Create spark particles
+        new ParticleEmitter(
+            centerPos, 0.3, 0.3, 200, PI, // pos, emitSize, emitTime, emitRate, emitCone
+            0, undefined, // tileIndex, tileSize
+            new Color(1, 1, 0.5, 0.9), new Color(1, 0.5, 0, 0.9), // colorStartA, colorStartB (yellow to orange)
+            new Color(1, 1, 0.5, 0), new Color(1, 0.5, 0, 0), // colorEndA, colorEndB (fade out)
+            0.5, 0.1, 0.05, 0.3, 0.1, // particleTime, sizeStart, sizeEnd, particleSpeed, particleAngleSpeed
+            0.95, 1, 0.2, PI, 0.3, // damping, angleDamping, gravityScale, particleCone, fadeRate
+            0.5, 0, 1, 0, 1e9 // randomness, collide, additive, randomColorLinear, renderOrder
+        );
+        
+        // Create smoke particles
+        new ParticleEmitter(
+            centerPos, 0.8, 0.8, 250, PI, // pos, emitSize, emitTime, emitRate, emitCone
+            0, undefined, // tileIndex, tileSize
+            new Color(0.2, 0.2, 0.2, 0.9), new Color(0.1, 0.1, 0.1, 0.7), // colorStartA, colorStartB (dark gray)
+            new Color(0.2, 0.2, 0.2, 0), new Color(0.1, 0.1, 0.1, 0), // colorEndA, colorEndB (fade out)
+            2.0, 0.3, 1.0, 0.1, 0.02, // particleTime, sizeStart, sizeEnd, particleSpeed, particleAngleSpeed
+            0.9, 1, -0.2, PI, 0.2, // damping, angleDamping, gravityScale (negative = rise), particleCone, fadeRate
+            0.4, 0, 0, 0, 1e8 // randomness, collide, additive, randomColorLinear, renderOrder
+        );
+        
+        // Create ongoing spark emitter for revealed tile (continuous)
+        const sparkEmitter = new ParticleEmitter(
+            centerPos, 0.1, 0, 10, PI * 0.5, // pos, emitSize, emitTime (0 = forever), emitRate, emitCone (upward)
+            0, undefined,
+            new Color(1, 1, 0.5, 0.6), new Color(1, 0.5, 0, 0.6),
+            new Color(1, 1, 0.5, 0), new Color(1, 0.5, 0, 0),
+            0.4, 0.05, 0.02, 0.15, 0.03,
+            0.95, 1, 0.1, PI * 0.5, 0.3,
+            0.3, 0, 1, 0, 1e9
+        );
+        
+        // Create ongoing smoke emitter for revealed tile (continuous)
+        const smokeEmitter = new ParticleEmitter(
+            centerPos, 0.4, 0, 20, PI * 0.5, // pos, emitSize, emitTime (0 = forever), emitRate, emitCone (upward)
+            0, undefined,
+            new Color(0.3, 0.3, 0.3, 0.6), new Color(0.1, 0.1, 0.1, 0.4),
+            new Color(0.3, 0.3, 0.3, 0), new Color(0.1, 0.1, 0.1, 0),
+            1.2, 0.2, 0.8, 0.06, 0.01,
+            0.9, 1, -0.15, PI * 0.5, 0.2,
+            0.3, 0, 0, 0, 1e8
+        );
+        
+        // Store emitters for this tile
+        this.tileParticleEmitters[tileIndex] = [sparkEmitter, smokeEmitter];
+        
+        // Check if all tiles are now destroyed
+        let allDestroyed = true;
+        for(let i = 0; i < this.tileStates.length; i++)
+        {
+            if (!this.tileStates[i])
+            {
+                allDestroyed = false;
+                break;
+            }
+        }
+        
+        // Only mark bell as destroyed when ALL tiles are destroyed
+        if (allDestroyed)
+        {
+            this.bellDestroyed = true;
+        }
+        else
+        {
+            // Recalculate available sounds when tiles are destroyed
+            // Current sound will finish, next sound will use updated pool
+            this.availableSounds = this.getAvailableSounds();
+        }
+    }
+    
+    render()
+    {
+        if (this.destroyed)
+            return;
+        
+        // Render each tile in the 3x3 grid
+        for(let i = 0; i < this.tilePositions.length; i++)
+        {
+            if (this.tileStates[i])
+                continue; // Skip broken tiles
+            
+            const tilePos = this.tilePositions[i];
+            const centerPos = tilePos.add(vec2(0.5));
+            const tileIndex = this.tileIndices[i];
+            
+            // Visual feedback for damaged tiles (health = 1)
+            let tileColor = new Color();
+            if (this.tileHealth[i] < 2)
+            {
+                // Damaged tile - slightly darker/reddish tint
+                tileColor = new Color(0.8, 0.7, 0.7); // Slight red tint when damaged
+            }
+            else
+            {
+                // Undamaged tile - slowly changing color animation (red only)
+                const baseColor = this.tileBaseColors[i];
+                const colorOffset = this.tileColorOffsets[i];
+                
+                // Slow color change using sine waves for smooth transitions
+                const colorSpeed = 0.5; // How fast colors change
+                const colorVariation = 0.3; // How much the color varies (0-1)
+                
+                // Create pulsing/changing color effect (red only)
+                const r = baseColor.r + colorVariation * Math.sin((time + colorOffset) * colorSpeed);
+                const g = baseColor.g; // Keep green at 0
+                const b = baseColor.b; // Keep blue at 0
+                
+                // Clamp values and ensure minimum brightness
+                tileColor = new Color(
+                    Math.max(0.4, Math.min(1.0, r)),
+                    Math.max(0.0, Math.min(0.0, g)),
+                    Math.max(0.0, Math.min(0.0, b))
+                );
+            }
+            
+            // Draw tile using drawTile2 (tiles2.png)
+            drawTile2(centerPos, vec2(1), tileIndex, vec2(16), tileColor, 0, 0);
+        }
+        
+        // Render revealed background tiles (tile 14) for destroyed bell tiles
+        for(let i = 0; i < this.tilePositions.length; i++)
+        {
+            if (!this.tileStates[i])
+                continue; // Only show background for broken tiles
+            
+            const tilePos = this.tilePositions[i];
+            const centerPos = tilePos.add(vec2(0.5));
+            
+            // Draw tile 14 from tiles2.png in background
+            drawTile2(centerPos, vec2(1), 14, vec2(16), new Color(), 0, 0);
+        }
+    }
+    
+    destroy()
+    {
+        if (this.destroyed)
+            return;
+        
+        // Stop bell sound
+        this.stopBellSound();
+        
+        // Remove from global array
+        const index = allBells.indexOf(this);
+        if (index >= 0)
+            allBells.splice(index, 1);
         
         // Destroy tile particle emitters
         for(const emitters of this.tileParticleEmitters)

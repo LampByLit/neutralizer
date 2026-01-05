@@ -17,6 +17,7 @@ const tileType_glass   = 6;
 const tileType_baseBack= 7;
 const tileType_window  = 8;
 const tileType_computer = 9;
+const tileType_bell = 10;
 
 const tileRenderOrder = -1e3;
 const tileBackgroundRenderOrder = -2e3;
@@ -1181,6 +1182,78 @@ function generateLevel()
         new Prop(pussybombPos, propType_rock_pussybomb);
     }
 
+    // spawn bell - one per level, at ground level in middle of map (opposite side from pussybomb, uses same ladder)
+    const bellX = levelSize.x / 2; // Middle of map (same X as pussybomb)
+    
+    // Find ground level at middle X position (where ladder starts)
+    const bellSurfaceTest = vec2(bellX, levelSize.y);
+    raycastHit = tileCollisionRaycast(bellSurfaceTest, vec2(bellX, 0));
+    
+    if (raycastHit)
+    {
+        const surfaceY = raycastHit.y; // Surface Y coordinate
+        const groundY = (surfaceY - 0.5) | 0; // Top of ground tile
+        
+        // Create a platform for the bell (similar to computer platform)
+        const bellPlatformWidth = 6; // 6 tiles wide platform (enough for 3x3 bell)
+        const bellPlatformHeight = 4; // 4 tiles tall clearance
+        const bellHalfWidth = bellPlatformWidth / 2;
+        const bellPlatformTop = groundY - bellPlatformHeight;
+        
+        // Clear the area above the platform (air space for the bell)
+        for(let x = bellX - bellHalfWidth; x <= bellX + bellHalfWidth; ++x)
+        {
+            for(let y = bellPlatformTop; y < groundY; ++y)
+            {
+                const pos = vec2(x, y);
+                if (pos.x >= 0 && pos.x < levelSize.x && pos.y >= 0 && pos.y < levelSize.y)
+                {
+                    setTileCollisionData(pos, tileType_empty);
+                    setTileBackgroundData(pos, tileType_empty);
+                }
+            }
+        }
+        
+        // Create the platform floor (solid ground)
+        for(let x = bellX - bellHalfWidth; x <= bellX + bellHalfWidth; ++x)
+        {
+            const pos = vec2(x, groundY);
+            if (pos.x >= 0 && pos.x < levelSize.x && pos.y >= 0 && pos.y < levelSize.y)
+            {
+                setTileCollisionData(pos, tileType_dirt);
+                setTileBackgroundData(pos, tileType_dirt);
+            }
+        }
+        
+        // Spawn the bell on top of the platform (bottom-left corner of 3x3 grid)
+        // Bell sits on top of the platform (one tile above platform)
+        // For 3x3 grid centered at bellX, bottom-left is bellX - 1
+        const bellBottomY = groundY - 1; // One tile above platform
+        const bellBottomLeft = vec2((bellX - 1)|0, bellBottomY);
+        
+        // Verify space is clear (should be after platform creation)
+        let hasSpace = true;
+        for(let x = 0; x < 3 && hasSpace; x++)
+        {
+            for(let y = 0; y < 3 && hasSpace; y++)
+            {
+                const checkPos = bellBottomLeft.add(vec2(x, y));
+                // Check if position is valid
+                if (checkPos.x < 0 || checkPos.x >= levelSize.x || 
+                    checkPos.y < 0 || checkPos.y >= levelSize.y)
+                {
+                    hasSpace = false;
+                    break;
+                }
+            }
+        }
+        
+        if (hasSpace)
+        {
+            new Bell(bellBottomLeft);
+        }
+    }
+
     // build checkpoints
     for(let x=0; x<levelSize.x-9; )
     {
@@ -1568,6 +1641,7 @@ function nextLevel()
     allCheckpoints = [];
     allComputers = []; // Clear computers for new level
     allPussybombs = []; // Clear pussybombs for new level
+    allBells = []; // Clear bells for new level
     playerWardrobeSuits = []; // Clear wardrobe suits for new level (one suit per level)
     
     // set level limits
