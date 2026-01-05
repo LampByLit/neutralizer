@@ -327,6 +327,7 @@ class Prop extends GameObject
             this.soundSequenceStartTime = 0; // Track when sound sequence started
             this.isDestroyedWithDarkTint = false; // Track if destroyed with dark tint (for rendering)
             this.destroyDelayTimer = new Timer(0.1); // Small delay to show dark tint before destroying
+            this.smokeEmitter = null; // Store reference to continuous smoke emitter
             // All game sounds array
             this.allGameSounds = [
                 sound_shoot,
@@ -362,9 +363,12 @@ class Prop extends GameObject
         const oldVelocity = this.velocity.copy();
         super.update();
 
-        // apply collision damage
-        const deltaSpeedSquared = this.velocity.subtract(oldVelocity).lengthSquared();
-        deltaSpeedSquared > .05 && this.damage(2*deltaSpeedSquared);
+        // apply collision damage (skip if modem is destroyed with dark tint)
+        if (!(this.type == propType_modem && this.isDestroyedWithDarkTint))
+        {
+            const deltaSpeedSquared = this.velocity.subtract(oldVelocity).lengthSquared();
+            deltaSpeedSquared > .05 && this.damage(2*deltaSpeedSquared);
+        }
 
         // Terminal nuke countdown (unchanged)
         if (this.type == propType_terminal && this.isNuking && !this.destroyed)
@@ -388,7 +392,16 @@ class Prop extends GameObject
         }
         
         // Modem sound sequence countdown and playback
-        if (this.type == propType_modem && this.isNuking && !this.destroyed)
+        // Also update smoke emitter position if destroyed
+        if (this.type == propType_modem)
+        {
+            // Update smoke emitter position to follow object (in case it moves)
+            if (this.isDestroyedWithDarkTint && this.smokeEmitter && !this.smokeEmitter.destroyed)
+            {
+                this.smokeEmitter.pos = this.pos;
+            }
+            
+            if (this.isNuking && !this.destroyed)
         {
             // Phase 1: Countdown (5 seconds) - beep every second
             if (!this.isPlayingSounds)
@@ -422,9 +435,8 @@ class Prop extends GameObject
                     if (!this.isDestroyedWithDarkTint)
                     {
                         this.isDestroyedWithDarkTint = true;
-                        this.destroyDelayTimer.set(0.1); // Small delay to show dark tint
                         
-                        // Create smoke particles (similar to destroyed computer tiles)
+                        // Create initial burst of smoke particles (similar to destroyed computer tiles)
                         const centerPos = this.pos;
                         new ParticleEmitter(
                             centerPos, 0.8, 0.8, 250, PI, // pos, emitSize, emitTime, emitRate, emitCone
@@ -436,8 +448,8 @@ class Prop extends GameObject
                             0.4, 0, 0, 0, 1e8 // randomness, collide, additive, randomColorLinear, renderOrder
                         );
                         
-                        // Create ongoing smoke emitter (continuous)
-                        new ParticleEmitter(
+                        // Create ongoing smoke emitter (continuous) - store reference
+                        this.smokeEmitter = new ParticleEmitter(
                             centerPos, 0.4, 0, 20, PI * 0.5, // pos, emitSize, emitTime (0 = forever), emitRate, emitCone (upward)
                             0, undefined,
                             new Color(0.3, 0.3, 0.3, 0.6), new Color(0.1, 0.1, 0.1, 0.4),
@@ -446,13 +458,16 @@ class Prop extends GameObject
                             0.9, 1, -0.15, PI * 0.5, 0.2,
                             0.3, 0, 0, 0, 1e8
                         );
+                        
+                        // Disable collision and interaction (but keep object alive)
+                        this.setCollision(0, 0);
+                        this.health = 0; // Mark as dead but don't destroy
                     }
                     
-                    // Destroy after brief delay to show dark tint
-                    if (this.destroyDelayTimer.elapsed())
+                    // Update smoke emitter position to follow object (in case it moves)
+                    if (this.smokeEmitter && !this.smokeEmitter.destroyed)
                     {
-                        this.destroy();
-                        return;
+                        this.smokeEmitter.pos = this.pos;
                     }
                 }
                 
@@ -464,6 +479,7 @@ class Prop extends GameObject
                     playSound(randomSound, this.pos);
                     this.soundPlayTimer.set(0.1); // Reset timer for next sound
                 }
+            }
             }
         }
 
@@ -508,6 +524,10 @@ class Prop extends GameObject
 
     damage(damage, damagingObject)
     {
+        // Skip damage if modem is destroyed with dark tint
+        if (this.type == propType_modem && this.isDestroyedWithDarkTint)
+            return;
+            
         // Terminal and modem: detect player melee attacks (damage = 1, from player character)
         if ((this.type == propType_terminal || this.type == propType_modem) && !this.isNuking && !this.destroyed)
         {
