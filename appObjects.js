@@ -3612,14 +3612,21 @@ class Computer extends GameObject
         // Add to global array
         allComputers.push(this);
         
-        // Define all 6 computer sounds
+        // Define all 13 computer sounds
         this.computerSounds = [
             [,,50,.07,1,.002,3,2.1,,,-451,1,,1,27,,,.96,.3],
             [,,485,.02,.01,.04,,.9,-14,,221,1.07,.02,,,,,.95,.01],
             [,,486,.01,.01,.04,5,.9,-14,,271,1.08,.02,,,,,1.05,.01],
             [,,488,.01,.02,.05,5,.9,-14,,221,1.08,.02,-0.1,1,-0.1,.01,1.05],
             [,,488,.01,.02,.05,5,.9,-13.9,,221,1.07,.02,-0.1,1,-0.1,.02,1.05],
-            [.8,,612,.34,.5,.38,,.6,,-2,,,,,,,,.78,.21,.4,-695]
+            [.8,,612,.34,.5,.38,,.6,,-2,,,,,,,,.78,.21,.4,-695],
+            [,,791,.03,.01,.03,1,3.6,,80,,,,,,,,.8,,.4,-1478],
+            [,,791,.04,.01,.03,1,3.6,,80,,,,,-1,,,.8,,.4,-1478],
+            [,,791,.04,.01,.03,1,3.6,,80,,,.01,,-1,,.01,.8,,.4,-1478],
+            [,,791,.04,.01,.03,1,3.6,,80,,,.01,,-1,,.01,.8,,.4,-1478],
+            [.7,,91,.03,.03,,3,3.3,,5,,,,.7,,.1,.05,.47,.07,,-1869],
+            [,,342,.03,.03,.08,1,1.4,,28,,,,.3,,,,.67,.04],
+            [,,342,.03,.02,.08,1,1.4,,28,,-0.01,,.3,-1,,,.67,.04]
         ];
         
         // Initialize looping computer sound
@@ -3633,8 +3640,8 @@ class Computer extends GameObject
     getAvailableSounds()
     {
         const intactTiles = this.tileStates.filter(t => !t).length;
-        // Map: 16 tiles → 6 sounds, 12 → 4, 8 → 3, 4 → 1
-        const maxSounds = Math.max(1, Math.floor(intactTiles / 2.67));
+        // Map: 16 tiles → 13 sounds, 12 → 9, 8 → 6, 4 → 3
+        const maxSounds = Math.max(1, Math.floor(intactTiles * 13 / 16));
         return this.computerSounds.slice(0, maxSounds);
     }
     
