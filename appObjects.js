@@ -191,7 +191,21 @@ class Prop extends GameObject
     { 
         super(pos);
 
-        const type = this.type = (typeOverride != undefined ? typeOverride : rand()**2*propType_count|0);
+        // Random prop generation - exclude node1 (it can only be created via fusion)
+        let type;
+        if (typeOverride != undefined)
+        {
+            type = this.type = typeOverride;
+        }
+        else
+        {
+            // Generate random type, but exclude node1 (propType_node1 = 14)
+            // Generate from 0 to propType_count-1, but if we get node1, generate again
+            do {
+                type = rand()**2*propType_count|0;
+            } while (type == propType_node1);
+            this.type = type;
+        }
         let health = 5;
         this.tileIndex = 16;
         this.explosionSize = 0;
@@ -408,7 +422,7 @@ class Prop extends GameObject
         }
         else if (this.type == propType_node1)
         {
-            this.tileIndex = 28; // Tile index 28 from tiles.png
+            this.tileIndex = 28; // Tile index 28 from tiles.png (fixed from 1)
             this.tileSize = vec2(16); // tiles.png uses 16x16 tiles
             this.color = new Color(1,1,1); // White/default color
             this.baseColor = new Color(1,1,1); // Store base color for dark tint
@@ -607,6 +621,13 @@ class Prop extends GameObject
         // Fusion system: terminal, modem, and cpu can fuse together
         if ((this.type == propType_terminal || this.type == propType_modem || this.type == propType_cpu) && !this.destroyed)
         {
+            // Ensure fusion properties are initialized (safety check)
+            if (this.isFusing === undefined) this.isFusing = false;
+            if (this.fusionPartner === undefined) this.fusionPartner = null;
+            if (this.fusionTimer === undefined) this.fusionTimer = new Timer(10);
+            if (this.fusionBeepTimer === undefined) this.fusionBeepTimer = new Timer(1);
+            if (this.fusionStartTime === undefined) this.fusionStartTime = 0;
+            
             // If already fusing, handle fusion countdown and movement
             if (this.isFusing && this.fusionPartner)
             {
@@ -737,8 +758,8 @@ class Prop extends GameObject
                     }
                 }
             }
-            // If not fusing, check for nearby fusion partners
-            else if (!this.isFusing && !this.isNuking)
+            // If not fusing, check for nearby fusion partners (only after object has been alive for a moment)
+            else if (!this.isFusing && !this.isNuking && (time - this.spawnTime) > 0.1)
             {
                 const fusionRangeSquared = 2 * 2; // 2 tiles squared (objects within 2 tiles trigger fusion)
                 let closestPartner = null;
@@ -748,7 +769,14 @@ class Prop extends GameObject
                 for (const obj of engineObjects)
                 {
                     // Must be different type, must be terminal/modem/cpu, must not be destroyed, must not be fusing, must not be nuking
-                    if (!obj || obj == this || obj.destroyed || obj.isFusing || obj.isNuking)
+                    if (!obj || obj == this || obj.destroyed)
+                        continue;
+                    
+                    // Ensure partner has fusion properties initialized
+                    if (obj.isFusing === undefined) continue;
+                    if (obj.isNuking === undefined) continue;
+                    
+                    if (obj.isFusing || obj.isNuking)
                         continue;
                     
                     if (obj.type != propType_terminal && obj.type != propType_modem && obj.type != propType_cpu)
@@ -781,7 +809,7 @@ class Prop extends GameObject
                 }
                 
                 // Start fusion if partner found (and they're more than 2 tiles apart)
-                if (closestPartner)
+                if (closestPartner && closestPartner.isFusing !== undefined)
                 {
                     this.isFusing = true;
                     this.fusionPartner = closestPartner;
