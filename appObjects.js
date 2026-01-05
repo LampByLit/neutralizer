@@ -1373,9 +1373,7 @@ class Weapon extends EngineObject
         // When mirrored (facing left), the engine will negate the angle again, so we need to account for that
         const spriteAngle = -baseAimAngle * this.getMirrorSign();
 
-        // melee animation - gun moves forward
-        // Use parent's mirror sign to match extension direction
-        const meleeAngleOffset = this.parent.meleeTimer && this.parent.meleeTimer.active() ? 1.2 * Math.sin(this.parent.meleeTimer.getPercent() * PI) * this.parent.getMirrorSign() : 0;
+        // melee animation - gun extends forward (no rotation)
         const meleeExtendOffset = this.parent.meleeTimer && this.parent.meleeTimer.active() ? .6 * Math.sin(this.parent.meleeTimer.getPercent() * PI) : 0;
 
         // extend weapon forward during melee
@@ -1383,13 +1381,21 @@ class Weapon extends EngineObject
         {
             const sizeScale = this.parent.sizeScale || 1;
             const baseOffset = this.localOffset ? this.localOffset.scale(sizeScale) : vec2(.55, 0);
-            this.localPos = baseOffset.add(vec2(meleeExtendOffset * this.getMirrorSign(), 0));
+            // Negate getMirrorSign so gun extends leftward when facing left, rightward when facing right
+            this.localPos = baseOffset.add(vec2(meleeExtendOffset * -this.getMirrorSign(), 0));
+        }
+        else
+        {
+            // Reset to base position when not meleeing
+            const sizeScale = this.parent.sizeScale || 1;
+            const baseOffset = this.localOffset ? this.localOffset.scale(sizeScale) : vec2(.55, 0);
+            this.localPos = baseOffset;
         }
 
         if (this.recoilTimer.active())
             this.localAngle = lerp(this.recoilTimer.getPercent(), spriteAngle, this.localAngle);
         else
-            this.localAngle = spriteAngle + meleeAngleOffset;
+            this.localAngle = spriteAngle;
 
         if (this.triggerIsDown)
         {
