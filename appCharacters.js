@@ -4485,15 +4485,17 @@ class Mosquito extends Enemy
         // Choose sprite based on state
         let bodyTileIndex;
         
-        // Dead mosquitoes always use stand tile (no animation)
+        // CRITICAL: Dead mosquitoes ALWAYS use stand tile with NO animation whatsoever
+        // This check MUST come first to prevent any animation logic from executing
         if (this.isDead())
         {
+            // Dead - use stand tile, NO animation, NO flicker timer updates
             bodyTileIndex = this.mosquitoStandTile;
         }
         else if (this.isFlying)
         {
-            // Flicker animation during flight - alternate between fly and stand sprites
-            // Only update flicker when flying AND not dead
+            // Only execute flicker animation if NOT dead AND flying
+            // Update flicker timer only when alive and flying
             if (this.flickerTimer.elapsed())
             {
                 this.flickerTimer.set(0.2); // Reset timer (flicker every 0.2 seconds)
@@ -4504,7 +4506,7 @@ class Mosquito extends Enemy
         }
         else
         {
-            // Standing - always use stand tile (no animation)
+            // Standing (alive but not flying) - always use stand tile (no animation)
             bodyTileIndex = this.mosquitoStandTile;
         }
         
