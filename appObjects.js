@@ -328,22 +328,17 @@ class Prop extends GameObject
             this.isDestroyedWithDarkTint = false; // Track if destroyed with dark tint (for rendering)
             this.destroyDelayTimer = new Timer(0.1); // Small delay to show dark tint before destroying
             this.smokeEmitter = null; // Store reference to continuous smoke emitter
-            // All game sounds array
+            // Use same sounds as bell
             this.allGameSounds = [
-                sound_shoot,
-                sound_destroyTile,
-                sound_die,
-                sound_jump,
-                sound_dodge,
-                sound_walk,
-                sound_explosion,
-                sound_checkpoint,
-                sound_rain,
-                sound_wind,
-                sound_grenade,
-                sound_laser,
-                sound_computer,
-                sound_computerDestroy
+                [,0,261.6256,.04,.1,.15,1,1.3,,,,,,,,,,.72,.18,,-1092],
+                [.7,0,261.6256,.02,.1,.37,5,1.3926083284742605,,,,,,.3,,,.17,.32,.11,,103],
+                [.7,0,261.6256,.02,.1,.37,5,1.3926083284742605,,,,,,.3,,,.17,.32,.11,,103],
+                [.7,0,261.6256,.02,.1,.37,5,1.3926083284742605,,,,,,.3,,,.17,.32,.11,,103],
+                [,0,65.40639,.01,.1,.48,5,1.9,,,,,,.2,,,,.98,.05],
+                [.5,0,65.40639,.15,.1,.26,5,1.3057224126253033,,,,,,.3,,.1,,.81,.12,,766],
+                [.5,0,65.40639,.15,.1,.26,5,1.3057224126253033,,,,,,.3,,.1,,.81,.12,,766],
+                [.5,0,65.40639,.15,.1,.26,5,1.3057224126253033,,,,,,.3,,.1,,.81,.12,,766],
+                [2,0,65.40639,.02,.51,.46,2,1.3,,,,,,,,.1,.12,.4,.04]
             ];
             // Normal size, pushable, no special properties
         }
