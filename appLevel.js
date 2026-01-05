@@ -1462,31 +1462,6 @@ function generateLevel()
         }
     }
     
-    // spawn CPUs - 5 randomly throughout every level
-    for(let i = 0; i < 5; i++)
-    {
-        let cpuSpawned = false;
-        for(let tries = 99; !cpuSpawned && tries--;)
-        {
-            // Find a random position across the level
-            const pos = vec2(randSeeded(levelSize.x-40, 40), levelSize.y);
-            raycastHit = tileCollisionRaycast(pos, vec2(pos.x, 0));
-            
-            // Must not be too close to checkpoint (keep distance from start)
-            if (raycastHit && abs(checkpointPos.x-pos.x) > 20)
-            {
-                const spawnPos = raycastHit.add(vec2(0, 1));
-                
-                // Make sure there's solid ground and empty space
-                if (getTileCollisionData(spawnPos) <= 0)
-                {
-                    new Prop(spawnPos, propType_cpu);
-                    cpuSpawned = true;
-                }
-            }
-        }
-    }
-    
     // clear edge tiles so players can jump off the sides (do this last after all generation)
     clearEdgeTiles(levelSize, 20);
 }
