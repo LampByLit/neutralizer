@@ -4154,14 +4154,18 @@ class Mosquito extends Enemy
         
         Character.prototype.update.call(this);
         
-        // If flying, counteract any gravity that was applied
-        // Character.update() resets gravityScale to 1, then applies gravity in EngineObject.update()
-        // So we need to remove the gravity that was added
+        // If flying, apply vertical movement and counteract gravity
         if (wasFlying)
         {
             // Calculate how much gravity was applied (gravity * gravityScale, where gravityScale was reset to 1)
             const gravityApplied = gravity * 1; // Character.update() resets to 1, so full gravity was applied
             this.velocity.y -= gravityApplied; // Remove the gravity that was applied
+            
+            // CRITICAL FIX: Apply vertical movement input to velocity.y for flying mosquitoes
+            // Character.update() only applies moveInput.x, so we need to handle moveInput.y ourselves
+            const flyingAccel = 0.042; // Same acceleration as horizontal movement
+            this.velocity.y = clamp(this.velocity.y + this.moveInput.y * flyingAccel, this.maxSpeed, -this.maxSpeed);
+            
             this.gravityScale = 0; // Set back to 0 for next frame
             this.groundObject = null; // Don't stick to ground
         }
@@ -4204,25 +4208,26 @@ class Mosquito extends Enemy
             }
         }
         
-        // Maintain hover height above ground
-        const groundTest = vec2(this.pos.x, this.pos.y);
-        const groundRaycast = tileCollisionRaycast(groundTest, vec2(this.pos.x, levelSize.y));
-        
-        if (groundRaycast)
+        // Maintain hover height above ground (only when not chasing player)
+        // When chasing, prioritize player over hover height
+        const isChasing = this.sawPlayerTimer.isSet() && this.sawPlayerTimer.get() < 5;
+        if (!isChasing)
         {
-            const groundY = groundRaycast.y;
-            this.targetHoverY = groundY - this.hoverHeight;
+            const groundTest = vec2(this.pos.x, this.pos.y);
+            const groundRaycast = tileCollisionRaycast(groundTest, vec2(this.pos.x, levelSize.y));
             
-            // Adjust velocity to maintain hover height
-            const heightDiff = this.targetHoverY - this.pos.y;
-            if (abs(heightDiff) > 0.2)
+            if (groundRaycast)
             {
-                this.velocity.y += sign(heightDiff) * 0.01; // Gentle vertical adjustment
-            }
-            else
-            {
-                // Maintain position - counteract any drift
-                this.velocity.y *= 0.95; // Damping
+                const groundY = groundRaycast.y;
+                this.targetHoverY = groundY - this.hoverHeight;
+                
+                // Gentle vertical adjustment to maintain hover height (only when idle)
+                const heightDiff = this.targetHoverY - this.pos.y;
+                if (abs(heightDiff) > 0.5)
+                {
+                    // Add small vertical movement input to maintain hover
+                    this.moveInput.y += sign(heightDiff) * 0.2;
+                }
             }
         }
         
@@ -4249,9 +4254,9 @@ class Mosquito extends Enemy
         // If stuck, fly randomly
         if (this.stuckTimer.active())
         {
-            // Random flight to get unstuck
-            this.moveInput.x = randSign() * rand(0.6, 0.3);
-            this.moveInput.y = randSign() * rand(0.6, 0.3);
+            // Random flight to get unstuck - use stronger movement
+            this.moveInput.x = randSign() * rand(0.9, 0.7);
+            this.moveInput.y = randSign() * rand(0.9, 0.7);
         }
         else if (this.sawPlayerTimer.isSet() && this.sawPlayerTimer.get() < 10)
         {
@@ -4269,8 +4274,8 @@ class Mosquito extends Enemy
                 const dist = delta.length();
                 const playerDirection = sign(delta.x);
                 
-                // Melee attack when close
-                if (dist < 2.0 && !this.meleeCooldownTimer.isSet())
+                // Melee attack when close (melee range is 1.8, so check at 1.9 to ensure we get close enough)
+                if (dist < 1.9 && !this.meleeCooldownTimer.isSet())
                 {
                     this.pressedMelee = 1;
                     this.meleeCooldownTimer.set(1.5);
@@ -4281,18 +4286,18 @@ class Mosquito extends Enemy
             }
             else
             {
-                // Lost player - search
-                this.moveInput.x = randSign() * rand(0.3, 0.1);
-                this.moveInput.y = clamp(this.sawPlayerPos.y - this.pos.y, 0.3, -0.3);
+                // Lost player - search (faster movement to find player)
+                this.moveInput.x = randSign() * rand(0.6, 0.4);
+                this.moveInput.y = clamp((this.sawPlayerPos.y - this.pos.y) * 0.5, 0.6, -0.6);
             }
         }
         else
         {
             // Idle behavior - gentle floating
             if (rand() < 0.02)
-                this.moveInput.x = randSign() * rand(0.2, 0.1);
+                this.moveInput.x = randSign() * rand(0.3, 0.2);
             if (rand() < 0.02)
-                this.moveInput.y = randSign() * rand(0.2, 0.1);
+                this.moveInput.y = randSign() * rand(0.3, 0.2);
         }
         
         // Face player if chasing
@@ -4322,9 +4327,9 @@ class Mosquito extends Enemy
             {
                 this.mirror = this.sawPlayerPos.x < this.pos.x;
                 
-                // Can still melee attack while standing
+                // Can still melee attack while standing (melee range is 1.8, so check at 1.9)
                 const dist = this.pos.distance(this.sawPlayerPos);
-                if (dist < 2.0 && !this.meleeCooldownTimer.isSet())
+                if (dist < 1.9 && !this.meleeCooldownTimer.isSet())
                 {
                     this.pressedMelee = 1;
                     this.meleeCooldownTimer.set(1.5);
@@ -4344,10 +4349,10 @@ class Mosquito extends Enemy
         
         if (directPathClear)
         {
-            // Direct path is clear - move directly toward player
+            // Direct path is clear - move directly toward player (FASTER movement)
             const normalizedDelta = delta.scale(1 / dist);
-            moveInput.x = normalizedDelta.x * rand(0.6, 0.4);
-            moveInput.y = normalizedDelta.y * rand(0.6, 0.4);
+            moveInput.x = normalizedDelta.x * rand(0.95, 0.75);
+            moveInput.y = normalizedDelta.y * rand(0.95, 0.75);
             return moveInput;
         }
         
@@ -4401,46 +4406,46 @@ class Mosquito extends Enemy
         // Use best path found
         if (bestVerticalPath !== null && !obstacleAhead)
         {
-            // Clear horizontal path with good vertical option
-            moveInput.x = playerDirection * rand(0.6, 0.4);
-            moveInput.y = clamp(bestVerticalPath * 0.4, 0.5, -0.5);
+            // Clear horizontal path with good vertical option (FASTER)
+            moveInput.x = playerDirection * rand(0.9, 0.7);
+            moveInput.y = clamp(bestVerticalPath * 0.6, 0.7, -0.7);
             bestPathFound = true;
         }
         else if (!obstacleAhead)
         {
-            // Clear path ahead - move toward player
-            moveInput.x = playerDirection * rand(0.6, 0.4);
+            // Clear path ahead - move toward player (FASTER)
+            moveInput.x = playerDirection * rand(0.9, 0.7);
             // Add vertical movement toward player
             const verticalDiff = delta.y;
-            if (abs(verticalDiff) > 0.5)
+            if (abs(verticalDiff) > 0.3)
             {
-                moveInput.y = clamp(verticalDiff * 0.4, 0.5, -0.5);
+                moveInput.y = clamp(verticalDiff * 0.6, 0.7, -0.7);
             }
             bestPathFound = true;
         }
         else
         {
-            // Obstacle ahead - try to go around
+            // Obstacle ahead - try to go around (FASTER)
             // Prefer diagonal movement (up-forward or down-forward)
             if (!obstacleDiagUp && delta.y < 0.5)
             {
                 // Go up and forward
-                moveInput.x = playerDirection * rand(0.4, 0.2);
-                moveInput.y = -rand(0.5, 0.3);
+                moveInput.x = playerDirection * rand(0.7, 0.5);
+                moveInput.y = -rand(0.7, 0.5);
                 bestPathFound = true;
             }
             else if (!obstacleDiagDown && delta.y > -0.5)
             {
                 // Go down and forward
-                moveInput.x = playerDirection * rand(0.4, 0.2);
-                moveInput.y = rand(0.5, 0.3);
+                moveInput.x = playerDirection * rand(0.7, 0.5);
+                moveInput.y = rand(0.7, 0.5);
                 bestPathFound = true;
             }
             else if (bestVerticalPath !== null)
             {
                 // Use best vertical path found
-                moveInput.x = playerDirection * rand(0.3, 0.1);
-                moveInput.y = clamp(bestVerticalPath * 0.4, 0.5, -0.5);
+                moveInput.x = playerDirection * rand(0.6, 0.4);
+                moveInput.y = clamp(bestVerticalPath * 0.6, 0.7, -0.7);
                 bestPathFound = true;
             }
             else
@@ -4454,16 +4459,16 @@ class Mosquito extends Enemy
                 
                 if (canGoUp && delta.y < 0)
                 {
-                    moveInput.y = -rand(0.4, 0.2);
+                    moveInput.y = -rand(0.6, 0.4);
                 }
                 else if (canGoDown && delta.y > 0)
                 {
-                    moveInput.y = rand(0.4, 0.2);
+                    moveInput.y = rand(0.6, 0.4);
                 }
                 else
                 {
                     // Last resort - try opposite direction briefly
-                    moveInput.x = -playerDirection * rand(0.3, 0.1);
+                    moveInput.x = -playerDirection * rand(0.5, 0.3);
                 }
             }
         }
