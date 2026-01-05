@@ -1260,45 +1260,85 @@ function generateLevel()
                 {
                     new Computer(computerBottomLeft);
                     computerSpawned = true;
-                    
-                    // Spawn mosquitoes near computer (2 mosquitoes per level)
-                    if (levelMaxMosquitoes > 0 && totalMosquitoesSpawned < levelMaxMosquitoes)
+                }
+            }
+        }
+    }
+    
+    // Spawn mosquitoes near computer with underground platform (2 mosquitoes per level)
+    if (levelMaxMosquitoes > 0 && totalMosquitoesSpawned < levelMaxMosquitoes)
+    {
+        // Find computer position (use first computer in allComputers array)
+        let computerPos = null;
+        if (allComputers.length > 0 && allComputers[0] && !allComputers[0].destroyed)
+        {
+            computerPos = allComputers[0].pos;
+        }
+        else
+        {
+            // Fallback: spawn near checkpoint if no computer found
+            computerPos = checkpointPos.add(vec2(50, 0));
+        }
+        
+        if (computerPos)
+        {
+            const computerX = computerPos.x;
+            
+            // Find ground level at computer position
+            const groundTest = vec2(computerX, levelSize.y);
+            const groundRaycast = tileCollisionRaycast(groundTest, vec2(computerX, 0));
+            
+            if (groundRaycast)
+            {
+                const groundY = (groundRaycast.y - 0.5) | 0; // Top of ground tile
+                
+                // Create underground platform (5 tiles below ground)
+                const platformY = groundY + 5;
+                const platformWidth = 8; // 8 tiles wide
+                const platformHeight = 4; // 4 tiles tall clearance
+                const halfWidth = platformWidth / 2;
+                const platformTop = platformY - platformHeight;
+                
+                // Clear the area above the platform (air space for mosquitoes)
+                for(let x = computerX - halfWidth; x <= computerX + halfWidth; ++x)
+                {
+                    for(let y = platformTop; y < platformY; ++y)
                     {
-                        const computerCenterX = computerBottomLeft.x + 2; // Center of 4x4 computer
-                        const computerCenterY = computerBottomLeft.y + 2;
-                        const computerPos = vec2(computerCenterX, computerCenterY);
-                        
-                        // Find ground level at computer position for reference
-                        const groundTest = vec2(computerCenterX, levelSize.y);
-                        const groundRaycast = tileCollisionRaycast(groundTest, vec2(computerCenterX, 0));
-                        
-                        if (groundRaycast)
+                        const pos = vec2(x, y);
+                        if (pos.x >= 0 && pos.x < levelSize.x && pos.y >= 0 && pos.y < levelSize.y)
                         {
-                            const groundY = groundRaycast.y;
-                            const hoverHeight = 2.5; // Spawn 2.5 tiles above ground
-                            
-                            // Spawn 2 mosquitoes, one on each side of computer
-                            for(let i = 0; i < 2 && totalMosquitoesSpawned < levelMaxMosquitoes; i++)
-                            {
-                                // Offset horizontally from computer (left and right)
-                                const offsetX = (i == 0 ? -4 : 4); // 4 tiles left or right
-                                const spawnX = computerCenterX + offsetX;
-                                
-                                // Spawn in air above ground
-                                const spawnY = groundY - hoverHeight;
-                                const mosquitoPos = vec2(spawnX, spawnY);
-                                
-                                // Check if position is valid (empty space, not in wall)
-                                if (getTileCollisionData(mosquitoPos) <= 0 &&
-                                    getTileCollisionData(mosquitoPos.add(vec2(0, 0.5))) <= 0 &&
-                                    getTileCollisionData(mosquitoPos.add(vec2(0, -0.5))) <= 0)
-                                {
-                                    new Mosquito(mosquitoPos);
-                                    totalMosquitoesSpawned++;
-                                    totalEnemiesSpawned++;
-                                }
-                            }
+                            setTileCollisionData(pos, tileType_empty);
+                            setTileBackgroundData(pos, tileType_empty);
                         }
+                    }
+                }
+                
+                // Create the platform floor (solid ground)
+                for(let x = computerX - halfWidth; x <= computerX + halfWidth; ++x)
+                {
+                    const pos = vec2(x, platformY);
+                    if (pos.x >= 0 && pos.x < levelSize.x && pos.y >= 0 && pos.y < levelSize.y)
+                    {
+                        setTileCollisionData(pos, tileType_dirt);
+                        setTileBackgroundData(pos, tileType_dirt);
+                    }
+                }
+                
+                // Spawn 2 mosquitoes on the platform (one on each side)
+                for(let i = 0; i < 2 && totalMosquitoesSpawned < levelMaxMosquitoes; i++)
+                {
+                    // Offset horizontally from center (left and right)
+                    const offsetX = (i == 0 ? -2 : 2); // 2 tiles left or right
+                    const spawnX = computerX + offsetX;
+                    const spawnY = platformY - 1; // One tile above platform
+                    const mosquitoPos = vec2(spawnX, spawnY);
+                    
+                    // Check if position is valid (empty space)
+                    if (getTileCollisionData(mosquitoPos) <= 0)
+                    {
+                        new Mosquito(mosquitoPos);
+                        totalMosquitoesSpawned++;
+                        totalEnemiesSpawned++;
                     }
                 }
             }
