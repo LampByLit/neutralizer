@@ -471,8 +471,8 @@ class Prop extends GameObject
                     }
                 }
                 
-                // Play random sound every 0.1 seconds
-                if (this.soundPlayTimer.elapsed())
+                // Play random sound every 0.1 seconds (stop if destroyed)
+                if (!this.isDestroyedWithDarkTint && this.soundPlayTimer.elapsed())
                 {
                     // Pick random sound from all game sounds
                     const randomSound = this.allGameSounds[rand(this.allGameSounds.length)|0];
