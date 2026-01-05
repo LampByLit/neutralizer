@@ -181,7 +181,8 @@ const propType_rock_jackrock        = 9;
 const propType_terminal             = 10;
 const propType_rock_pussybomb       = 11;
 const propType_modem                = 12;
-const propType_count                = 13;
+const propType_cpu                  = 13;
+const propType_count                = 14;
 
 class Prop extends GameObject 
 {
@@ -342,6 +343,47 @@ class Prop extends GameObject
             ];
             // Normal size, pushable, no special properties
         }
+        else if (this.type == propType_cpu)
+        {
+            this.tileIndex = 27; // Tile index 27 from tiles.png
+            this.tileSize = vec2(16); // tiles.png uses 16x16 tiles
+            this.color = new Color(1,1,1); // White/default color
+            this.baseColor = new Color(1,1,1); // Store base color for dark tint
+            health = 50;
+            // Sound sequence countdown properties
+            this.isNuking = false;
+            this.nukeTimer = new Timer(2); // 2 second countdown before sound sequence
+            this.beepTimer = new Timer(1); // Beep every 1 second during countdown
+            this.nukeStartTime = 0; // Track when countdown started
+            // Sound sequence properties
+            this.isPlayingSounds = false; // Track if sound sequence is active
+            this.soundSequenceTimer = new Timer(5); // 5 second sound sequence
+            this.soundPlayTimer = new Timer(0.1); // Play sound every 0.1 seconds
+            this.soundSequenceStartTime = 0; // Track when sound sequence started
+            this.isDestroyedWithDarkTint = false; // Track if destroyed with dark tint (for rendering)
+            this.destroyDelayTimer = new Timer(0.1); // Small delay to show dark tint before destroying
+            this.smokeEmitter = null; // Store reference to continuous smoke emitter
+            // Use computer sounds instead of bell sounds
+            this.allGameSounds = [
+                [2.9,,90,.01,.03,.02,,.5,,,,,,,74,,,.65,.03,.3,226],
+                [2.9,,90,.01,.2,.03,2,.6,.1,,,.01,-0.02,,74,,,.75,.04,.3,226],
+                [1.3,,21,,.03,.03,2,3.1,29,,82,.18,,,,,.02,.84,.01,,-1066],
+                [2,,613,.02,.02,.001,1,.8,,,,,,,,,.02,.82,.01],
+                [2,,613,.02,.02,.001,1,.8,,,,,,,,,.02,.82,.01],
+                [,,233,.01,.03,.02,5,.14887360527130392,4.1,5,,,-0.01,-0.1,109,.4,,.78,,.01,614],
+                [1.1,,65,.03,.03,.006,2,3.1,-1,,-137,.09,,,,.2,,.74,.03,,120],
+                [,,803,.02,.03,.02,5,1.8295184594314835,,1,153,.59,,,39,.1,,.75,.01],
+                [,,309,.03,,.02,5,.21809541555653847,,,-80,.16,,.1,219,,,.98,.01],
+                [,,309,.03,,.02,5,.21809541555653847,,,-80,.16,,.1,219,,,.98,.01],
+                [.5,0,65.40639,.03,.88,.19,2,2.8,,,,,,.3,,,,.31,.06,,428],
+                [1.4,,632,.46,.25,.19,1,.7,3,-15,,,,,.3,,.19,.65,.12,,-777],
+                [3.6,,46,,.03,.04,1,2.5,,,-293,,,,78,,.04,.86,.03,.06,379],
+                [.7,,225,,.03,.01,3,3.8,,52,,,,,,,,.76,,.17,-877],
+                [.7,,225,,.03,.01,3,3.8,,52,,,,,,,,.76,,.17,-877],
+                [1.6,,741,.02,.04,.004,3,1.5,,,,,,,,.5,.01,.94,.02,,133]
+            ];
+            // Normal size, pushable, no special properties
+        }
 
         // randomly angle and flip axis (90 degree rotation)
         this.angle = (rand(4)|0)*PI/2;
@@ -358,8 +400,8 @@ class Prop extends GameObject
         const oldVelocity = this.velocity.copy();
         super.update();
 
-        // apply collision damage (skip if modem is destroyed with dark tint)
-        if (!(this.type == propType_modem && this.isDestroyedWithDarkTint))
+        // apply collision damage (skip if modem or CPU is destroyed with dark tint)
+        if (!((this.type == propType_modem || this.type == propType_cpu) && this.isDestroyedWithDarkTint))
         {
             const deltaSpeedSquared = this.velocity.subtract(oldVelocity).lengthSquared();
             deltaSpeedSquared > .05 && this.damage(2*deltaSpeedSquared);
@@ -386,9 +428,9 @@ class Prop extends GameObject
             }
         }
         
-        // Modem sound sequence countdown and playback
+        // Modem and CPU sound sequence countdown and playback
         // Also update smoke emitter position if destroyed
-        if (this.type == propType_modem)
+        if (this.type == propType_modem || this.type == propType_cpu)
         {
             // Update smoke emitter position to follow object (in case it moves)
             if (this.isDestroyedWithDarkTint && this.smokeEmitter && !this.smokeEmitter.destroyed)
@@ -519,12 +561,12 @@ class Prop extends GameObject
 
     damage(damage, damagingObject)
     {
-        // Skip damage if modem is destroyed with dark tint
-        if (this.type == propType_modem && this.isDestroyedWithDarkTint)
+        // Skip damage if modem or CPU is destroyed with dark tint
+        if ((this.type == propType_modem || this.type == propType_cpu) && this.isDestroyedWithDarkTint)
             return;
             
-        // Terminal and modem: detect player melee attacks (damage = 1, from player character)
-        if ((this.type == propType_terminal || this.type == propType_modem) && !this.isNuking && !this.destroyed)
+        // Terminal, modem, and CPU: detect player melee attacks (damage = 1, from player character)
+        if ((this.type == propType_terminal || this.type == propType_modem || this.type == propType_cpu) && !this.isNuking && !this.destroyed)
         {
             // Check if this is a player melee attack (damage = 1, from player character)
             if (damagingObject && damagingObject.isPlayer && damage == 1)
