@@ -181,7 +181,9 @@ const propType_rock_jackrock        = 9;
 const propType_terminal             = 10;
 const propType_rock_pussybomb       = 11;
 const propType_modem                = 12;
-const propType_count                = 13;
+const propType_cpu                  = 13;
+const propType_node1                = 14;
+const propType_count                = 15;
 
 class Prop extends GameObject 
 {
@@ -285,6 +287,13 @@ class Prop extends GameObject
             this.nukeTimer = new Timer(5); // 5 second countdown
             this.beepTimer = new Timer(1); // Beep every 1 second
             this.nukeStartTime = 0; // Track when countdown started
+            // Fusion properties
+            this.isFusing = false;
+            this.fusionPartner = null;
+            this.fusionTimer = new Timer(10); // 10 second countdown
+            this.fusionBeepTimer = new Timer(1); // Beep every 1 second
+            this.fusionStartTime = 0; // Track when fusion started
+            this.fusionTargetPos = null; // Target position for smooth movement
             // Normal size, pushable, no special properties
         }
         else if (this.type == propType_rock_pussybomb)
@@ -328,6 +337,13 @@ class Prop extends GameObject
             this.isDestroyedWithDarkTint = false; // Track if destroyed with dark tint (for rendering)
             this.destroyDelayTimer = new Timer(0.1); // Small delay to show dark tint before destroying
             this.smokeEmitter = null; // Store reference to continuous smoke emitter
+            // Fusion properties
+            this.isFusing = false;
+            this.fusionPartner = null;
+            this.fusionTimer = new Timer(10); // 10 second countdown
+            this.fusionBeepTimer = new Timer(1); // Beep every 1 second
+            this.fusionStartTime = 0; // Track when fusion started
+            this.fusionTargetPos = null; // Target position for smooth movement
             // Use same sounds as bell
             this.allGameSounds = [
                 [,0,261.6256,.04,.1,.15,1,1.3,,,,,,,,,,.72,.18,,-1092],
@@ -340,6 +356,78 @@ class Prop extends GameObject
                 [.5,0,65.40639,.15,.1,.26,5,1.3057224126253033,,,,,,.3,,.1,,.81,.12,,766],
                 [2,0,65.40639,.02,.51,.46,2,1.3,,,,,,,,.1,.12,.4,.04]
             ];
+            // Normal size, pushable, no special properties
+        }
+        else if (this.type == propType_cpu)
+        {
+            this.tileIndex = 27; // Tile index 27 from tiles.png
+            this.tileSize = vec2(16); // tiles.png uses 16x16 tiles
+            this.color = new Color(1,1,1); // White/default color
+            this.baseColor = new Color(1,1,1); // Store base color for dark tint
+            health = 50;
+            // Sound sequence countdown properties
+            this.isNuking = false;
+            this.nukeTimer = new Timer(2); // 2 second countdown before sound sequence
+            this.beepTimer = new Timer(1); // Beep every 1 second during countdown
+            this.nukeStartTime = 0; // Track when countdown started
+            // Sound sequence properties
+            this.isPlayingSounds = false; // Track if sound sequence is active
+            this.soundSequenceTimer = new Timer(5); // 5 second sound sequence
+            this.soundPlayTimer = new Timer(0.1); // Play sound every 0.1 seconds
+            this.soundSequenceStartTime = 0; // Track when sound sequence started
+            this.isDestroyedWithDarkTint = false; // Track if destroyed with dark tint (for rendering)
+            this.destroyDelayTimer = new Timer(0.1); // Small delay to show dark tint before destroying
+            this.smokeEmitter = null; // Store reference to continuous smoke emitter
+            // Fusion properties
+            this.isFusing = false;
+            this.fusionPartner = null;
+            this.fusionTimer = new Timer(10); // 10 second countdown
+            this.fusionBeepTimer = new Timer(1); // Beep every 1 second
+            this.fusionStartTime = 0; // Track when fusion started
+            this.fusionTargetPos = null; // Target position for smooth movement
+            // Use computer sounds instead of bell sounds
+            this.allGameSounds = [
+                [2.9,,90,.01,.03,.02,,.5,,,,,,,74,,,.65,.03,.3,226],
+                [2.9,,90,.01,.2,.03,2,.6,.1,,,.01,-0.02,,74,,,.75,.04,.3,226],
+                [1.3,,21,,.03,.03,2,3.1,29,,82,.18,,,,,.02,.84,.01,,-1066],
+                [2,,613,.02,.02,.001,1,.8,,,,,,,,,.02,.82,.01],
+                [2,,613,.02,.02,.001,1,.8,,,,,,,,,.02,.82,.01],
+                [,,233,.01,.03,.02,5,.14887360527130392,4.1,5,,,-0.01,-0.1,109,.4,,.78,,.01,614],
+                [1.1,,65,.03,.03,.006,2,3.1,-1,,-137,.09,,,,.2,,.74,.03,,120],
+                [,,803,.02,.03,.02,5,1.8295184594314835,,1,153,.59,,,39,.1,,.75,.01],
+                [,,309,.03,,.02,5,.21809541555653847,,,-80,.16,,.1,219,,,.98,.01],
+                [,,309,.03,,.02,5,.21809541555653847,,,-80,.16,,.1,219,,,.98,.01],
+                [.5,0,65.40639,.03,.88,.19,2,2.8,,,,,,.3,,,,.31,.06,,428],
+                [1.4,,632,.46,.25,.19,1,.7,3,-15,,,,,.3,,.19,.65,.12,,-777],
+                [3.6,,46,,.03,.04,1,2.5,,,-293,,,,78,,.04,.86,.03,.06,379],
+                [.7,,225,,.03,.01,3,3.8,,52,,,,,,,,.76,,.17,-877],
+                [.7,,225,,.03,.01,3,3.8,,52,,,,,,,,.76,,.17,-877],
+                [1.6,,741,.02,.04,.004,3,1.5,,,,,,,,.5,.01,.94,.02,,133]
+            ];
+            // Normal size, pushable, no special properties
+        }
+        else if (this.type == propType_node1)
+        {
+            this.tileIndex = 1; // Tile index 1 from tiles.png
+            this.tileSize = vec2(16); // tiles.png uses 16x16 tiles
+            this.color = new Color(1,1,1); // White/default color
+            this.baseColor = new Color(1,1,1); // Store base color for dark tint
+            health = 50;
+            // Sound sequence countdown properties (same as modem)
+            this.isNuking = false;
+            this.nukeTimer = new Timer(2); // 2 second countdown before sound sequence
+            this.beepTimer = new Timer(1); // Beep every 1 second during countdown
+            this.nukeStartTime = 0; // Track when countdown started
+            // Sound sequence properties
+            this.isPlayingSounds = false; // Track if sound sequence is active
+            this.soundSequenceTimer = new Timer(5); // 5 second sound sequence
+            this.soundPlayTimer = new Timer(0.1); // Play sound every 0.1 seconds
+            this.soundSequenceStartTime = 0; // Track when sound sequence started
+            this.isDestroyedWithDarkTint = false; // Track if destroyed with dark tint (for rendering)
+            this.destroyDelayTimer = new Timer(0.1); // Small delay to show dark tint before destroying
+            this.smokeEmitter = null; // Store reference to continuous smoke emitter
+            // Use checkpoint sounds instead of bell sounds
+            this.allGameSounds = sound_checkpoint; // Use checkpoint sound array
             // Normal size, pushable, no special properties
         }
 
@@ -358,8 +446,8 @@ class Prop extends GameObject
         const oldVelocity = this.velocity.copy();
         super.update();
 
-        // apply collision damage (skip if modem is destroyed with dark tint)
-        if (!(this.type == propType_modem && this.isDestroyedWithDarkTint))
+        // apply collision damage (skip if modem or CPU is destroyed with dark tint)
+        if (!((this.type == propType_modem || this.type == propType_cpu) && this.isDestroyedWithDarkTint))
         {
             const deltaSpeedSquared = this.velocity.subtract(oldVelocity).lengthSquared();
             deltaSpeedSquared > .05 && this.damage(2*deltaSpeedSquared);
@@ -386,9 +474,9 @@ class Prop extends GameObject
             }
         }
         
-        // Modem sound sequence countdown and playback
+        // Modem and CPU sound sequence countdown and playback
         // Also update smoke emitter position if destroyed
-        if (this.type == propType_modem)
+        if (this.type == propType_modem || this.type == propType_cpu)
         {
             // Update smoke emitter position to follow object (in case it moves)
             if (this.isDestroyedWithDarkTint && this.smokeEmitter && !this.smokeEmitter.destroyed)
@@ -515,16 +603,187 @@ class Prop extends GameObject
             const darkness = lerp(healthPercent, 0.2, 1.0);
             this.color = this.baseColor.scale(darkness, 1);
         }
+
+        // Fusion system: terminal, modem, and cpu can fuse together
+        if ((this.type == propType_terminal || this.type == propType_modem || this.type == propType_cpu) && !this.destroyed)
+        {
+            // If already fusing, handle fusion countdown and movement
+            if (this.isFusing && this.fusionPartner)
+            {
+                // Check if partner is still valid
+                if (this.fusionPartner.destroyed || !this.fusionPartner.isFusing)
+                {
+                    // Partner destroyed or fusion cancelled - cancel this fusion
+                    this.isFusing = false;
+                    this.fusionPartner = null;
+                    this.fusionTargetPos = null;
+                }
+                else
+                {
+                    // Calculate midpoint for smooth movement
+                    let myPos = this.pos.copy();
+                    let partnerPos = this.fusionPartner.pos.copy();
+                    
+                    // If being carried, use player position
+                    if (this.parent && this.parent.isPlayer && this.parent.isCarrying && this.parent.carriedObject == this)
+                    {
+                        myPos = this.parent.pos.copy();
+                    }
+                    if (this.fusionPartner.parent && this.fusionPartner.parent.isPlayer && this.fusionPartner.parent.isCarrying && this.fusionPartner.parent.carriedObject == this.fusionPartner)
+                    {
+                        partnerPos = this.fusionPartner.parent.pos.copy();
+                    }
+                    
+                    const midpoint = myPos.add(partnerPos).scale(0.5);
+                    
+                    // Smoothly move toward midpoint
+                    const moveSpeed = 0.15; // Speed of movement
+                    const toMidpoint = midpoint.subtract(myPos);
+                    const distToMidpoint = toMidpoint.length();
+                    
+                    if (distToMidpoint > 0.1) // Still moving together
+                    {
+                        // Move toward midpoint
+                        const moveDir = toMidpoint.scale(1 / distToMidpoint);
+                        const moveDelta = moveDir.scale(moveSpeed);
+                        this.pos = this.pos.add(moveDelta);
+                        
+                        // If being carried, drop it
+                        if (this.parent && this.parent.isPlayer && this.parent.isCarrying && this.parent.carriedObject == this)
+                        {
+                            this.parent.dropCarriedObject();
+                        }
+                    }
+                    else
+                    {
+                        // Snap to midpoint
+                        this.pos = midpoint.copy();
+                    }
+                    
+                    // Update fusion countdown
+                    const elapsed = time - this.fusionStartTime;
+                    if (elapsed >= 10 || this.fusionTimer.elapsed())
+                    {
+                        // Fusion complete! Only process on one object to avoid duplicate spawns
+                        if (this.type < this.fusionPartner.type) // Process on lower type to ensure only one handles it
+                        {
+                            const fusionPos = this.pos.copy();
+                            
+                            // Create confetti effect
+                            const colors = [
+                                [new Color(1,0,0,.8), new Color(1,.2,.2,.8)], // Red
+                                [new Color(0,1,0,.8), new Color(.2,1,.2,.8)], // Green
+                                [new Color(0,0,1,.8), new Color(.2,.2,1,.8)], // Blue
+                                [new Color(1,1,0,.8), new Color(1,1,.2,.8)], // Yellow
+                                [new Color(1,0,1,.8), new Color(1,.2,1,.8)], // Magenta
+                                [new Color(0,1,1,.8), new Color(.2,1,1,.8)], // Cyan
+                            ];
+                            
+                            colors.forEach((colorPair, idx) => {
+                                const angleOffset = (idx / colors.length) * PI * 2;
+                                new ParticleEmitter(
+                                    fusionPos, .3, .15, 150, PI * 2, // pos, emitSize, emitTime, emitRate, emitCone (full circle)
+                                    0, undefined,     // tileIndex, tileSize
+                                    colorPair[0], colorPair[1], // colorStartA, colorStartB
+                                    new Color(colorPair[0].r, colorPair[0].g, colorPair[0].b, 0), 
+                                    new Color(colorPair[1].r, colorPair[1].g, colorPair[1].b, 0), // colorEndA, colorEndB (fade to transparent)
+                                    .4, .3, .15, .2, .2, // particleTime, sizeStart, sizeEnd, particleSpeed, particleAngleSpeed
+                                    .95, 1, .8, PI * 2, .1,  // damping, angleDamping, gravityScale, particleCone, fadeRate
+                                    .6, 0, 0, 0, 1e8  // randomness, collide, additive, randomColorLinear, renderOrder
+                                );
+                            });
+                            
+                            // Play checkpoint sound
+                            playSound(sound_checkpoint, fusionPos);
+                            
+                            // Spawn node1
+                            new Prop(fusionPos, propType_node1);
+                            
+                            // Destroy both objects
+                            this.fusionPartner.destroy();
+                            this.destroy();
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        // Beep every second during countdown
+                        if (this.fusionBeepTimer.elapsed())
+                        {
+                            playSound(sound_grenade, this.pos);
+                            this.fusionBeepTimer.set(1);
+                        }
+                    }
+                }
+            }
+            // If not fusing, check for nearby fusion partners
+            else if (!this.isFusing && !this.isNuking)
+            {
+                const fusionRangeSquared = 2 * 2; // 2 tiles squared
+                let closestPartner = null;
+                let closestDistSq = fusionRangeSquared;
+                
+                // Check all objects for potential fusion partners
+                for (const obj of engineObjects)
+                {
+                    // Must be different type, must be terminal/modem/cpu, must not be destroyed, must not be fusing, must not be nuking
+                    if (!obj || obj == this || obj.destroyed || obj.isFusing || obj.isNuking)
+                        continue;
+                    
+                    if (obj.type != propType_terminal && obj.type != propType_modem && obj.type != propType_cpu)
+                        continue;
+                    
+                    // Must be different type (no same-type fusion)
+                    if (obj.type == this.type)
+                        continue;
+                    
+                    // Get positions (account for being carried)
+                    let myPos = this.pos.copy();
+                    let objPos = obj.pos.copy();
+                    
+                    if (this.parent && this.parent.isPlayer && this.parent.isCarrying && this.parent.carriedObject == this)
+                    {
+                        myPos = this.parent.pos.copy();
+                    }
+                    if (obj.parent && obj.parent.isPlayer && obj.parent.isCarrying && obj.parent.carriedObject == obj)
+                    {
+                        objPos = obj.parent.pos.copy();
+                    }
+                    
+                    const distSq = myPos.distanceSquared(objPos);
+                    if (distSq < closestDistSq && distSq > 0.01) // > 0.01 to avoid same position
+                    {
+                        closestPartner = obj;
+                        closestDistSq = distSq;
+                    }
+                }
+                
+                // Start fusion if partner found
+                if (closestPartner)
+                {
+                    this.isFusing = true;
+                    this.fusionPartner = closestPartner;
+                    closestPartner.isFusing = true;
+                    closestPartner.fusionPartner = this;
+                    this.fusionTimer.set(10);
+                    this.fusionBeepTimer.set(1);
+                    this.fusionStartTime = time;
+                    closestPartner.fusionTimer.set(10);
+                    closestPartner.fusionBeepTimer.set(1);
+                    closestPartner.fusionStartTime = time;
+                }
+            }
+        }
     }
 
     damage(damage, damagingObject)
     {
-        // Skip damage if modem is destroyed with dark tint
-        if (this.type == propType_modem && this.isDestroyedWithDarkTint)
+        // Skip damage if modem or CPU is destroyed with dark tint
+        if ((this.type == propType_modem || this.type == propType_cpu) && this.isDestroyedWithDarkTint)
             return;
             
-        // Terminal and modem: detect player melee attacks (damage = 1, from player character)
-        if ((this.type == propType_terminal || this.type == propType_modem) && !this.isNuking && !this.destroyed)
+        // Terminal, modem, and CPU: detect player melee attacks (damage = 1, from player character)
+        if ((this.type == propType_terminal || this.type == propType_modem || this.type == propType_cpu) && !this.isNuking && !this.destroyed)
         {
             // Check if this is a player melee attack (damage = 1, from player character)
             if (damagingObject && damagingObject.isPlayer && damage == 1)
@@ -569,7 +828,7 @@ class Prop extends GameObject
             drawTile2(this.pos, this.size, this.tileIndex, this.tileSize, this.color.scale(this.burnColorPercent(),1), this.angle, this.mirror, this.additiveColor);
             
             // Visual feedback during nuke countdown (similar to grenade)
-            if (this.isNuking && !this.destroyed)
+            if (this.isNuking && !this.destroyed && !this.isFusing)
             {
                 const elapsed = time - this.nukeStartTime;
                 const a = elapsed; // Use elapsed time for pulsing
@@ -579,10 +838,24 @@ class Prop extends GameObject
                 drawTile(this.pos, vec2(.5), 0, vec2(16), new Color(1,1,1,.2-.2*Math.cos(a*2*PI)));
                 setBlendMode(0);
             }
+            // Visual feedback during fusion countdown (red glowing)
+            if (this.isFusing && !this.destroyed)
+            {
+                const elapsed = time - this.fusionStartTime;
+                const a = elapsed; // Use elapsed time for pulsing
+                const intensity = 1 - (elapsed / 10); // Increase intensity as countdown progresses
+                setBlendMode(1);
+                drawTile(this.pos, vec2(2), 0, vec2(16), new Color(1,0,0,.3*intensity-.3*intensity*Math.cos(a*4*PI)));
+                drawTile(this.pos, vec2(1.5), 0, vec2(16), new Color(1,0,0,.25*intensity-.25*intensity*Math.cos(a*4*PI)));
+                drawTile(this.pos, vec2(1), 0, vec2(16), new Color(1,0,0,.2*intensity-.2*intensity*Math.cos(a*4*PI)));
+                drawTile(this.pos, vec2(.5), 0, vec2(16), new Color(1,1,1,.15*intensity-.15*intensity*Math.cos(a*4*PI)));
+                setBlendMode(0);
+            }
         }
-        else if (this.type == propType_modem)
+        else if (this.type == propType_modem || this.type == propType_cpu)
         {
             // Modem uses drawTile (tiles.png) with tile index 31
+            // CPU uses drawTile (tiles.png) with tile index 27
             // Apply dark tint if destroyed with sound sequence
             let renderColor = this.color.scale(this.burnColorPercent(),1);
             if (this.isDestroyedWithDarkTint)
@@ -4000,10 +4273,10 @@ class Computer extends GameObject
                 }
             }
             
-            // Check all terminals and modems (including those being carried)
+            // Check all terminals, modems, and CPUs (including those being carried)
             for (const obj of engineObjects)
             {
-                if (obj && (obj.type == propType_terminal || obj.type == propType_modem) && !obj.destroyed && !obj.transmuted)
+                if (obj && (obj.type == propType_terminal || obj.type == propType_modem || obj.type == propType_cpu) && !obj.destroyed && !obj.transmuted)
                 {
                     // Check if terminal is being carried by a player
                     let terminalPos = obj.pos.copy();
@@ -4020,14 +4293,14 @@ class Computer extends GameObject
                     const distSq = this.pos.distanceSquared(terminalPos);
                     if (distSq <= transmuteRangeSquared)
                     {
-                        // If terminal/modem is being carried, drop it first
+                        // If terminal/modem/CPU is being carried, drop it first
                         if (isCarried && carryingPlayer)
                         {
                             carryingPlayer.dropCarriedObject();
                             terminalPos = obj.pos.copy(); // Update position after drop
                         }
                         
-                        // Transform terminal/modem to boy
+                        // Transform terminal/modem/CPU to boy
                         const transformPos = terminalPos.copy();
                         
                         // Create confetti effect (same as health boost)

@@ -795,7 +795,6 @@ engineInit(
         rightColumnY = drawColoredText('Neutralize all <red>Malefactors</red>.', rightColumnX, rightColumnY, 'bold 20px JetBrains Mono', defaultTextColor, rightColumnMaxWidth, lineHeight) + lineHeight;
         rightColumnY = drawColoredText('Decommission the <orange>Calculator</orange>.', rightColumnX, rightColumnY, 'bold 20px JetBrains Mono', defaultTextColor, rightColumnMaxWidth, lineHeight) + lineHeight;
         rightColumnY = drawColoredText('Login to all Node <cyan>Terminals</cyan>.', rightColumnX, rightColumnY, 'bold 20px JetBrains Mono', defaultTextColor, rightColumnMaxWidth, lineHeight) + lineHeight;
-        rightColumnY = drawColoredText('Detonate the <pink>Pussybomb</pink>.', rightColumnX, rightColumnY, 'bold 20px JetBrains Mono', defaultTextColor, rightColumnMaxWidth, lineHeight) + lineHeight;
         drawColoredText('<yellow>Protip:</yellow> Use the <orange>Calculator</orange> to Transmute <cyan>Terminals</cyan> and <green>Greenhorns</green> into <purple>Henchmen</purple>.', rightColumnX, rightColumnY, 'bold 20px JetBrains Mono', defaultTextColor, rightColumnMaxWidth, lineHeight);
     }
     else if (gameState === 'playing')

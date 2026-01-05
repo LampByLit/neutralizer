@@ -196,13 +196,13 @@ class Character extends GameObject
                 }
             });
             
-            // Also check for terminals and modems (props with type propType_terminal or propType_modem) - check all objects, not just collide objects
+            // Also check for terminals, modems, and CPUs (props with type propType_terminal, propType_modem, or propType_cpu) - check all objects, not just collide objects
             if (this.isPlayer)
             {
                 forEachObject(this.pos, meleeRange, (o)=>
                 {
-                    // Check for terminals and modems
-                    if ((o.type == propType_terminal || o.type == propType_modem) && !o.destroyed && o.health > 0)
+                    // Check for terminals, modems, and CPUs
+                    if ((o.type == propType_terminal || o.type == propType_modem || o.type == propType_cpu) && !o.destroyed && o.health > 0)
                     {
                         o.damage(1, this); // this = player character
                     }
