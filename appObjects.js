@@ -313,12 +313,37 @@ class Prop extends GameObject
             this.tileIndex = 31; // Tile index 31 from tiles.png
             this.tileSize = vec2(16); // tiles.png uses 16x16 tiles
             this.color = new Color(1,1,1); // White/default color
+            this.baseColor = new Color(1,1,1); // Store base color for dark tint
             health = 50;
-            // Nuke countdown properties (identical to terminal)
+            // Sound sequence countdown properties
             this.isNuking = false;
-            this.nukeTimer = new Timer(5); // 5 second countdown
-            this.beepTimer = new Timer(1); // Beep every 1 second
+            this.nukeTimer = new Timer(5); // 5 second countdown before sound sequence
+            this.beepTimer = new Timer(1); // Beep every 1 second during countdown
             this.nukeStartTime = 0; // Track when countdown started
+            // Sound sequence properties
+            this.isPlayingSounds = false; // Track if sound sequence is active
+            this.soundSequenceTimer = new Timer(5); // 5 second sound sequence
+            this.soundPlayTimer = new Timer(0.1); // Play sound every 0.1 seconds
+            this.soundSequenceStartTime = 0; // Track when sound sequence started
+            this.isDestroyedWithDarkTint = false; // Track if destroyed with dark tint (for rendering)
+            this.destroyDelayTimer = new Timer(0.1); // Small delay to show dark tint before destroying
+            // All game sounds array
+            this.allGameSounds = [
+                sound_shoot,
+                sound_destroyTile,
+                sound_die,
+                sound_jump,
+                sound_dodge,
+                sound_walk,
+                sound_explosion,
+                sound_checkpoint,
+                sound_rain,
+                sound_wind,
+                sound_grenade,
+                sound_laser,
+                sound_computer,
+                sound_computerDestroy
+            ];
             // Normal size, pushable, no special properties
         }
 
@@ -341,8 +366,8 @@ class Prop extends GameObject
         const deltaSpeedSquared = this.velocity.subtract(oldVelocity).lengthSquared();
         deltaSpeedSquared > .05 && this.damage(2*deltaSpeedSquared);
 
-        // Terminal and modem nuke countdown
-        if ((this.type == propType_terminal || this.type == propType_modem) && this.isNuking && !this.destroyed)
+        // Terminal nuke countdown (unchanged)
+        if (this.type == propType_terminal && this.isNuking && !this.destroyed)
         {
             // Check if countdown has elapsed (5 seconds)
             const elapsed = time - this.nukeStartTime;
@@ -359,6 +384,86 @@ class Prop extends GameObject
             {
                 playSound(sound_grenade, this.pos);
                 this.beepTimer.set(1);
+            }
+        }
+        
+        // Modem sound sequence countdown and playback
+        if (this.type == propType_modem && this.isNuking && !this.destroyed)
+        {
+            // Phase 1: Countdown (5 seconds) - beep every second
+            if (!this.isPlayingSounds)
+            {
+                const elapsed = time - this.nukeStartTime;
+                if (elapsed >= 5 || this.nukeTimer.elapsed())
+                {
+                    // Start sound sequence
+                    this.isPlayingSounds = true;
+                    this.soundSequenceTimer.set(5); // 5 second sound sequence
+                    this.soundPlayTimer.set(0.1); // Play first sound immediately
+                    this.soundSequenceStartTime = time;
+                }
+                else
+                {
+                    // Beep every second during countdown
+                    if (this.beepTimer.elapsed())
+                    {
+                        playSound(sound_grenade, this.pos);
+                        this.beepTimer.set(1);
+                    }
+                }
+            }
+            // Phase 2: Sound sequence (5 seconds) - play random sound every 0.1 seconds
+            else
+            {
+                const elapsed = time - this.soundSequenceStartTime;
+                if (elapsed >= 5 || this.soundSequenceTimer.elapsed())
+                {
+                    // Sound sequence complete - set dark tint flag and create smoke
+                    if (!this.isDestroyedWithDarkTint)
+                    {
+                        this.isDestroyedWithDarkTint = true;
+                        this.destroyDelayTimer.set(0.1); // Small delay to show dark tint
+                        
+                        // Create smoke particles (similar to destroyed computer tiles)
+                        const centerPos = this.pos;
+                        new ParticleEmitter(
+                            centerPos, 0.8, 0.8, 250, PI, // pos, emitSize, emitTime, emitRate, emitCone
+                            0, undefined, // tileIndex, tileSize
+                            new Color(0.2, 0.2, 0.2, 0.9), new Color(0.1, 0.1, 0.1, 0.7), // colorStartA, colorStartB (dark gray)
+                            new Color(0.2, 0.2, 0.2, 0), new Color(0.1, 0.1, 0.1, 0), // colorEndA, colorEndB (fade out)
+                            2.0, 0.3, 1.0, 0.1, 0.02, // particleTime, sizeStart, sizeEnd, particleSpeed, particleAngleSpeed
+                            0.9, 1, -0.2, PI, 0.2, // damping, angleDamping, gravityScale (negative = rise), particleCone, fadeRate
+                            0.4, 0, 0, 0, 1e8 // randomness, collide, additive, randomColorLinear, renderOrder
+                        );
+                        
+                        // Create ongoing smoke emitter (continuous)
+                        new ParticleEmitter(
+                            centerPos, 0.4, 0, 20, PI * 0.5, // pos, emitSize, emitTime (0 = forever), emitRate, emitCone (upward)
+                            0, undefined,
+                            new Color(0.3, 0.3, 0.3, 0.6), new Color(0.1, 0.1, 0.1, 0.4),
+                            new Color(0.3, 0.3, 0.3, 0), new Color(0.1, 0.1, 0.1, 0),
+                            1.2, 0.2, 0.8, 0.06, 0.01,
+                            0.9, 1, -0.15, PI * 0.5, 0.2,
+                            0.3, 0, 0, 0, 1e8
+                        );
+                    }
+                    
+                    // Destroy after brief delay to show dark tint
+                    if (this.destroyDelayTimer.elapsed())
+                    {
+                        this.destroy();
+                        return;
+                    }
+                }
+                
+                // Play random sound every 0.1 seconds
+                if (this.soundPlayTimer.elapsed())
+                {
+                    // Pick random sound from all game sounds
+                    const randomSound = this.allGameSounds[rand(this.allGameSounds.length)|0];
+                    playSound(randomSound, this.pos);
+                    this.soundPlayTimer.set(0.1); // Reset timer for next sound
+                }
             }
         }
 
@@ -463,10 +568,17 @@ class Prop extends GameObject
         else if (this.type == propType_modem)
         {
             // Modem uses drawTile (tiles.png) with tile index 31
-            drawTile(this.pos, this.size, this.tileIndex, this.tileSize, this.color.scale(this.burnColorPercent(),1), this.angle, this.mirror, this.additiveColor);
+            // Apply dark tint if destroyed with sound sequence
+            let renderColor = this.color.scale(this.burnColorPercent(),1);
+            if (this.isDestroyedWithDarkTint)
+            {
+                // Dark tint like destroyed computer tiles
+                renderColor = new Color(0.2, 0.2, 0.2); // Very dark gray
+            }
+            drawTile(this.pos, this.size, this.tileIndex, this.tileSize, renderColor, this.angle, this.mirror, this.additiveColor);
             
-            // Visual feedback during nuke countdown (identical to terminal)
-            if (this.isNuking && !this.destroyed)
+            // Visual feedback during countdown (before sound sequence)
+            if (this.isNuking && !this.destroyed && !this.isPlayingSounds)
             {
                 const elapsed = time - this.nukeStartTime;
                 const a = elapsed; // Use elapsed time for pulsing
@@ -474,6 +586,17 @@ class Prop extends GameObject
                 drawTile(this.pos, vec2(2), 0, vec2(16), new Color(1,0,0,.2-.2*Math.cos(a*2*PI)));
                 drawTile(this.pos, vec2(1), 0, vec2(16), new Color(1,0,0,.2-.2*Math.cos(a*2*PI)));
                 drawTile(this.pos, vec2(.5), 0, vec2(16), new Color(1,1,1,.2-.2*Math.cos(a*2*PI)));
+                setBlendMode(0);
+            }
+            // Visual feedback during sound sequence (different color - maybe blue/purple)
+            else if (this.isPlayingSounds && !this.destroyed && !this.isDestroyedWithDarkTint)
+            {
+                const elapsed = time - this.soundSequenceStartTime;
+                const a = elapsed; // Use elapsed time for pulsing
+                setBlendMode(1);
+                drawTile(this.pos, vec2(2), 0, vec2(16), new Color(0,1,1,.2-.2*Math.cos(a*4*PI))); // Cyan
+                drawTile(this.pos, vec2(1), 0, vec2(16), new Color(1,0,1,.2-.2*Math.cos(a*4*PI))); // Magenta
+                drawTile(this.pos, vec2(.5), 0, vec2(16), new Color(1,1,0,.2-.2*Math.cos(a*4*PI))); // Yellow
                 setBlendMode(0);
             }
         }
