@@ -192,20 +192,17 @@ class Prop extends GameObject
         super(pos);
 
         // Random prop generation - exclude node1 (it can only be created via fusion)
-        let type;
         if (typeOverride != undefined)
         {
-            type = this.type = typeOverride;
+            this.type = typeOverride;
         }
         else
         {
             // Generate random type, but exclude node1 (propType_node1 = 14)
-            // Generate from 0 to propType_count-1, but if we get node1, generate again
-            do {
-                type = rand()**2*propType_count|0;
-            } while (type == propType_node1);
-            this.type = type;
+            // Generate from 0 to propType_count-2 (which is 13, excluding node1 at 14)
+            this.type = rand()**2*(propType_count-2)|0;
         }
+        const type = this.type;
         let health = 5;
         this.tileIndex = 16;
         this.explosionSize = 0;
@@ -1057,7 +1054,7 @@ class Checkpoint extends GameObject
     {
         super.update();
         
-        // Spawn terminal on first update if not first checkpoint
+        // Spawn terminal on first update if not first checkpoint (do this BEFORE inUpdateWindow check)
         if (!this.terminalSpawned && !this.isFirstCheckpoint)
         {
             // Spawn terminal prop at checkpoint position
