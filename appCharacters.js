@@ -4117,10 +4117,21 @@ class Mosquito extends Enemy
             this.updateStanding();
         }
         
-        // Call parent update for physics
+        // Set up movement input and other state before calling Character.update()
+        this.pressedDodge = this.climbingWall = this.pressingThrow = 0;
+        this.holdingShoot = 0; // No weapon, so no shooting
+        this.holdingJump = 0; // Mosquitoes don't jump
+        
+        // Override mirror to face player if chasing
+        if (this.facePlayerTimer.active() && !this.dodgeTimer.active() && !this.reactionTimer.active())
+        {
+            if (this.sawPlayerTimer.isSet() && this.sawPlayerTimer.get() < 5)
+                this.mirror = this.sawPlayerPos.x < this.pos.x;
+        }
+        
+        // Call Character.update() directly (not Enemy.update()) since we have no weapon
         // We need to handle gravity specially for flying mosquitoes
         const wasFlying = this.isFlying;
-        const velocityBeforeUpdate = this.velocity.copy();
         
         // Temporarily set gravityScale to 0 if flying (Character.update() will reset it, but we'll counteract)
         if (wasFlying)
@@ -4129,7 +4140,7 @@ class Mosquito extends Enemy
             this.groundObject = null;
         }
         
-        super.update();
+        Character.prototype.update.call(this);
         
         // If flying, counteract any gravity that was applied
         // Character.update() resets gravityScale to 1, then applies gravity in EngineObject.update()
