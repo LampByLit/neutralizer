@@ -191,18 +191,7 @@ class Prop extends GameObject
     { 
         super(pos);
 
-        // Random prop generation - exclude node1 (it can only be created via fusion)
-        if (typeOverride != undefined)
-        {
-            this.type = typeOverride;
-        }
-        else
-        {
-            // Generate random type, but exclude node1 (propType_node1 = 14)
-            // Generate from 0 to propType_count-2 (which is 13, excluding node1 at 14)
-            this.type = rand()**2*(propType_count-2)|0;
-        }
-        const type = this.type;
+        const type = this.type = (typeOverride != undefined ? typeOverride : rand()**2*propType_count|0);
         let health = 5;
         this.tileIndex = 16;
         this.explosionSize = 0;
@@ -419,7 +408,7 @@ class Prop extends GameObject
         }
         else if (this.type == propType_node1)
         {
-            this.tileIndex = 28; // Tile index 28 from tiles.png (fixed from 1)
+            this.tileIndex = 1; // Tile index 1 from tiles.png
             this.tileSize = vec2(16); // tiles.png uses 16x16 tiles
             this.color = new Color(1,1,1); // White/default color
             this.baseColor = new Color(1,1,1); // Store base color for dark tint
@@ -618,13 +607,6 @@ class Prop extends GameObject
         // Fusion system: terminal, modem, and cpu can fuse together
         if ((this.type == propType_terminal || this.type == propType_modem || this.type == propType_cpu) && !this.destroyed)
         {
-            // Ensure fusion properties are initialized (safety check)
-            if (this.isFusing === undefined) this.isFusing = false;
-            if (this.fusionPartner === undefined) this.fusionPartner = null;
-            if (this.fusionTimer === undefined) this.fusionTimer = new Timer(10);
-            if (this.fusionBeepTimer === undefined) this.fusionBeepTimer = new Timer(1);
-            if (this.fusionStartTime === undefined) this.fusionStartTime = 0;
-            
             // If already fusing, handle fusion countdown and movement
             if (this.isFusing && this.fusionPartner)
             {
@@ -755,8 +737,8 @@ class Prop extends GameObject
                     }
                 }
             }
-            // If not fusing, check for nearby fusion partners (only after object has been alive for a moment)
-            else if (!this.isFusing && !this.isNuking && (time - this.spawnTime) > 0.1)
+            // If not fusing, check for nearby fusion partners
+            else if (!this.isFusing && !this.isNuking)
             {
                 const fusionRangeSquared = 2 * 2; // 2 tiles squared (objects within 2 tiles trigger fusion)
                 let closestPartner = null;
@@ -766,14 +748,7 @@ class Prop extends GameObject
                 for (const obj of engineObjects)
                 {
                     // Must be different type, must be terminal/modem/cpu, must not be destroyed, must not be fusing, must not be nuking
-                    if (!obj || obj == this || obj.destroyed)
-                        continue;
-                    
-                    // Ensure partner has fusion properties initialized
-                    if (obj.isFusing === undefined) continue;
-                    if (obj.isNuking === undefined) continue;
-                    
-                    if (obj.isFusing || obj.isNuking)
+                    if (!obj || obj == this || obj.destroyed || obj.isFusing || obj.isNuking)
                         continue;
                     
                     if (obj.type != propType_terminal && obj.type != propType_modem && obj.type != propType_cpu)
@@ -806,7 +781,7 @@ class Prop extends GameObject
                 }
                 
                 // Start fusion if partner found (and they're more than 2 tiles apart)
-                if (closestPartner && closestPartner.isFusing !== undefined)
+                if (closestPartner)
                 {
                     this.isFusing = true;
                     this.fusionPartner = closestPartner;
@@ -903,7 +878,7 @@ class Prop extends GameObject
         {
             // Modem uses drawTile (tiles.png) with tile index 31
             // CPU uses drawTile (tiles.png) with tile index 27
-            // Node1 uses drawTile (tiles.png) with tile index 28
+            // Node1 uses drawTile (tiles.png) with tile index 1
             // Apply dark tint if destroyed with sound sequence
             let renderColor = this.color.scale(this.burnColorPercent(),1);
             if (this.isDestroyedWithDarkTint)
@@ -1042,19 +1017,22 @@ class Checkpoint extends GameObject
         this.renderOrder = tileRenderOrder-1;
         this.isCheckpoint = 1;
         this.secured = false; // Track if this checkpoint has been secured
-        this.isFirstCheckpoint = false; // Initialize to false, will be set to true for first checkpoint
-        this.terminalSpawned = false; // Track if terminal has been spawned
         allCheckpoints.push(this); // Add to global array
         for(let x=3;x--;)
         for(let y=6;y--;)
             setTileCollisionData(pos.subtract(vec2(x-1,1-y)), y ? tileType_empty : tileType_solid);
+        
+        // Spawn terminal at checkpoint (except first checkpoint)
+        // We'll check isFirstCheckpoint after it's set in appLevel.js
+        // Use a small delay to check the property after construction
+        this.terminalSpawned = false;
     }
 
     update()
     {
         super.update();
         
-        // Spawn terminal on first update if not first checkpoint (do this BEFORE inUpdateWindow check)
+        // Spawn terminal on first update if not first checkpoint
         if (!this.terminalSpawned && !this.isFirstCheckpoint)
         {
             // Spawn terminal prop at checkpoint position
