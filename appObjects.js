@@ -446,8 +446,8 @@ class Prop extends GameObject
         const oldVelocity = this.velocity.copy();
         super.update();
 
-        // apply collision damage (skip if modem or CPU is destroyed with dark tint)
-        if (!((this.type == propType_modem || this.type == propType_cpu) && this.isDestroyedWithDarkTint))
+        // apply collision damage (skip if modem, CPU, or node1 is destroyed with dark tint)
+        if (!((this.type == propType_modem || this.type == propType_cpu || this.type == propType_node1) && this.isDestroyedWithDarkTint))
         {
             const deltaSpeedSquared = this.velocity.subtract(oldVelocity).lengthSquared();
             deltaSpeedSquared > .05 && this.damage(2*deltaSpeedSquared);
@@ -474,9 +474,9 @@ class Prop extends GameObject
             }
         }
         
-        // Modem and CPU sound sequence countdown and playback
+        // Modem, CPU, and Node1 sound sequence countdown and playback
         // Also update smoke emitter position if destroyed
-        if (this.type == propType_modem || this.type == propType_cpu)
+        if (this.type == propType_modem || this.type == propType_cpu || this.type == propType_node1)
         {
             // Update smoke emitter position to follow object (in case it moves)
             if (this.isDestroyedWithDarkTint && this.smokeEmitter && !this.smokeEmitter.destroyed)
@@ -713,15 +713,36 @@ class Prop extends GameObject
                             playSound(sound_grenade, this.pos);
                             this.fusionBeepTimer.set(1);
                         }
+                        
+                        // Damage objects/characters that touch fusing objects
+                        const damageRadius = 0.8; // Slightly larger than object size
+                        for (const obj of engineObjects)
+                        {
+                            if (!obj || obj == this || obj == this.fusionPartner || obj.destroyed)
+                                continue;
+                            
+                            // Check if object is close enough
+                            const distSq = this.pos.distanceSquared(obj.pos);
+                            if (distSq < damageRadius * damageRadius)
+                            {
+                                // Damage characters and other objects
+                                if (obj.isCharacter || (obj.isGameObject && obj.health !== undefined))
+                                {
+                                    // Heavy damage - 50 damage per frame (very dangerous!)
+                                    if (obj.damage)
+                                        obj.damage(50, this);
+                                }
+                            }
+                        }
                     }
                 }
             }
             // If not fusing, check for nearby fusion partners
             else if (!this.isFusing && !this.isNuking)
             {
-                const fusionRangeSquared = 2 * 2; // 2 tiles squared
+                const fusionRangeSquared = 2 * 2; // 2 tiles squared (objects within 2 tiles trigger fusion)
                 let closestPartner = null;
-                let closestDistSq = fusionRangeSquared;
+                let closestDistSq = Infinity;
                 
                 // Check all objects for potential fusion partners
                 for (const obj of engineObjects)
@@ -751,14 +772,15 @@ class Prop extends GameObject
                     }
                     
                     const distSq = myPos.distanceSquared(objPos);
-                    if (distSq < closestDistSq && distSq > 0.01) // > 0.01 to avoid same position
+                    // Objects must be more than 2 tiles apart to trigger fusion (distance > 2, so distSq > 4)
+                    if (distSq > fusionRangeSquared && distSq < closestDistSq)
                     {
                         closestPartner = obj;
                         closestDistSq = distSq;
                     }
                 }
                 
-                // Start fusion if partner found
+                // Start fusion if partner found (and they're more than 2 tiles apart)
                 if (closestPartner)
                 {
                     this.isFusing = true;
@@ -778,12 +800,12 @@ class Prop extends GameObject
 
     damage(damage, damagingObject)
     {
-        // Skip damage if modem or CPU is destroyed with dark tint
-        if ((this.type == propType_modem || this.type == propType_cpu) && this.isDestroyedWithDarkTint)
+        // Skip damage if modem, CPU, or node1 is destroyed with dark tint
+        if ((this.type == propType_modem || this.type == propType_cpu || this.type == propType_node1) && this.isDestroyedWithDarkTint)
             return;
             
-        // Terminal, modem, and CPU: detect player melee attacks (damage = 1, from player character)
-        if ((this.type == propType_terminal || this.type == propType_modem || this.type == propType_cpu) && !this.isNuking && !this.destroyed)
+        // Terminal, modem, CPU, and node1: detect player melee attacks (damage = 1, from player character)
+        if ((this.type == propType_terminal || this.type == propType_modem || this.type == propType_cpu || this.type == propType_node1) && !this.isNuking && !this.destroyed && !this.isFusing)
         {
             // Check if this is a player melee attack (damage = 1, from player character)
             if (damagingObject && damagingObject.isPlayer && damage == 1)
@@ -852,10 +874,11 @@ class Prop extends GameObject
                 setBlendMode(0);
             }
         }
-        else if (this.type == propType_modem || this.type == propType_cpu)
+        else if (this.type == propType_modem || this.type == propType_cpu || this.type == propType_node1)
         {
             // Modem uses drawTile (tiles.png) with tile index 31
             // CPU uses drawTile (tiles.png) with tile index 27
+            // Node1 uses drawTile (tiles.png) with tile index 1
             // Apply dark tint if destroyed with sound sequence
             let renderColor = this.color.scale(this.burnColorPercent(),1);
             if (this.isDestroyedWithDarkTint)
@@ -865,8 +888,21 @@ class Prop extends GameObject
             }
             drawTile(this.pos, this.size, this.tileIndex, this.tileSize, renderColor, this.angle, this.mirror, this.additiveColor);
             
+            // Visual feedback during fusion countdown (red glowing) - priority over nuke countdown
+            if (this.isFusing && !this.destroyed)
+            {
+                const elapsed = time - this.fusionStartTime;
+                const a = elapsed; // Use elapsed time for pulsing
+                const intensity = 1 - (elapsed / 10); // Increase intensity as countdown progresses
+                setBlendMode(1);
+                drawTile(this.pos, vec2(2), 0, vec2(16), new Color(1,0,0,.3*intensity-.3*intensity*Math.cos(a*4*PI)));
+                drawTile(this.pos, vec2(1.5), 0, vec2(16), new Color(1,0,0,.25*intensity-.25*intensity*Math.cos(a*4*PI)));
+                drawTile(this.pos, vec2(1), 0, vec2(16), new Color(1,0,0,.2*intensity-.2*intensity*Math.cos(a*4*PI)));
+                drawTile(this.pos, vec2(.5), 0, vec2(16), new Color(1,1,1,.15*intensity-.15*intensity*Math.cos(a*4*PI)));
+                setBlendMode(0);
+            }
             // Visual feedback during countdown (before sound sequence)
-            if (this.isNuking && !this.destroyed && !this.isPlayingSounds)
+            else if (this.isNuking && !this.destroyed && !this.isPlayingSounds)
             {
                 const elapsed = time - this.nukeStartTime;
                 const a = elapsed; // Use elapsed time for pulsing
