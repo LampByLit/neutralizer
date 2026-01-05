@@ -531,7 +531,7 @@ class Prop extends GameObject
             {
                 // Start nuke countdown (only once, continue if already started)
                 this.isNuking = true;
-                this.nukeTimer.set(2); // 2 second countdown
+                this.nukeTimer.set(3); // 3 second countdown
                 this.beepTimer.set(1); // Start beeping immediately
                 this.nukeStartTime = time;
             }
@@ -1377,18 +1377,15 @@ class Weapon extends EngineObject
         const meleeExtendOffset = this.parent.meleeTimer && this.parent.meleeTimer.active() ? .6 * Math.sin(this.parent.meleeTimer.getPercent() * PI) : 0;
 
         // extend weapon forward during melee
+        const sizeScale = this.parent.sizeScale || 1;
+        const baseOffset = this.localOffset ? this.localOffset.scale(sizeScale) : vec2(.55, 0);
         if (meleeExtendOffset)
         {
-            const sizeScale = this.parent.sizeScale || 1;
-            const baseOffset = this.localOffset ? this.localOffset.scale(sizeScale) : vec2(.55, 0);
-            // Negate getMirrorSign so gun extends leftward when facing left, rightward when facing right
-            this.localPos = baseOffset.add(vec2(meleeExtendOffset * -this.getMirrorSign(), 0));
+            // Extend forward - engine will flip X when mirrored, so always use positive offset
+            this.localPos = baseOffset.add(vec2(meleeExtendOffset, 0));
         }
         else
         {
-            // Reset to base position when not meleeing
-            const sizeScale = this.parent.sizeScale || 1;
-            const baseOffset = this.localOffset ? this.localOffset.scale(sizeScale) : vec2(.55, 0);
             this.localPos = baseOffset;
         }
 
