@@ -317,7 +317,7 @@ class Prop extends GameObject
             health = 50;
             // Sound sequence countdown properties
             this.isNuking = false;
-            this.nukeTimer = new Timer(5); // 5 second countdown before sound sequence
+            this.nukeTimer = new Timer(2); // 2 second countdown before sound sequence
             this.beepTimer = new Timer(1); // Beep every 1 second during countdown
             this.nukeStartTime = 0; // Track when countdown started
             // Sound sequence properties
@@ -403,11 +403,11 @@ class Prop extends GameObject
             
             if (this.isNuking && !this.destroyed)
         {
-            // Phase 1: Countdown (5 seconds) - beep every second
+            // Phase 1: Countdown (2 seconds) - beep every second
             if (!this.isPlayingSounds)
             {
                 const elapsed = time - this.nukeStartTime;
-                if (elapsed >= 5 || this.nukeTimer.elapsed())
+                if (elapsed >= 2 || this.nukeTimer.elapsed())
                 {
                     // Start sound sequence
                     this.isPlayingSounds = true;
@@ -536,7 +536,7 @@ class Prop extends GameObject
             {
                 // Start nuke countdown (only once, continue if already started)
                 this.isNuking = true;
-                this.nukeTimer.set(5); // 5 second countdown
+                this.nukeTimer.set(2); // 2 second countdown
                 this.beepTimer.set(1); // Start beeping immediately
                 this.nukeStartTime = time;
             }
@@ -3755,21 +3755,24 @@ class Computer extends GameObject
         // Add to global array
         allComputers.push(this);
         
-        // Define all 13 computer sounds
+        // Define all 16 computer sounds
         this.computerSounds = [
-            [.5,,10,,.19,.002,3,.5,,,37,.18,.13,.8,,,,.75,.46,.08,112],
-            [,,12,.44,.01,.005,,0,-3,-27,,,.03,,,,,.8,.02,.02],
-            [1.9,,174,.37,.01,.14,4,3.1,,29,,,.15,,,.5,.4,.93,.26,.43],
-            [1.9,,175,.37,,.14,4,2.9,,29,150,,.15,,1,.4,.4,.93,.27,.43,1],
-            [.5,,20,.16,.2,.01,2,1.4,,,,,,,53,,,.78,.05,,-1412],
-            [,,10,.06,,.004,1,1.6,,,94,.02,.04,,.1,,,.66,.3,.01],
-            [,,17,,.27,.006,3,2.6,-30,73.1,,-0.01,.1,,53,,,.54,.22],
-            [1.1,,13,.27,.07,.08,3,2.3,,-0.1,,,,.1,,,.19,.85,,,240],
-            [1.1,,13,.27,.07,.08,5,1.5195787605395044,,-0.1,,,,.2,,,.18,.85,,,240],
-            [,,350,.03,1,.01,1,1.3,22,.1,,-0.01,-0.03,-0.1,64,.1,,.73,.4],
-            [,,349,.03,1,.01,1,1.3,22,.1,,-0.01,-0.03,-0.1,64,.2,,.63,.4],
-            [,,600,1,1,.01,1,1.3,22,.1,,-0.01,-0.02,-0.1,64,.2,,.63,.4,,1],
-            [,,600,.99,1,.01,5,1.3,22,.1,,,-0.02,-0.1,64,.1,.01,.53,.4,.01,1]
+            [2.9,,90,.01,.03,.02,,.5,,,,,,,74,,,.65,.03,.3,226],
+            [2.9,,90,.01,.2,.03,2,.6,.1,,,.01,-0.02,,74,,,.75,.04,.3,226],
+            [1.3,,21,,.03,.03,2,3.1,29,,82,.18,,,,,.02,.84,.01,,-1066],
+            [2,,613,.02,.02,.001,1,.8,,,,,,,,,.02,.82,.01],
+            [2,,613,.02,.02,.001,1,.8,,,,,,,,,.02,.82,.01],
+            [,,233,.01,.03,.02,5,.14887360527130392,4.1,5,,,-0.01,-0.1,109,.4,,.78,,.01,614],
+            [1.1,,65,.03,.03,.006,2,3.1,-1,,-137,.09,,,,.2,,.74,.03,,120],
+            [,,803,.02,.03,.02,5,1.8295184594314835,,1,153,.59,,,39,.1,,.75,.01],
+            [,,309,.03,,.02,5,.21809541555653847,,,-80,.16,,.1,219,,,.98,.01],
+            [,,309,.03,,.02,5,.21809541555653847,,,-80,.16,,.1,219,,,.98,.01],
+            [.5,0,65.40639,.03,.88,.19,2,2.8,,,,,,.3,,,,.31,.06,,428],
+            [1.4,,632,.46,.25,.19,1,.7,3,-15,,,,,.3,,.19,.65,.12,,-777],
+            [3.6,,46,,.03,.04,1,2.5,,,-293,,,,78,,.04,.86,.03,.06,379],
+            [.7,,225,,.03,.01,3,3.8,,52,,,,,,,,.76,,.17,-877],
+            [.7,,225,,.03,.01,3,3.8,,52,,,,,,,,.76,,.17,-877],
+            [1.6,,741,.02,.04,.004,3,1.5,,,,,,,,.5,.01,.94,.02,,133]
         ];
         
         // Initialize looping computer sound
@@ -3783,8 +3786,8 @@ class Computer extends GameObject
     getAvailableSounds()
     {
         const intactTiles = this.tileStates.filter(t => !t).length;
-        // Map: 16 tiles → 13 sounds, 12 → 9, 8 → 6, 4 → 3
-        const maxSounds = Math.max(1, Math.floor(intactTiles * 13 / 16));
+        // Map: 16 tiles → 16 sounds, 12 → 12, 8 → 8, 4 → 4
+        const maxSounds = Math.max(1, Math.floor(intactTiles * 16 / 16));
         return this.computerSounds.slice(0, maxSounds);
     }
     
