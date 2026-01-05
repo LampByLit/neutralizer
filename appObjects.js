@@ -657,6 +657,41 @@ class Prop extends GameObject
                 setBlendMode(0);
             }
         }
+        else if (this.type == propType_cpu)
+        {
+            // CPU uses drawTile (tiles.png) with tile index 27
+            // Apply dark tint if destroyed with sound sequence
+            let renderColor = this.color.scale(this.burnColorPercent(),1);
+            if (this.isDestroyedWithDarkTint)
+            {
+                // Dark tint like destroyed computer tiles
+                renderColor = new Color(0.2, 0.2, 0.2); // Very dark gray
+            }
+            drawTile(this.pos, this.size, this.tileIndex, this.tileSize, renderColor, this.angle, this.mirror, this.additiveColor);
+            
+            // Visual feedback during countdown (before sound sequence)
+            if (this.isNuking && !this.destroyed && !this.isPlayingSounds)
+            {
+                const elapsed = time - this.nukeStartTime;
+                const a = elapsed; // Use elapsed time for pulsing
+                setBlendMode(1);
+                drawTile(this.pos, vec2(2), 0, vec2(16), new Color(1,0,0,.2-.2*Math.cos(a*2*PI)));
+                drawTile(this.pos, vec2(1), 0, vec2(16), new Color(1,0,0,.2-.2*Math.cos(a*2*PI)));
+                drawTile(this.pos, vec2(.5), 0, vec2(16), new Color(1,1,1,.2-.2*Math.cos(a*2*PI)));
+                setBlendMode(0);
+            }
+            // Visual feedback during sound sequence (different color - maybe blue/purple)
+            else if (this.isPlayingSounds && !this.destroyed && !this.isDestroyedWithDarkTint)
+            {
+                const elapsed = time - this.soundSequenceStartTime;
+                const a = elapsed; // Use elapsed time for pulsing
+                setBlendMode(1);
+                drawTile(this.pos, vec2(2), 0, vec2(16), new Color(0,1,1,.2-.2*Math.cos(a*4*PI))); // Cyan
+                drawTile(this.pos, vec2(1), 0, vec2(16), new Color(1,0,1,.2-.2*Math.cos(a*4*PI))); // Magenta
+                drawTile(this.pos, vec2(.5), 0, vec2(16), new Color(1,1,0,.2-.2*Math.cos(a*4*PI))); // Yellow
+                setBlendMode(0);
+            }
+        }
         else if (this.type == propType_rock_pussybomb)
         {
             // Render the rock itself
@@ -4046,10 +4081,10 @@ class Computer extends GameObject
                 }
             }
             
-            // Check all terminals and modems (including those being carried)
+            // Check all terminals, modems, and CPUs (including those being carried)
             for (const obj of engineObjects)
             {
-                if (obj && (obj.type == propType_terminal || obj.type == propType_modem) && !obj.destroyed && !obj.transmuted)
+                if (obj && (obj.type == propType_terminal || obj.type == propType_modem || obj.type == propType_cpu) && !obj.destroyed && !obj.transmuted)
                 {
                     // Check if terminal is being carried by a player
                     let terminalPos = obj.pos.copy();
