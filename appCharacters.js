@@ -177,11 +177,10 @@ class Character extends GameObject
                 this.velocity.y += .2;
         }
 
-        if (this.pressedMelee && !this.meleeTimer.active() && !this.meleeRechargeTimer.active() && !this.dodgeTimer.active())
+        if (this.pressedMelee && !this.meleeTimer.active() && !this.dodgeTimer.active())
         {
             // start melee attack
             this.meleeTimer.set(.2);
-            this.meleeRechargeTimer.set(2);
             playSound(sound_shoot, this.pos);
 
             // check for nearby enemies and apply damage
@@ -399,7 +398,7 @@ class Character extends GameObject
         const headColor = this.team == team_enemy ? new Color() : color; // enemies use neutral color for head
 
         // melee animation - head moves back
-        const meleeHeadOffset = this.meleeTimer.active() ? -.12 * Math.sin(this.meleeTimer.getPercent() * PI) : 0;
+        const meleeHeadOffset = 0;
 
         const bodyPos = this.pos.add(vec2(0,-.1+.06*Math.sin(this.walkCyclePercent*PI)).scale(sizeScale));
         
@@ -988,7 +987,7 @@ class Slime extends Enemy
         
         // Draw head (like normal enemies)
         const headColor = new Color(); // Enemies use neutral color for head
-        const meleeHeadOffset = this.meleeTimer && this.meleeTimer.active() ? -.12 * Math.sin(this.meleeTimer.getPercent() * PI) : 0;
+        const meleeHeadOffset = 0;
         drawTile(this.pos.add(vec2(this.getMirrorSign(.05) + meleeHeadOffset * this.getMirrorSign(),.46).scale(sizeScale).rotate(-this.angle)),vec2(sizeScale/2),this.headTile,vec2(8), headColor,this.angle,this.mirror);
         
         // Draw eyes on head (like normal enemies)
@@ -1762,7 +1761,7 @@ class Barrister extends Enemy
         const headColor = this.team == team_enemy ? new Color() : color; // enemies use neutral color for head
 
         // melee animation - head moves back
-        const meleeHeadOffset = this.meleeTimer.active() ? -.12 * Math.sin(this.meleeTimer.getPercent() * PI) : 0;
+        const meleeHeadOffset = 0;
 
         const bodyPos = this.pos.add(vec2(0,-.1+.06*Math.sin(this.walkCyclePercent*PI)).scale(sizeScale));
         
@@ -2045,7 +2044,7 @@ class Solicitor extends Enemy
         const headColor = this.team == team_enemy ? new Color() : color; // enemies use neutral color for head
 
         // melee animation - head moves back
-        const meleeHeadOffset = this.meleeTimer.active() ? -.12 * Math.sin(this.meleeTimer.getPercent() * PI) : 0;
+        const meleeHeadOffset = 0;
 
         const bodyPos = this.pos.add(vec2(0,-.1+.06*Math.sin(this.walkCyclePercent*PI)).scale(sizeScale));
         
@@ -2285,7 +2284,7 @@ class Prosecutor extends Enemy
         const headColor = this.team == team_enemy ? new Color() : color; // enemies use neutral color for head
 
         // melee animation - head moves back
-        const meleeHeadOffset = this.meleeTimer.active() ? -.12 * Math.sin(this.meleeTimer.getPercent() * PI) : 0;
+        const meleeHeadOffset = 0;
 
         const bodyPos = this.pos.add(vec2(0,-.1+.06*Math.sin(this.walkCyclePercent*PI)).scale(sizeScale));
         
@@ -2698,7 +2697,7 @@ class Malefactor extends Enemy
         const headColor = this.team == team_enemy ? new Color() : color; // enemies use neutral color for head
 
         // melee animation - head moves back
-        const meleeHeadOffset = this.meleeTimer.active() ? -.12 * Math.sin(this.meleeTimer.getPercent() * PI) : 0;
+        const meleeHeadOffset = 0;
 
         const bodyPos = this.pos.add(vec2(0,-.1+.06*Math.sin(this.walkCyclePercent*PI)).scale(sizeScale));
         
@@ -3176,7 +3175,7 @@ class Spider extends Enemy
         const headColor = this.team == team_enemy ? new Color() : color;
 
         // melee animation - head moves back
-        const meleeHeadOffset = this.meleeTimer.active() ? -.12 * Math.sin(this.meleeTimer.getPercent() * PI) : 0;
+        const meleeHeadOffset = 0;
 
         const bodyPos = this.pos.add(vec2(0, -this.bodyHeight + 0.06*Math.sin(this.walkCyclePercent*PI)).scale(sizeScale));
         
@@ -3838,7 +3837,7 @@ class Spiderling extends Enemy
         const headColor = this.team == team_enemy ? new Color() : color;
 
         // melee animation - head moves back
-        const meleeHeadOffset = this.meleeTimer.active() ? -.12 * Math.sin(this.meleeTimer.getPercent() * PI) : 0;
+        const meleeHeadOffset = 0;
 
         const bodyPos = this.pos.add(vec2(0, -this.bodyHeight + 0.06*Math.sin(this.walkCyclePercent*PI)).scale(sizeScale));
         
