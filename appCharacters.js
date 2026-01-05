@@ -4028,7 +4028,7 @@ class Mosquito extends Enemy
         // Mosquito is small and flies
         this.size = this.size.scale(this.sizeScale = 0.8); // Slightly smaller than normal
         this.health = this.healthMax = 1; // Weak health
-        this.maxSpeed = maxCharacterSpeed * 0.25; // 25% of normal speed (slow flying)
+        this.maxSpeed = maxCharacterSpeed * 1.5; // 150% of normal speed (faster flying)
         
         // Mosquito sprites - tile 20 (stand), tile 21 (fly) from tiles.png
         this.mosquitoStandTile = 20;
@@ -4046,6 +4046,18 @@ class Mosquito extends Enemy
         this.standingDuration = 7; // 7 seconds standing
         this.targetHoverY = pos.y; // Target Y position for hovering
         
+        // Stuck detection for random flight
+        this.lastStuckPos = pos.copy();
+        this.stuckTimer = new Timer;
+        this.randomFlightTimer = new Timer;
+        this.pathfindCheckTimer = new Timer;
+        this.pathfindCheckTimer.set(0.5); // Check for stuck every 0.5 seconds
+        
+        // Flicker animation timer (for flying animation)
+        this.flickerTimer = new Timer;
+        this.flickerTimer.set(0.1); // Flicker every 0.1 seconds (10 times per second)
+        this.flickerState = 0; // 0 = fly tile, 1 = stand tile
+        
         // Remove weapon - mosquito is melee only
         if (this.weapon)
         {
@@ -4062,8 +4074,8 @@ class Mosquito extends Enemy
         // Don't burn (optional)
         // this.canBurn = 0;
         
-        // Color - dark brown/black like a mosquito
-        this.color = new Color(0.2, 0.15, 0.1);
+        // Color - white/neutral (no tint)
+        this.color = new Color(1, 1, 1);
         this.eyeColor = new Color(0.8, 0.6, 0.4);
     }
     
@@ -4214,10 +4226,34 @@ class Mosquito extends Enemy
             }
         }
         
+        // Stuck detection - check if we're not moving despite trying to
+        if (this.pathfindCheckTimer.elapsed())
+        {
+            this.pathfindCheckTimer.set(0.5);
+            const distanceMoved = this.pos.distance(this.lastStuckPos);
+            const isTryingToMove = abs(this.moveInput.x) > 0.1 || abs(this.moveInput.y) > 0.1;
+            
+            // If we're trying to move but haven't moved much, we're stuck
+            if (isTryingToMove && distanceMoved < 0.3)
+            {
+                // We're stuck - start random flight
+                this.stuckTimer.set(rand(2.0, 1.0)); // Random flight for 1-2 seconds
+            }
+            
+            this.lastStuckPos = this.pos.copy();
+        }
+        
         // Movement and obstacle avoidance
         this.moveInput = vec2(0, 0);
         
-        if (this.sawPlayerTimer.isSet() && this.sawPlayerTimer.get() < 10)
+        // If stuck, fly randomly
+        if (this.stuckTimer.active())
+        {
+            // Random flight to get unstuck
+            this.moveInput.x = randSign() * rand(0.6, 0.3);
+            this.moveInput.y = randSign() * rand(0.6, 0.3);
+        }
+        else if (this.sawPlayerTimer.isSet() && this.sawPlayerTimer.get() < 10)
         {
             // Chase player
             const timeSinceSawPlayer = this.sawPlayerTimer.get();
@@ -4240,7 +4276,7 @@ class Mosquito extends Enemy
                     this.meleeCooldownTimer.set(1.5);
                 }
                 
-                // Smart movement with obstacle avoidance
+                // Smart movement with improved obstacle avoidance
                 this.moveInput = this.calculateSmartMovement(delta, playerDirection);
             }
             else
@@ -4299,56 +4335,136 @@ class Mosquito extends Enemy
     
     calculateSmartMovement(delta, playerDirection)
     {
-        // Smart movement with obstacle avoidance
+        // Improved 3D pathfinding with better obstacle avoidance
         const moveInput = vec2(0, 0);
-        const lookAhead = playerDirection * 1.0;
+        const dist = delta.length();
         
-        // Check for obstacles ahead
-        const checkPos = this.pos.add(vec2(lookAhead, 0));
-        const obstacleAhead = getTileCollisionData(checkPos) > 0;
+        // Check direct path to player first (raycast)
+        const directPathClear = !tileCollisionRaycast(this.pos, this.sawPlayerPos);
         
-        // Check for ceiling above
-        const checkAbove = this.pos.add(vec2(0, -1.5));
-        const ceilingAbove = getTileCollisionData(checkAbove) > 0;
+        if (directPathClear)
+        {
+            // Direct path is clear - move directly toward player
+            const normalizedDelta = delta.scale(1 / dist);
+            moveInput.x = normalizedDelta.x * rand(0.6, 0.4);
+            moveInput.y = normalizedDelta.y * rand(0.6, 0.4);
+            return moveInput;
+        }
         
-        // Check for floor below (when trying to descend)
-        const checkBelow = this.pos.add(vec2(0, 1.5));
-        const floorBelow = getTileCollisionData(checkBelow) > 0;
+        // Direct path blocked - use improved obstacle avoidance
+        // Check multiple look-ahead distances for better pathfinding
+        const lookAheadDistances = [1.0, 1.5, 2.0, 2.5];
+        let obstacleAhead = false;
+        let bestPathFound = false;
         
-        // Horizontal movement
-        if (!obstacleAhead)
+        // Check horizontal path first
+        for(const lookAhead of lookAheadDistances)
+        {
+            const checkPos = this.pos.add(vec2(playerDirection * lookAhead, 0));
+            if (getTileCollisionData(checkPos) > 0)
+            {
+                obstacleAhead = true;
+                break;
+            }
+        }
+        
+        // Check diagonal paths (up-forward and down-forward)
+        const checkDiagUp = this.pos.add(vec2(playerDirection * 1.5, -1.5));
+        const checkDiagDown = this.pos.add(vec2(playerDirection * 1.5, 1.5));
+        const obstacleDiagUp = getTileCollisionData(checkDiagUp) > 0;
+        const obstacleDiagDown = getTileCollisionData(checkDiagDown) > 0;
+        
+        // Check multiple vertical layers for 3D pathfinding
+        const verticalChecks = [-2.0, -1.5, -1.0, -0.5, 0, 0.5, 1.0, 1.5, 2.0];
+        let bestVerticalPath = null;
+        let bestVerticalScore = -1;
+        
+        // Find best vertical path
+        for(const verticalOffset of verticalChecks)
+        {
+            const checkPos = this.pos.add(vec2(playerDirection * 1.5, verticalOffset));
+            if (getTileCollisionData(checkPos) <= 0)
+            {
+                // This path is clear - score it based on how close it gets to player
+                const testPath = this.pos.add(vec2(playerDirection * 2.0, verticalOffset));
+                const pathToPlayer = this.sawPlayerPos.subtract(testPath);
+                const pathScore = 1.0 / (pathToPlayer.length() + 0.1); // Closer to player = better score
+                
+                if (pathScore > bestVerticalScore)
+                {
+                    bestVerticalScore = pathScore;
+                    bestVerticalPath = verticalOffset;
+                }
+            }
+        }
+        
+        // Use best path found
+        if (bestVerticalPath !== null && !obstacleAhead)
+        {
+            // Clear horizontal path with good vertical option
+            moveInput.x = playerDirection * rand(0.6, 0.4);
+            moveInput.y = clamp(bestVerticalPath * 0.4, 0.5, -0.5);
+            bestPathFound = true;
+        }
+        else if (!obstacleAhead)
         {
             // Clear path ahead - move toward player
-            moveInput.x = playerDirection * rand(0.4, 0.2);
+            moveInput.x = playerDirection * rand(0.6, 0.4);
+            // Add vertical movement toward player
+            const verticalDiff = delta.y;
+            if (abs(verticalDiff) > 0.5)
+            {
+                moveInput.y = clamp(verticalDiff * 0.4, 0.5, -0.5);
+            }
+            bestPathFound = true;
         }
         else
         {
             // Obstacle ahead - try to go around
-            // Try going up or down
-            if (!ceilingAbove && delta.y < 0)
+            // Prefer diagonal movement (up-forward or down-forward)
+            if (!obstacleDiagUp && delta.y < 0.5)
             {
-                // Go up
-                moveInput.y = -rand(0.3, 0.2);
+                // Go up and forward
+                moveInput.x = playerDirection * rand(0.4, 0.2);
+                moveInput.y = -rand(0.5, 0.3);
+                bestPathFound = true;
             }
-            else if (!floorBelow && delta.y > 0)
+            else if (!obstacleDiagDown && delta.y > -0.5)
             {
-                // Go down
-                moveInput.y = rand(0.3, 0.2);
+                // Go down and forward
+                moveInput.x = playerDirection * rand(0.4, 0.2);
+                moveInput.y = rand(0.5, 0.3);
+                bestPathFound = true;
+            }
+            else if (bestVerticalPath !== null)
+            {
+                // Use best vertical path found
+                moveInput.x = playerDirection * rand(0.3, 0.1);
+                moveInput.y = clamp(bestVerticalPath * 0.4, 0.5, -0.5);
+                bestPathFound = true;
             }
             else
             {
-                // Can't go up or down - try opposite direction
-                moveInput.x = -playerDirection * rand(0.3, 0.1);
-            }
-        }
-        
-        // Vertical movement toward player (if no obstacles)
-        if (!ceilingAbove && !floorBelow)
-        {
-            const verticalDiff = delta.y;
-            if (abs(verticalDiff) > 1.0)
-            {
-                moveInput.y = clamp(verticalDiff * 0.3, 0.3, -0.3);
+                // Can't find good path - try to go around obstacle
+                // Check if we can go up or down
+                const checkUp = this.pos.add(vec2(0, -2.0));
+                const checkDown = this.pos.add(vec2(0, 2.0));
+                const canGoUp = getTileCollisionData(checkUp) <= 0;
+                const canGoDown = getTileCollisionData(checkDown) <= 0;
+                
+                if (canGoUp && delta.y < 0)
+                {
+                    moveInput.y = -rand(0.4, 0.2);
+                }
+                else if (canGoDown && delta.y > 0)
+                {
+                    moveInput.y = rand(0.4, 0.2);
+                }
+                else
+                {
+                    // Last resort - try opposite direction briefly
+                    moveInput.x = -playerDirection * rand(0.3, 0.1);
+                }
             }
         }
         
@@ -4365,7 +4481,23 @@ class Mosquito extends Enemy
         const eyeColor = this.eyeColor.scale(this.burnColorPercent(), 1);
         
         // Choose sprite based on state
-        const bodyTileIndex = this.isFlying ? this.mosquitoFlyTile : this.mosquitoStandTile;
+        let bodyTileIndex;
+        if (this.isFlying)
+        {
+            // Flicker animation during flight - alternate between fly and stand sprites
+            if (this.flickerTimer.elapsed())
+            {
+                this.flickerTimer.set(0.1); // Reset timer (flicker every 0.1 seconds)
+                this.flickerState = 1 - this.flickerState; // Toggle between 0 and 1
+            }
+            // Use fly tile when flickerState is 0, stand tile when flickerState is 1
+            bodyTileIndex = this.flickerState == 0 ? this.mosquitoFlyTile : this.mosquitoStandTile;
+        }
+        else
+        {
+            // Standing - always use stand tile
+            bodyTileIndex = this.mosquitoStandTile;
+        }
         
         // Draw body sprite
         const bodyPos = this.pos.add(vec2(0, -0.1 + 0.06 * Math.sin(this.walkCyclePercent * PI)).scale(sizeScale));
