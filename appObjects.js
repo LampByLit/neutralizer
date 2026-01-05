@@ -1017,15 +1017,12 @@ class Checkpoint extends GameObject
         this.renderOrder = tileRenderOrder-1;
         this.isCheckpoint = 1;
         this.secured = false; // Track if this checkpoint has been secured
+        this.isFirstCheckpoint = false; // Initialize to false, will be set to true for first checkpoint
+        this.terminalSpawned = false; // Track if terminal has been spawned
         allCheckpoints.push(this); // Add to global array
         for(let x=3;x--;)
         for(let y=6;y--;)
             setTileCollisionData(pos.subtract(vec2(x-1,1-y)), y ? tileType_empty : tileType_solid);
-        
-        // Spawn terminal at checkpoint (except first checkpoint)
-        // We'll check isFirstCheckpoint after it's set in appLevel.js
-        // Use a small delay to check the property after construction
-        this.terminalSpawned = false;
     }
 
     update()
